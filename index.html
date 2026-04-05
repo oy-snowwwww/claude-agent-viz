@@ -109,6 +109,12 @@
     .ag-edit{position:absolute;top:6px;right:6px;background:var(--surface-hover);border:1px solid var(--border);border-radius:3px;padding:2px 5px;font-size:.5rem;font-family:monospace;color:var(--text-secondary);cursor:pointer;opacity:0;transition:opacity .2s}
     .ag:hover .ag-edit{opacity:1}
     .ag-edit:hover{color:var(--accent);border-color:var(--accent)}
+    .ag-toggle{position:absolute;top:6px;right:6px;width:34px;height:18px;border-radius:9px;background:var(--surface-hover);border:1px solid var(--border);cursor:pointer;transition:all .2s;z-index:2}
+    .ag-toggle::after{content:'';position:absolute;top:2px;left:2px;width:12px;height:12px;border-radius:50%;background:var(--text-secondary);transition:all .2s}
+    .ag-toggle.on{background:rgba(0,255,200,.25);border-color:var(--accent);box-shadow:0 0 6px rgba(0,255,200,.3)}
+    .ag-toggle.on::after{left:18px;background:var(--accent)}
+    .ag.disabled{opacity:.4}
+    .ag.disabled .ag-name{color:var(--text-secondary) !important}
 
     /* MCP Servers */
     .mcp-item{background:var(--bg);border:1px solid var(--border);border-radius:4px;padding:6px 8px;margin-bottom:4px;display:flex;align-items:center;gap:6px}
@@ -448,6 +454,7 @@
   var elapsed=0;
   var editingId=null;
   var masterTab='global';
+  var projectAgents={hasRestriction:false,enabled:[]};
 
   // === Session ===
   var sessions={};
@@ -533,7 +540,7 @@
   function registerSession(s){
     if(!s||!s.pid) return;var isNew=!sessions[s.pid];
     sessions[s.pid]={pid:s.pid,name:s.name||'Session '+s.pid,cwd:s.cwd||'',sid:s.sid||'',startTime:s.startTime||new Date().toISOString(),lastActivity:new Date().toISOString(),eventCount:(sessions[s.pid]?sessions[s.pid].eventCount:0)+1,agentCount:(sessions[s.pid]?sessions[s.pid].agentCount:0)||0,alive:true};
-    if(isNew){if(!currentSession)currentSession=s.pid;renderSessionTabs();updateHeaderStat()}return isNew;
+    if(isNew){var wasEmpty=!currentSession;if(wasEmpty)currentSession=s.pid;renderSessionTabs();updateHeaderStat();if(wasEmpty&&s.cwd)fetchProjectAgents(s.cwd)}return isNew;
   }
   function removeSession(pid){
     if(sessions[pid]){
@@ -543,11 +550,12 @@
     }
   }
   function switchSession(pid){
-    currentSession=pid;renderSessionTabs();renderLogs();renderActivity();renderWorkspace();
+    currentSession=pid;masterData._thinkHistory=[];masterData._sessionPid=null;renderSessionTabs();renderLogs();renderActivity();renderWorkspace();
     document.getElementById('logFilterLabel').textContent=!pid?'':(sessions[pid]?' ['+sessions[pid].name+']':'');
     // 세션의 프로젝트 CLAUDE.md 로드
     var cwd=(pid&&sessions[pid])?sessions[pid].cwd:'';
     fetchMaster(cwd);
+    fetchProjectAgents(cwd);
   }
   var _tabsBuilt=false;
   function renderSessionTabs(){
@@ -570,7 +578,7 @@
         var cntEl=tab.querySelector('.sess-count');
         if(cntEl) cntEl.textContent=s.agentCount?'\uD83E\uDD16'+s.agentCount:'';
         // 스피너
-        var hasWorking=Object.values(liveInstances).some(function(i){return i.sessionPid===pid&&i.st==='working'});
+        var hasWorking=Object.values(liveInstances).some(function(i){return i.sessionPid===pid&&i.st==='working'})||((masterData._st==='thinking'||masterData._st==='working')&&masterData._sessionPid===pid);
         var spinEl=tab.querySelector('.sess-spinner');
         if(hasWorking&&!spinEl){var sp=document.createElement('span');sp.className='sess-spinner';tab.insertBefore(sp,tab.querySelector('.sess-close'))}
         if(!hasWorking&&spinEl) spinEl.remove();
@@ -635,12 +643,27 @@
       agents=data.map(function(a,i){a.color=agColor(a.id,i);a.active=true;return a});setConn(true);renderAll();
     }).catch(function(){setConn(false);document.getElementById('agentList').innerHTML='<div style="color:var(--negative);font-size:.6rem;font-family:monospace;padding:14px;text-align:center">\uC11C\uBC84 \uC5F0\uACB0 \uC2E4\uD328</div>'});
   }
+  function fetchProjectAgents(cwd){
+    if(!cwd){projectAgents={hasRestriction:false,enabled:[]};renderAll();return}
+    fetch(API+'/api/project-agents?cwd='+encodeURIComponent(cwd)).then(function(r){return r.json()}).then(function(d){
+      projectAgents=d;_wsBuilt=false;renderAll();
+    }).catch(function(){projectAgents={hasRestriction:false,enabled:[]};renderAll()});
+  }
+  function saveProjectAgents(enabled){
+    var pid=currentSession;
+    var cwd=(pid&&sessions[pid])?sessions[pid].cwd:'';
+    if(!cwd){toast('프로젝트 경로 없음','err');return}
+    fetch(API+'/api/project-agents',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({cwd:cwd,enabled:enabled,hasRestriction:true})}).then(function(r){return r.json()}).then(function(r){
+      if(r.ok){projectAgents={hasRestriction:true,enabled:enabled};_wsBuilt=false;renderAll();fetchMaster(cwd);toast('에이전트 설정 저장')}
+      else toast('실패','err');
+    }).catch(function(){toast('연결 실패','err')});
+  }
   function fetchMaster(cwd){
     var url=API+'/api/master';
     if(cwd) url+='?cwd='+encodeURIComponent(cwd);
-    fetch(url).then(function(r){return r.json()}).then(function(d){masterData=d;renderMasterCard()}).catch(function(){});
+    fetch(url).then(function(r){return r.json()}).then(function(d){var keep={_st:masterData._st,_task:masterData._task,_thinkStart:masterData._thinkStart,_thinkHistory:masterData._thinkHistory,_turnCount:masterData._turnCount,_sessionPid:masterData._sessionPid,_lastDoneTime:masterData._lastDoneTime};masterData=d;Object.keys(keep).forEach(function(k){if(keep[k]!==undefined)masterData[k]=keep[k]});renderMasterCard()}).catch(function(){});
   }
-  function fetchSessions(){fetch(API+'/api/sessions').then(function(r){return r.json()}).then(function(d){d.forEach(function(s){sessions[s.pid]={pid:s.pid,name:s.name||'Session '+s.pid,cwd:s.cwd||'',startTime:s.startTime||'',lastActivity:s.lastActivity||'',eventCount:s.eventCount||0,alive:true}});renderSessionTabs();updateHeaderStat()}).catch(function(){})}
+  function fetchSessions(){fetch(API+'/api/sessions').then(function(r){return r.json()}).then(function(d){d.forEach(function(s){sessions[s.pid]={pid:s.pid,name:s.name||'Session '+s.pid,cwd:s.cwd||'',startTime:s.startTime||'',lastActivity:s.lastActivity||'',eventCount:s.eventCount||0,alive:true}});renderSessionTabs();updateHeaderStat();var cwd=(currentSession&&sessions[currentSession])?sessions[currentSession].cwd:'';if(cwd&&agents.length>0)fetchProjectAgents(cwd)}).catch(function(){})}
 
   function renderMasterCard(){
     var box=document.getElementById('masterCard');var card=document.createElement('div');card.className='master-card';card.onclick=function(){openMaster()};
@@ -658,13 +681,46 @@
 
   // === Render ===
   function renderList(){
+    var left=document.querySelector('.left');var scrollPos=left?left.scrollTop:0;
     var box=document.getElementById('agentList');box.innerHTML='';
+    var hasCwd=currentSession&&sessions[currentSession]&&sessions[currentSession].cwd;
     agents.forEach(function(ag){
-      var card=document.createElement('div');card.className='ag on';
+      var isEnabled=!projectAgents.hasRestriction||projectAgents.enabled.indexOf(ag.id)>=0;
+      var card=document.createElement('div');card.className='ag on'+(isEnabled?'':' disabled');
       card.onclick=function(){openEdit(ag.id)};
       // 어딘가에서 working 중이면 라이브 dot
       var isLive=Object.values(liveInstances).some(function(inst){return inst.agentId===ag.id&&inst.st==='working'});
       if(isLive){var dot=document.createElement('span');dot.className='ag-live';card.appendChild(dot)}
+      // 프로젝트별 토글
+      if(hasCwd){
+        var toggle=document.createElement('span');toggle.className='ag-toggle'+(isEnabled?' on':'');
+        toggle.title=isEnabled?'이 프로젝트에서 활성':'이 프로젝트에서 비활성';
+        (function(agId,en){
+          toggle.onclick=function(e){
+            e.stopPropagation();
+            var newEnabled;
+            if(!projectAgents.hasRestriction){
+              // 제한 없음 → 이 에이전트만 끄기 (나머지 전부 ON)
+              newEnabled=agents.map(function(a){return a.id}).filter(function(id){return id!==agId});
+            } else if(en){
+              // ON → OFF
+              newEnabled=projectAgents.enabled.filter(function(id){return id!==agId});
+            } else {
+              // OFF → ON
+              newEnabled=projectAgents.enabled.concat([agId]);
+            }
+            // 전부 ON이면 제한 해제
+            if(newEnabled.length>=agents.length){
+              fetch(API+'/api/project-agents',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({cwd:(currentSession&&sessions[currentSession])?sessions[currentSession].cwd:'',enabled:[],hasRestriction:false})}).then(function(r){return r.json()}).then(function(r){
+                if(r.ok){projectAgents={hasRestriction:false,enabled:[]};_wsBuilt=false;renderAll();var cwdR=(currentSession&&sessions[currentSession])?sessions[currentSession].cwd:'';fetchMaster(cwdR);toast('에이전트 제한 해제')}
+              }).catch(function(){toast('연결 실패','err')});
+            } else {
+              saveProjectAgents(newEnabled);
+            }
+          };
+        })(ag.id,isEnabled);
+        card.appendChild(toggle);
+      }
       var row=document.createElement('div');row.className='ag-row';row.appendChild(buildPix(ag.id,ag.color,'sm',ag.model));
       var info=document.createElement('div');info.innerHTML='<div class="ag-name" style="color:'+ag.color+'">'+ag.name+'</div><div class="ag-desc">'+ag.description+'</div>';
       row.appendChild(info);card.appendChild(row);
@@ -673,15 +729,20 @@
       card.appendChild(meta);
       box.appendChild(card);
     });
+    if(left)left.scrollTop=scrollPos;
   }
 
   var _wsBuilt=false;
   function renderWorkspace(){
     var ws=document.getElementById('workspace');
 
-    // 항상 Master + 전체 에이전트 정의를 고정 위치로 표시
+    // 항상 Master + 활성 에이전트만 표시
     var nodes=[{wsId:'master',id:'master',name:'Master',color:'#fbbf24',model:'opus'}];
-    agents.filter(function(a){return a.active}).forEach(function(ag){
+    agents.filter(function(a){
+      if(!a.active) return false;
+      if(projectAgents.hasRestriction&&projectAgents.enabled.indexOf(a.id)<0) return false;
+      return true;
+    }).forEach(function(ag){
       nodes.push({wsId:ag.id,id:ag.id,name:ag.name,color:ag.color,model:ag.model});
     });
 
@@ -911,15 +972,37 @@
   function renderTimeline(){
     var box=document.getElementById('timelineBody');if(!box)return;box.innerHTML='';
     var instances=getLiveInstances();
-    if(instances.length===0){box.innerHTML='<div class="tl-empty">\uC5D0\uC774\uC804\uD2B8 \uD65C\uB3D9 \uC5C6\uC74C</div>';return}
+    // Master thinking 구간 수집
+    var masterEntries=masterData._thinkHistory||[];
+    if(masterData._thinkStart) masterEntries=masterEntries.concat([{start:masterData._thinkStart,end:null}]);
+    if(instances.length===0&&masterEntries.length===0){box.innerHTML='<div class="tl-empty">\uD65C\uB3D9 \uC5C6\uC74C</div>';return}
     // 시간 범위 계산
     var minStart=Infinity,maxEnd=0,now=Date.now();
+    masterEntries.forEach(function(m){if(m.start<minStart)minStart=m.start;var end=m.end||now;if(end>maxEnd)maxEnd=end});
     instances.forEach(function(inst){
       if(inst.startTime<minStart)minStart=inst.startTime;
       var end=inst.doneTime||now;
       if(end>maxEnd)maxEnd=end;
     });
     var totalMs=Math.max(maxEnd-minStart,1000);
+    // Master 바 렌더링
+    if(masterEntries.length>0){
+      var row=document.createElement('div');row.className='tl-row';
+      var lbl=document.createElement('span');lbl.className='tl-label';lbl.style.color='#c084fc';lbl.textContent='Master';
+      var track=document.createElement('div');track.className='tl-track';
+      masterEntries.forEach(function(m){
+        var bar=document.createElement('div');bar.className='tl-bar'+(m.end?'':' working');
+        var startPct=((m.start-minStart)/totalMs)*100;
+        var endTime=m.end||now;
+        var widthPct=((endTime-m.start)/totalMs)*100;
+        bar.style.left=startPct+'%';bar.style.width=Math.max(widthPct,1)+'%';bar.style.background='#c084fc';
+        var sec=Math.round((endTime-m.start)/1000);
+        if(widthPct>15){var bl=document.createElement('span');bl.className='tl-bar-label';bl.textContent=sec+'s';bar.appendChild(bl)}
+        bar.title='Master '+sec+'s';
+        track.appendChild(bar);
+      });
+      row.appendChild(lbl);row.appendChild(track);box.appendChild(row);
+    }
     // 각 에이전트 바 렌더링
     instances.forEach(function(inst){
       var ai=getAgentInfo(inst.agentId);var name=ai?ai.name:inst.agentId;
@@ -931,7 +1014,6 @@
       var endTime=inst.doneTime||now;
       var widthPct=((endTime-inst.startTime)/totalMs)*100;
       bar.style.left=startPct+'%';bar.style.width=Math.max(widthPct,1)+'%';bar.style.background=inst.color;
-      // 시간 라벨
       var sec=Math.round((endTime-inst.startTime)/1000);
       if(widthPct>15){var bl=document.createElement('span');bl.className='tl-bar-label';bl.textContent=sec+'s';bar.appendChild(bl)}
       bar.title=name+' '+sec+'s';
@@ -1151,7 +1233,8 @@
 
     if(evt==='thinking_start'){
       masterData._turnCount=(masterData._turnCount||0)+1;
-      masterData._st='thinking';masterData._task='생각 중...';masterData._thinkStart=Date.now();
+      masterData._st='thinking';masterData._task='생각 중...';masterData._thinkStart=Date.now();masterData._sessionPid=sp;
+      masterData._thinkHistory=[];
       // 이전 done/stale 에이전트 정리 (새 질문 경계)
       // 새 질문 시작 → 이전 done/stale 에이전트 정리 (이력은 이벤트 로그에 유지)
       Object.keys(liveInstances).forEach(function(k){if(liveInstances[k].sessionPid===sp&&liveInstances[k].st!=='working')delete liveInstances[k]});
@@ -1161,6 +1244,7 @@
     if(evt==='thinking_end'){
       var anyWorking=Object.values(liveInstances).some(function(i){return i.st==='working'});
       var sec=masterData._thinkStart?Math.round((Date.now()-masterData._thinkStart)/1000):0;
+      if(masterData._thinkStart){if(!masterData._thinkHistory)masterData._thinkHistory=[];masterData._thinkHistory.push({start:masterData._thinkStart,end:Date.now()})}
       masterData._thinkStart=null; // thinking 종료 표시
       if(!anyWorking){
         masterData._st='done';masterData._task='Q'+masterData._turnCount+' 완료'+(sec>0?' ('+sec+'s)':'');
@@ -1208,7 +1292,7 @@
       var taskDesc=desc||name;
       liveInstances[key]={key:key,agentId:at,sessionPid:sp,sessionName:sn,st:'working',task:taskDesc,desc:taskDesc,prog:10,startTime:Date.now(),color:color};
       addLog({name:name,color:color},(sn?'['+sn+'] ':'')+name+' \uC2DC\uC791 \u2014 '+taskDesc,'',sp,sn);
-      masterData._st='working';masterData._task=(sn?'['+sn+'] ':'')+'\uC870\uC728 \uC911...';
+      masterData._st='working';masterData._task=(sn?'['+sn+'] ':'')+'\uC870\uC728 \uC911...';masterData._sessionPid=sp;
       // 타임라인 자동 펼침
       if(!_tlOpen){_tlOpen=true;document.getElementById('timelineBody').style.display='';document.getElementById('tlToggle').textContent='\u25BC'}
       renderAll();setTimeout(function(){sparks('inst-'+key,color);flyDot('master','inst-'+key)},50);
@@ -1433,6 +1517,8 @@
   // fetchAgents 완료 후 SSE 연결 (에이전트 목록 없이 이벤트 수신 시 캐릭터 누락 방지)
   fetch(API+'/api/agents').then(function(r){return r.json()}).then(function(data){
     agents=data.map(function(a,i){a.color=agColor(a.id,i);a.active=true;return a});setConn(true);renderAll();
+    var cwd=(currentSession&&sessions[currentSession])?sessions[currentSession].cwd:'';
+    if(cwd) fetchProjectAgents(cwd);
   }).catch(function(){setConn(false)}).finally(function(){connectSSE()});
   setInterval(checkStaleInstances,30000);
   </script>

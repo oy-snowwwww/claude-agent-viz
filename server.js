@@ -218,7 +218,11 @@ const server = http.createServer(function(req, res) {
 
         // Agent 도구인 경우 에이전트 정보 추출
         if (parsed.tool_name === 'Agent' || (parsed.tool_input && parsed.tool_input.subagent_type)) {
-          parsed.agent_type = parsed.tool_input.subagent_type || parsed.tool_input.name || 'unknown';
+          var sat = parsed.tool_input.subagent_type || '';
+          var nm = parsed.tool_input.name || '';
+          var desc = parsed.tool_input.description || '';
+          // subagent_type이 general-purpose이면 name을 우선 사용, 둘 다 없으면 description
+          parsed.agent_type = (sat && sat !== 'general-purpose') ? sat : (nm || desc || sat || 'unknown');
           parsed.agent_description = parsed.tool_input.description || '';
           parsed.agent_prompt = (parsed.tool_input.prompt || '').substring(0, 200);
         }
@@ -499,6 +503,72 @@ const server = http.createServer(function(req, res) {
       res.writeHead(404, {'Content-Type': 'application/json'});
       res.end(JSON.stringify({error: 'not found'}));
     }
+    return;
+  }
+
+  // API: 프로젝트별 에이전트 설정 (GET /api/project-agents?cwd=...)
+  if (url.startsWith('/api/project-agents') && req.method === 'GET') {
+    var qs = req.url.split('?')[1] || '';
+    var params = {};
+    qs.split('&').forEach(function(p) { var kv = p.split('='); if (kv[0]) params[decodeURIComponent(kv[0])] = decodeURIComponent(kv[1] || ''); });
+    var cwd = params.cwd || '';
+    var enabled = []; // 빈 배열 = 제한 없음 (전부 사용)
+    var hasRestriction = false;
+    if (cwd) {
+      var claudeMd = path.join(cwd, 'CLAUDE.md');
+      if (fs.existsSync(claudeMd)) {
+        var content = fs.readFileSync(claudeMd, 'utf8');
+        var match = content.match(/<!-- agent-viz:agents (.*?) -->/);
+        if (match) {
+          hasRestriction = true;
+          if (match[1].trim() !== 'none') {
+            enabled = match[1].split(',').map(function(s) { return s.trim(); }).filter(Boolean);
+          }
+        }
+      }
+    }
+    res.writeHead(200, {'Content-Type': 'application/json'});
+    res.end(JSON.stringify({ enabled: enabled, hasRestriction: hasRestriction }));
+    return;
+  }
+
+  // API: 프로젝트별 에이전트 설정 저장 (PUT /api/project-agents)
+  if (url === '/api/project-agents' && req.method === 'PUT') {
+    var bodyChunks = [];
+    req.on('data', function(c) { bodyChunks.push(c); });
+    req.on('end', function() {
+      try {
+        var data = JSON.parse(Buffer.concat(bodyChunks).toString());
+        var cwd = data.cwd || '';
+        var enabled = data.enabled || [];
+        var hasRestriction = data.hasRestriction !== undefined ? data.hasRestriction : enabled.length > 0;
+        if (!cwd) { res.writeHead(400); res.end(JSON.stringify({error: 'cwd required'})); return; }
+
+        var claudeMd = path.join(cwd, 'CLAUDE.md');
+        var content = '';
+        if (fs.existsSync(claudeMd)) {
+          content = fs.readFileSync(claudeMd, 'utf8');
+        }
+
+        // 기존 마커 제거
+        content = content.replace(/\s*<!-- agent-viz:agents .*? -->\s*<!-- 이 프로젝트에서는 .*? -->\s*/g, '');
+
+        // 제한이 있으면 마커 추가
+        if (hasRestriction) {
+          var agentList = enabled.length > 0 ? enabled.join(', ') : 'none';
+          var comment = enabled.length > 0 ? '이 프로젝트에서는 위 에이전트만 사용한다' : '이 프로젝트에서는 에이전트를 사용하지 않는다';
+          var marker = '\n<!-- agent-viz:agents ' + agentList + ' -->\n<!-- ' + comment + ' -->\n';
+          content = content.trimEnd() + '\n' + marker;
+        }
+
+        fs.writeFileSync(claudeMd, content, 'utf8');
+        res.writeHead(200, {'Content-Type': 'application/json'});
+        res.end(JSON.stringify({ok: true}));
+      } catch(e) {
+        res.writeHead(400, {'Content-Type': 'application/json'});
+        res.end(JSON.stringify({error: e.message}));
+      }
+    });
     return;
   }
 
