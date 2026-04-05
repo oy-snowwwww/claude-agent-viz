@@ -175,7 +175,7 @@
     @keyframes twinkle{0%{opacity:.3}100%{opacity:.9}}
     @keyframes fireflyFloat{0%{transform:translate(0,0);opacity:.3}25%{opacity:1}50%{transform:translate(15px,-10px);opacity:.5}75%{opacity:1}100%{transform:translate(-10px,8px);opacity:.2}}
     /* 태양/달 */
-    .ws-celestial{position:absolute;font-size:20px;z-index:0;pointer-events:none;transition:left 5s linear,top 5s ease-in-out,opacity 2s ease;filter:drop-shadow(0 0 8px rgba(255,200,50,.5))}
+    .ws-celestial{position:absolute;font-size:20px;z-index:0;pointer-events:none;transition:left 6s linear,top 6s ease-in-out,opacity 2s ease;filter:drop-shadow(0 0 8px rgba(255,200,50,.5))}
     /* 구름 */
     .ws-cloud{position:absolute;z-index:0;pointer-events:none;font-size:18px;opacity:.5;filter:blur(0.5px)}
     @keyframes cloudDrift{0%{left:-15%}100%{left:110%}}
@@ -371,6 +371,7 @@
         <button class="help-btn" onclick="toggleHelp()" title="도움말">?</button>
         <button class="help-btn restart-btn" onclick="restartServer()" title="재시작">&#8635;</button>
         <button class="help-btn stop-btn" onclick="shutdownServer()" title="서버 종료">&#9632;</button>
+        <button class="season-btn" onclick="toggleEnv()" id="envBtn" title="환경 효과 on/off">🌍</button>
         <button class="season-btn" onclick="cycleSeason()" id="seasonBtn">🌸 봄</button>
         <button class="theme-btn" onclick="cycleTheme()" id="themeBtn">Dark</button>
       </div>
@@ -1156,7 +1157,11 @@
   }
   function fmtTime(s){var m=Math.floor(s/60);var sec=s%60;return(m<10?'0':'')+m+':'+(sec<10?'0':'')+sec}
 
-  function renderAll(){try{renderList();renderWorkspace();renderActivity();renderTimeline();renderLogs();updateHeaderStat();renderSessionTabs()}catch(e){console.error('[agent-viz] renderAll error:',e)}}
+  var _renderTimer=null;
+  function renderAll(){
+    if(_renderTimer)clearTimeout(_renderTimer);
+    _renderTimer=setTimeout(function(){_renderTimer=null;try{renderList();renderWorkspace();renderActivity();renderTimeline();renderLogs();updateHeaderStat();renderSessionTabs()}catch(e){console.error('[agent-viz] renderAll error:',e)}},50);
+  }
 
   // === Modal ===
   function openEdit(id){
@@ -1473,7 +1478,7 @@
       });
     });
   }
-  setInterval(blinkEyes,1500);
+  var _blinkInterval=setInterval(blinkEyes,1500);
 
   // === Creature Life System (requestAnimationFrame 기반 자율 행동) ===
   var creatureLife={};
@@ -1502,9 +1507,12 @@
     });
     return tooClose;
   }
+  var _lastCreatureTick=0;
   function tickCreatures(){
     requestAnimationFrame(tickCreatures);
     var now=Date.now();
+    if(now-_lastCreatureTick<66)return; // ~15fps
+    _lastCreatureTick=now;
     document.querySelectorAll('.ws-agent').forEach(function(el){
       var id=el.id.replace('ws-','');
       var agSt=el.dataset.st||'idle';
@@ -1611,7 +1619,7 @@
       cells[49].style.background=t;cells[50].style.background=t;cells[51].style.background=dk;cells[52].style.background=t;cells[53].style.background=dk;cells[54].style.background=t;cells[55].style.background=t;
     }
   }
-  setInterval(function(){
+  var _walkInterval=setInterval(function(){
     // working 캐릭터: 항상 걷기
     document.querySelectorAll('.ws-agent.working .pix-lg').forEach(function(pix){
       if(Math.random()>0.6) return;
@@ -1697,31 +1705,38 @@
 
     // 태양 (낮: phase 0.05~0.6)
     var sun=ws.querySelector('.ws-sun');
-    if(!sun){sun=document.createElement('div');sun.className='ws-celestial ws-sun';ws.insertBefore(sun,ws.firstChild)}
+    if(!sun){sun=document.createElement('div');sun.className='ws-celestial ws-sun';sun._visible=false;ws.insertBefore(sun,ws.firstChild)}
     sun.textContent='☀️';sun.style.fontSize='48px';
-    var sunPhase=Math.max(0,Math.min(1,(phase-0.05)/0.55)); // 0.05~0.6 구간을 0~1로
+    var sunVisible=phase>0.05&&phase<0.6;
+    var sunPhase=Math.max(0,Math.min(1,(phase-0.05)/0.55));
     var sunX=5+sunPhase*90;
     var sunY=45-Math.sin(sunPhase*Math.PI)*42;
-    sun.style.left=sunX+'%';sun.style.top=Math.max(2,sunY)+'%';
-    sun.style.opacity=(phase>0.05&&phase<0.6)?Math.min(1,Math.min((phase-0.05)/0.05,(0.6-phase)/0.05)):'0';
+    // 보이지 않을 때 → 보일 때: transition 없이 위치 세팅
+    if(sunVisible&&!sun._visible){sun.style.transition='none';sun.style.left=sunX+'%';sun.style.top=Math.max(2,sunY)+'%';sun.offsetHeight;sun.style.transition=''}
+    else{sun.style.left=sunX+'%';sun.style.top=Math.max(2,sunY)+'%'}
+    sun.style.opacity=sunVisible?Math.min(1,Math.min((phase-0.05)/0.05,(0.6-phase)/0.05)):'0';
     sun.style.filter='drop-shadow(0 0 16px rgba(255,200,50,.7))';
+    sun._visible=sunVisible;
 
     // 달 (밤: phase 0.65~0.95)
     var moon=ws.querySelector('.ws-moon');
-    if(!moon){moon=document.createElement('div');moon.className='ws-celestial ws-moon';ws.insertBefore(moon,ws.firstChild)}
+    if(!moon){moon=document.createElement('div');moon.className='ws-celestial ws-moon';moon._visible=false;ws.insertBefore(moon,ws.firstChild)}
     moon.textContent='🌙';moon.style.fontSize='40px';
-    var moonPhase=Math.max(0,Math.min(1,(phase-0.65)/0.3)); // 0.65~0.95 구간을 0~1로
+    var moonVisible=phase>0.65&&phase<0.95;
+    var moonPhase=Math.max(0,Math.min(1,(phase-0.65)/0.3));
     var moonX=10+moonPhase*80;
     var moonY=40-Math.sin(moonPhase*Math.PI)*35;
-    moon.style.left=moonX+'%';moon.style.top=Math.max(3,moonY)+'%';
-    moon.style.opacity=(phase>0.65&&phase<0.95)?Math.min(1,Math.min((phase-0.65)/0.05,(0.95-phase)/0.05)):'0';
+    if(moonVisible&&!moon._visible){moon.style.transition='none';moon.style.left=moonX+'%';moon.style.top=Math.max(3,moonY)+'%';moon.offsetHeight;moon.style.transition=''}
+    else{moon.style.left=moonX+'%';moon.style.top=Math.max(3,moonY)+'%'}
+    moon.style.opacity=moonVisible?Math.min(1,Math.min((phase-0.65)/0.05,(0.95-phase)/0.05)):'0';
     moon.style.filter='drop-shadow(0 0 14px rgba(200,200,255,.7))';
+    moon._visible=moonVisible;
 
     // 구름 (랜덤 생성)
     if(!ws._cloudInterval){
       function spawnCloud(startX){
         var ws2=document.getElementById('workspace');if(!ws2)return;
-        if(ws2.querySelectorAll('.ws-cloud').length>=6) return;
+        if(ws2.querySelectorAll('.ws-cloud').length>=4) return;
         var cloud=document.createElement('div');cloud.className='ws-cloud';
         cloud.textContent='☁️';
         cloud.style.fontSize=(36+Math.random()*40)+'px';
@@ -1764,10 +1779,10 @@
       ws.dataset.groundDetail=gdKey;
       ws.querySelectorAll('.ws-ground-detail').forEach(function(g){g.remove()});
       var GROUND_ITEMS={
-        spring:{items:['🌷','🌼','🌸','🌻','🌱','🦋','🐝','💐'],count:14},
-        summer:{items:['🌿','🌾','🌺','🌻','🌼','🦗','🐞','☘️'],count:14},
-        autumn:{items:['🍄','🌰','🍂','🍁','🎃','🍁','🌾','🦔'],count:14},
-        winter:{items:['⛄','❄️','🎄','🏔️','🧣','☃️','🎿','🌨️'],count:12}
+        spring:{items:['🌷','🌼','🌸','🌻','🦋','💐'],count:8},
+        summer:{items:['🌿','🌾','🌺','🌻','🐞','☘️'],count:8},
+        autumn:{items:['🍄','🌰','🍂','🍁','🎃','🦔'],count:8},
+        winter:{items:['⛄','❄️','🎄','🏔️','☃️','🌨️'],count:8}
       };
       var seasonCfg=GROUND_ITEMS[currentSeason];
       for(var gi=0;gi<seasonCfg.count;gi++){
@@ -1786,7 +1801,7 @@
       if(!fireflyEl){
         fireflyEl=document.createElement('div');fireflyEl.className='ws-fireflies';
         fireflyEl.style.cssText='position:absolute;inset:0;pointer-events:none;z-index:1';
-        for(var fi=0;fi<25;fi++){
+        for(var fi=0;fi<15;fi++){
           var ff=document.createElement('span');
           var fSize=2+Math.random()*3;
           ff.style.cssText='position:absolute;width:'+fSize+'px;height:'+fSize+'px;border-radius:50%;background:#ADFF2F;box-shadow:0 0 8px #ADFF2F,0 0 16px #7FFF00;animation:fireflyFloat '+(2+Math.random()*5)+'s ease-in-out infinite alternate;left:'+(5+Math.random()*90)+'%;top:'+(25+Math.random()*60)+'%;animation-delay:'+(Math.random()*6)+'s';
@@ -1797,19 +1812,22 @@
       fireflyEl.style.opacity='1';
     } else {if(fireflyEl)fireflyEl.style.opacity='0'}
 
-    // 하루 지나면 계절 자동 변경
+  }catch(e){console.error('[agent-viz] updateEnvironment error:',e)}}
+
+  // 계절 자동 순환 (하루 = DAY_CYCLE_MS)
+  var _seasonInterval=setInterval(function(){
     var currentCycle=Math.floor((Date.now()+_dayOffset)/DAY_CYCLE_MS);
     if(currentCycle!==_lastSeasonCycle){
       _lastSeasonCycle=currentCycle;
       var idx=SEASONS.indexOf(currentSeason);
       currentSeason=SEASONS[(idx+1)%SEASONS.length];
-      localStorage.setItem('agviz-season',currentSeason);
       document.getElementById('seasonBtn').textContent=SEASON_LABELS[currentSeason];
-      ws.dataset.groundDetail='';ws.dataset.treeKey='';
-      ws.querySelectorAll('.ws-fireflies').forEach(function(f){f.remove()});
-      startWeather();startSparkles();
+      var ws=document.getElementById('workspace');
+      if(ws){ws.dataset.groundDetail='';ws.dataset.treeKey='';ws.querySelectorAll('.ws-fireflies').forEach(function(f){f.remove()})}
+      updateEnvironment();startWeather();startSparkles();
+      _wsBuilt=false;renderAll();
     }
-  }catch(e){console.error('[agent-viz] updateEnvironment error:',e)}}
+  },3000);
 
   // 날씨 파티클
   var _weatherInterval=null;
@@ -1820,10 +1838,10 @@
     ws.querySelectorAll('.weather-particle').forEach(function(p){p.remove()});
 
     var config={
-      spring:{type:'petal',interval:400,duration:4000},
-      summer:{type:'petal',interval:500,duration:4000},
-      autumn:{type:'leaf',interval:600,duration:5000},
-      winter:{type:'snow',interval:200,duration:6000}
+      spring:{type:'petal',interval:500,duration:4000},
+      summer:{type:'petal',interval:600,duration:4000},
+      autumn:{type:'leaf',interval:700,duration:5000},
+      winter:{type:'snow',interval:400,duration:6000}
     }[currentSeason];
 
     _weatherInterval=setInterval(function(){
@@ -1852,21 +1870,47 @@
   function startSparkles(){
     if(_sparkleInterval)clearInterval(_sparkleInterval);
     var ws=document.getElementById('workspace');if(!ws)return;
-    var SPARKLE_COLORS={spring:['#FFB7C5','#FFF0F5','#FFD700','#98FB98'],summer:['#FFD700','#FFF8DC','#87CEEB','#FFFFFF'],autumn:['#FFD700','#FFA500','#FF6347','#DEB887'],winter:['#FFFFFF','#E0FFFF','#B0E0E6','#ADD8E6']};
+    var SPARKLE_COLORS={spring:['#FFB7C5','#FFF0F5','#FFD700'],summer:['#FFD700','#FFF8DC','#FFFFFF'],autumn:['#FFD700','#FFA500','#DEB887'],winter:['#FFFFFF','#E0FFFF','#B0E0E6']};
     _sparkleInterval=setInterval(function(){
+      // 밤에만 빤짝이
+      var phase=getDayPhase();
+      if(phase<0.6)return;
       var colors=SPARKLE_COLORS[currentSeason];
       var sp=document.createElement('span');sp.className='sparkle-fall';
-      var x=Math.random()*100;
-      sp.style.left=x+'%';sp.style.top='0';
+      sp.style.left=Math.random()*100+'%';sp.style.top='0';
       var dot=document.createElement('span');
       dot.style.background=colors[Math.floor(Math.random()*colors.length)];
-      dot.style.width=(1+Math.random()*2)+'px';
-      dot.style.height=dot.style.width;
-      dot.style.boxShadow='0 0 3px '+dot.style.background;
-      dot.style.animationDuration=(4+Math.random()*4)+'s';
+      var sz=1+Math.random()*2;dot.style.width=sz+'px';dot.style.height=sz+'px';
+      dot.style.boxShadow='0 0 4px '+dot.style.background;
+      dot.style.animationDuration=(5+Math.random()*4)+'s';
       sp.appendChild(dot);ws.appendChild(sp);
-      setTimeout(function(){sp.remove()},8000);
-    },300);
+      setTimeout(function(){sp.remove()},9000);
+    },500);
+  }
+
+  var _envEnabled=localStorage.getItem('agviz-env')!=='off';
+  function toggleEnv(){
+    _envEnabled=!_envEnabled;
+    localStorage.setItem('agviz-env',_envEnabled?'on':'off');
+    var ws=document.getElementById('workspace');
+    var btn=document.getElementById('envBtn');
+    if(_envEnabled){
+      btn.textContent='🌍';btn.style.opacity='1';
+      updateEnvironment();startWeather();startSparkles();
+      if(!_envInterval)_envInterval=setInterval(updateEnvironment,8000);
+      if(!_seasonInterval)_seasonInterval=setInterval(function(){var cc=Math.floor((Date.now()+_dayOffset)/DAY_CYCLE_MS);if(cc!==_lastSeasonCycle){_lastSeasonCycle=cc;var idx=SEASONS.indexOf(currentSeason);currentSeason=SEASONS[(idx+1)%SEASONS.length];document.getElementById('seasonBtn').textContent=SEASON_LABELS[currentSeason];if(ws){ws.dataset.groundDetail='';ws.dataset.treeKey='';ws.querySelectorAll('.ws-fireflies').forEach(function(f){f.remove()})}updateEnvironment();startWeather();startSparkles();_wsBuilt=false;renderAll()}},3000);
+    } else {
+      btn.textContent='🌑';btn.style.opacity='.5';
+      if(_weatherInterval){clearInterval(_weatherInterval);_weatherInterval=null}
+      if(_sparkleInterval){clearInterval(_sparkleInterval);_sparkleInterval=null}
+      if(_envInterval){clearInterval(_envInterval);_envInterval=null}
+      if(_seasonInterval){clearInterval(_seasonInterval);_seasonInterval=null}
+      if(ws){
+        ws.querySelectorAll('.weather-particle,.sparkle-fall,.ws-cloud,.ws-sun,.ws-moon,.ws-stars,.ws-tree,.ws-ground-detail,.ws-fireflies').forEach(function(e){e.remove()});
+        ws._cloudInterval=null;
+        ws.style.background='var(--bg)';
+      }
+    }
   }
 
   function cycleSeason(){
@@ -1883,7 +1927,8 @@
 
   // 초기화
   document.getElementById('seasonBtn').textContent=SEASON_LABELS[currentSeason];
-  updateEnvironment();startWeather();startSparkles();
+  if(_envEnabled){updateEnvironment();startWeather();startSparkles()}
+  else{document.getElementById('envBtn').textContent='🌑';document.getElementById('envBtn').style.opacity='.5'}
 
   // === Init ===
   fetchMaster();fetchSessions();fetchMcpServers();fetchHooks();
@@ -1896,7 +1941,7 @@
   setInterval(checkStaleInstances,30000);
 
   // === Page Visibility: 탭 비활성 시 애니메이션 일시정지 ===
-  var _envInterval=setInterval(updateEnvironment,5000);
+  var _envInterval=setInterval(updateEnvironment,8000);
   document.addEventListener('visibilitychange',function(){
     var ws=document.getElementById('workspace');
     if(document.hidden){
@@ -1904,13 +1949,19 @@
       if(_weatherInterval){clearInterval(_weatherInterval);_weatherInterval=null}
       if(_sparkleInterval){clearInterval(_sparkleInterval);_sparkleInterval=null}
       if(_envInterval){clearInterval(_envInterval);_envInterval=null}
+      if(_blinkInterval){clearInterval(_blinkInterval);_blinkInterval=null}
+      if(_walkInterval){clearInterval(_walkInterval);_walkInterval=null}
+      if(_seasonInterval){clearInterval(_seasonInterval);_seasonInterval=null}
       if(ws&&ws._cloudInterval){clearInterval(ws._cloudInterval);ws._cloudInterval=null}
       if(ws)ws.querySelectorAll('.weather-particle,.sparkle-fall').forEach(function(p){p.remove()});
     } else {
       // 탭 활성: 재개
       startWeather();startSparkles();
-      if(ws)ws._cloudInterval=null; // 다음 updateEnvironment에서 재생성
-      _envInterval=setInterval(updateEnvironment,5000);
+      if(ws)ws._cloudInterval=null;
+      _envInterval=setInterval(updateEnvironment,8000);
+      _blinkInterval=setInterval(blinkEyes,1500);
+      _seasonInterval=setInterval(function(){var cc=Math.floor((Date.now()+_dayOffset)/DAY_CYCLE_MS);if(cc!==_lastSeasonCycle){_lastSeasonCycle=cc;var idx=SEASONS.indexOf(currentSeason);currentSeason=SEASONS[(idx+1)%SEASONS.length];document.getElementById('seasonBtn').textContent=SEASON_LABELS[currentSeason];var w=document.getElementById('workspace');if(w){w.dataset.groundDetail='';w.dataset.treeKey='';w.querySelectorAll('.ws-fireflies').forEach(function(f){f.remove()})}updateEnvironment();startWeather();startSparkles();_wsBuilt=false;renderAll()}},3000);
+      _walkInterval=setInterval(function(){document.querySelectorAll('.ws-agent.working .pix-lg,.ws-agent.idle .pix-lg').forEach(function(pix){var agent=pix.parentElement.parentElement||pix.parentElement;var id=agent.id?agent.id.replace('ws-',''):'';var c=creatureLife[id];if(agent.classList.contains('working')){if(Math.random()>.6)return;walkLegs(pix)}else if(c&&c.beh==='roam'){if(Math.random()>.5)return;walkLegs(pix)}})},350);
       updateEnvironment();renderAll();
     }
   });
