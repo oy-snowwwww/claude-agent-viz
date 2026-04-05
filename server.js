@@ -13,6 +13,8 @@ const path = require('path');
 
 const PORT = 54321;
 const AGENTS_DIR = path.join(process.env.HOME, '.claude', 'agents');
+const MCP_JSON = path.join(process.env.HOME, '.mcp.json');
+const SETTINGS_JSON = path.join(process.env.HOME, '.claude', 'settings.json');
 const HTML_PATH = path.join(__dirname, 'index.html');
 const GLOBAL_CLAUDE_MD = path.join(process.env.HOME, 'CLAUDE.md');
 const CWD = process.cwd();
@@ -84,6 +86,71 @@ function readAgents() {
     });
   });
   return agents;
+}
+
+function readMcpServers() {
+  var servers = [];
+  // ~/.mcp.json
+  if (fs.existsSync(MCP_JSON)) {
+    try {
+      var data = JSON.parse(fs.readFileSync(MCP_JSON, 'utf8'));
+      var mcp = data.mcpServers || {};
+      Object.keys(mcp).forEach(function(id) {
+        var s = mcp[id];
+        var cmd = s.command || '';
+        var args = s.args || [];
+        var type = cmd;
+        if (cmd === 'docker') type = 'docker';
+        else if (cmd === 'npx' || cmd.includes('npx')) type = 'npx';
+        else if (cmd === 'node' || cmd.includes('node')) type = 'node';
+        else if (cmd.includes('python')) type = 'python';
+        servers.push({ id: id, name: id, command: cmd, args: args, type: type, source: '~/.mcp.json' });
+      });
+    } catch(e) {}
+  }
+  // settings.json / settings.local.json mcpServers
+  var settingsFiles = [
+    path.join(process.env.HOME, '.claude', 'settings.json'),
+    path.join(process.env.HOME, '.claude', 'settings.local.json')
+  ];
+  settingsFiles.forEach(function(f) {
+    if (!fs.existsSync(f)) return;
+    try {
+      var data = JSON.parse(fs.readFileSync(f, 'utf8'));
+      var mcp = data.mcpServers || {};
+      Object.keys(mcp).forEach(function(id) {
+        if (servers.find(function(s) { return s.id === id; })) return;
+        var s = mcp[id];
+        servers.push({ id: id, name: id, command: s.command || '', type: s.command || '', source: path.basename(f) });
+      });
+    } catch(e) {}
+  });
+  return servers;
+}
+
+function readHooks() {
+  var result = [];
+  if (!fs.existsSync(SETTINGS_JSON)) return result;
+  try {
+    var data = JSON.parse(fs.readFileSync(SETTINGS_JSON, 'utf8'));
+    var hooks = data.hooks || {};
+    Object.keys(hooks).forEach(function(event) {
+      var entries = hooks[event] || [];
+      entries.forEach(function(entry) {
+        var matcher = entry.matcher || '';
+        var innerHooks = entry.hooks || [];
+        innerHooks.forEach(function(h) {
+          result.push({
+            event: event,
+            type: h.type || 'command',
+            command: h.command || '',
+            matcher: matcher
+          });
+        });
+      });
+    });
+  } catch(e) {}
+  return result;
 }
 
 // --- Session Tracking ---
@@ -432,6 +499,20 @@ const server = http.createServer(function(req, res) {
       res.writeHead(404, {'Content-Type': 'application/json'});
       res.end(JSON.stringify({error: 'not found'}));
     }
+    return;
+  }
+
+  // API: MCP 서버 목록
+  if (url === '/api/mcp' && req.method === 'GET') {
+    res.writeHead(200, {'Content-Type': 'application/json; charset=utf-8'});
+    res.end(JSON.stringify(readMcpServers()));
+    return;
+  }
+
+  // API: Hooks 현황
+  if (url === '/api/hooks' && req.method === 'GET') {
+    res.writeHead(200, {'Content-Type': 'application/json; charset=utf-8'});
+    res.end(JSON.stringify(readHooks()));
     return;
   }
 

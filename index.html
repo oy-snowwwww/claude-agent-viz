@@ -25,7 +25,7 @@
     body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;background-image:radial-gradient(var(--border) 1px,transparent 1px);background-size:20px 20px}
 
     /* === Layout === */
-    .app{position:relative;z-index:1;display:grid;grid-template-columns:250px 1fr;grid-template-rows:auto auto 1fr;height:100vh}
+    .app{position:relative;z-index:1;display:grid;grid-template-columns:300px 1fr;grid-template-rows:auto auto 1fr;height:100vh}
 
     /* Header */
     .header{grid-column:1/-1;grid-row:1;display:flex;align-items:center;gap:14px;padding:8px 20px;background:linear-gradient(135deg,var(--surface) 0%,var(--surface-alt) 100%);border-bottom:1px solid var(--border)}
@@ -100,7 +100,7 @@
     .ag-live{position:absolute;top:8px;right:8px;width:6px;height:6px;border-radius:50%;background:var(--positive);box-shadow:0 0 6px var(--positive);animation:pulse 1.2s ease-in-out infinite}
     .ag-row{display:flex;align-items:center;gap:6px}
     .ag-name{font-size:.7rem;font-weight:600;font-family:monospace}
-    .ag-desc{font-size:.55rem;color:var(--text-secondary);font-family:monospace;margin-top:1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:140px}
+    .ag-desc{font-size:.55rem;color:var(--text-secondary);font-family:monospace;margin-top:1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:190px}
     .ag-meta{display:flex;gap:3px;margin-top:4px;flex-wrap:wrap}
     .ag-tag{font-size:.45rem;padding:1px 4px;border-radius:3px;font-family:monospace;background:rgba(0,255,200,.08);color:var(--accent)}
     .ag-tag.model-opus{background:rgba(251,191,36,.12);color:#fbbf24}
@@ -109,6 +109,18 @@
     .ag-edit{position:absolute;top:6px;right:6px;background:var(--surface-hover);border:1px solid var(--border);border-radius:3px;padding:2px 5px;font-size:.5rem;font-family:monospace;color:var(--text-secondary);cursor:pointer;opacity:0;transition:opacity .2s}
     .ag:hover .ag-edit{opacity:1}
     .ag-edit:hover{color:var(--accent);border-color:var(--accent)}
+
+    /* MCP Servers */
+    .mcp-item{background:var(--bg);border:1px solid var(--border);border-radius:4px;padding:6px 8px;margin-bottom:4px;display:flex;align-items:center;gap:6px}
+    .mcp-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+    .mcp-name{font-size:.6rem;font-weight:600;font-family:monospace;color:var(--text)}
+    .mcp-type{font-size:.4rem;font-family:monospace;color:var(--text-secondary);margin-top:1px}
+    .mcp-empty{font-size:.5rem;color:var(--text-secondary);font-family:monospace;padding:4px}
+    .hook-group{margin-bottom:6px}
+    .hook-event{font-size:.55rem;font-weight:600;font-family:monospace;color:var(--text);padding:2px 0;display:flex;align-items:center;gap:4px}
+    .hook-event-dot{width:5px;height:5px;border-radius:50%;flex-shrink:0}
+    .hook-handler{font-size:.45rem;font-family:monospace;color:var(--text-secondary);padding:1px 0 1px 9px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .hook-matcher{font-size:.4rem;font-family:monospace;color:var(--accent);padding-left:9px}
 
     /* Pixel Avatar */
     .pix{width:24px;height:24px;display:grid;grid-template-columns:repeat(7,1fr);grid-template-rows:repeat(8,1fr);flex-shrink:0;image-rendering:pixelated}
@@ -328,6 +340,10 @@
       <div id="masterCard"></div>
       <div class="stitle" style="margin-top:10px"><span>AGENTS</span><button onclick="openNew()">+ New</button></div>
       <div id="agentList"></div>
+      <div class="stitle" style="margin-top:10px"><span>MCP SERVERS</span></div>
+      <div id="mcpList"></div>
+      <div class="stitle" style="margin-top:10px"><span>HOOKS</span></div>
+      <div id="hooksList"></div>
     </section>
 
     <div class="main">
@@ -949,11 +965,10 @@
 
   // === Modal ===
   function openEdit(id){
-    var ag=agents.find(function(a){return a.id===id});if(!ag)return;editingId=id;
-    document.getElementById('modalTitle').textContent=ag.name;document.getElementById('fName').value=ag.name;document.getElementById('fName').disabled=true;
+    var ag=agents.find(function(a){return a.id===id});if(!ag)return;editingId=id;    document.getElementById('modalTitle').textContent=ag.name;document.getElementById('fName').value=ag.name;document.getElementById('fName').disabled=true;
     document.getElementById('fDesc').value=ag.description;document.getElementById('fModel').value=ag.model;document.getElementById('fBody').value=ag.body||'';
     document.getElementById('btnDel').style.display='';renderToolsGrid(ag.tools||[]);
-    document.getElementById('agentFields').style.display='';document.getElementById('masterFields').style.display='none';
+    document.getElementById('agentFields').style.display='';document.getElementById('masterFields').style.display='none';    document.getElementById('btnSave').onclick=saveAgent;document.getElementById('btnDel').onclick=deleteAgent;
     document.getElementById('overlay').classList.add('show');
   }
   function openNew(){
@@ -961,12 +976,12 @@
     document.getElementById('fName').value='';document.getElementById('fName').disabled=false;
     document.getElementById('fDesc').value='';document.getElementById('fModel').value='sonnet';document.getElementById('fBody').value='';
     document.getElementById('btnDel').style.display='none';renderToolsGrid(['Read','Glob','Grep']);
-    document.getElementById('agentFields').style.display='';document.getElementById('masterFields').style.display='none';
+    document.getElementById('agentFields').style.display='';document.getElementById('masterFields').style.display='none';    document.getElementById('btnSave').onclick=saveAgent;document.getElementById('btnDel').onclick=deleteAgent;
     document.getElementById('overlay').classList.add('show');
   }
   function openMaster(){
     editingId='master';masterTab='global';document.getElementById('modalTitle').textContent='\u2605 Master';
-    document.getElementById('agentFields').style.display='none';document.getElementById('masterFields').style.display='';
+    document.getElementById('agentFields').style.display='none';document.getElementById('masterFields').style.display='';    document.getElementById('btnSave').onclick=saveAgent;
     document.getElementById('btnDel').style.display='none';document.getElementById('fMaster').value=masterData.global||'';
     document.getElementById('masterFileLabel').textContent=masterData.globalPath||'~/CLAUDE.md';updateMasterTabs();
     document.getElementById('overlay').classList.add('show');
@@ -997,6 +1012,62 @@
       delConfirmTimer=setTimeout(function(){btn.dataset.confirm='';btn.textContent='\uC0AD\uC81C';btn.style.background='';btn.style.color=''},3000);
     }
   }
+  // === MCP ===
+  var mcpServers=[];
+  function fetchMcpServers(){
+    fetch(API+'/api/mcp').then(function(r){return r.json()}).then(function(data){
+      mcpServers=data;renderMcpList();
+    }).catch(function(){});
+  }
+  function renderMcpList(){
+    var box=document.getElementById('mcpList');box.innerHTML='';
+    if(mcpServers.length===0){box.innerHTML='<div class="mcp-empty">MCP 서버 없음</div>';return}
+    var MCP_COLORS={github:'#00ffc8',datadog:'#632ca6','google-calendar':'#4285f4',oracle:'#f80000',teamcity:'#00b4f0','oyoy-jira-confluence':'#0052cc'};
+    mcpServers.forEach(function(mcp){
+      var el=document.createElement('div');el.className='mcp-item';
+      var color=MCP_COLORS[mcp.id]||'var(--accent)';
+      el.innerHTML='<span class="mcp-dot" style="background:'+color+';box-shadow:0 0 4px '+color+'"></span><div><div class="mcp-name">'+mcp.name+'</div><div class="mcp-type">'+mcp.type+'</div></div>';
+      box.appendChild(el);
+    });
+  }
+
+  // === Hooks ===
+  var hooksData=[];
+  function fetchHooks(){
+    fetch(API+'/api/hooks').then(function(r){return r.json()}).then(function(data){
+      hooksData=data;renderHooksList();
+    }).catch(function(){});
+  }
+  function renderHooksList(){
+    var box=document.getElementById('hooksList');box.innerHTML='';
+    if(hooksData.length===0){box.innerHTML='<div class="mcp-empty">Hook 없음</div>';return}
+    var EVENT_COLORS={SessionStart:'#10b981',SessionEnd:'#f43f5e',UserPromptSubmit:'#fbbf24',Stop:'#fb923c',PreToolUse:'#00d4ff',PostToolUse:'#a78bfa'};
+    // 이벤트별 그룹핑
+    var groups={};
+    hooksData.forEach(function(h){
+      if(!groups[h.event]) groups[h.event]=[];
+      groups[h.event].push(h);
+    });
+    Object.keys(groups).forEach(function(evt){
+      var g=document.createElement('div');g.className='hook-group';
+      var color=EVENT_COLORS[evt]||'var(--accent)';
+      var header='<div class="hook-event"><span class="hook-event-dot" style="background:'+color+'"></span>'+evt+' <span style="font-size:.4rem;color:var(--text-secondary);font-weight:400">('+groups[evt].length+')</span></div>';
+      g.innerHTML=header;
+      groups[evt].forEach(function(h){
+        var cmd=h.command||'';
+        // 경로 축약
+        var shortCmd=cmd.replace(/\/Users\/[^/]+/g,'~').replace(/\/\.claude\/agent-viz\//,'');
+        var line=document.createElement('div');line.className='hook-handler';line.textContent=shortCmd;line.title=cmd;
+        g.appendChild(line);
+        if(h.matcher){
+          var m=document.createElement('div');m.className='hook-matcher';m.textContent='matcher: '+h.matcher;
+          g.appendChild(m);
+        }
+      });
+      box.appendChild(g);
+    });
+  }
+
   function toggleHelp(){document.getElementById('helpOverlay').classList.toggle('show')}
   var restartConfirmTimer=null;
   function restartServer(){
@@ -1358,7 +1429,7 @@
   },350);
 
   // === Init ===
-  fetchMaster();fetchSessions();
+  fetchMaster();fetchSessions();fetchMcpServers();fetchHooks();
   // fetchAgents 완료 후 SSE 연결 (에이전트 목록 없이 이벤트 수신 시 캐릭터 누락 방지)
   fetch(API+'/api/agents').then(function(r){return r.json()}).then(function(data){
     agents=data.map(function(a,i){a.color=agColor(a.id,i);a.active=true;return a});setConn(true);renderAll();
