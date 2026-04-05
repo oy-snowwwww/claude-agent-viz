@@ -128,14 +128,14 @@
     .main{grid-column:2;grid-row:3;display:flex;flex-direction:column;overflow:hidden;background:var(--bg)}
 
     /* Workspace */
-    .workspace{flex:3;position:relative;overflow:hidden;min-height:180px}
+    .workspace{flex:3;position:relative;overflow:visible;min-height:180px;clip-path:inset(-30px -20px 0 -20px)}
     .workspace::before{content:'';position:absolute;inset:0;pointer-events:none;z-index:0;background-image:radial-gradient(1px 1px at 10% 20%,rgba(0,255,200,.15),transparent),radial-gradient(1px 1px at 30% 70%,rgba(167,139,250,.12),transparent),radial-gradient(1px 1px at 60% 15%,rgba(0,212,255,.1),transparent),radial-gradient(1px 1px at 80% 60%,rgba(251,191,36,.1),transparent),radial-gradient(1px 1px at 45% 85%,rgba(244,114,182,.1),transparent),radial-gradient(1px 1px at 90% 40%,rgba(0,255,200,.12),transparent),radial-gradient(1px 1px at 20% 50%,rgba(132,204,22,.1),transparent);animation:twinkle 4s ease-in-out infinite alternate}
     @keyframes twinkle{0%{opacity:.5}100%{opacity:1}}
     .workspace::after{content:'';position:absolute;inset:0;pointer-events:none;background:repeating-linear-gradient(0deg,transparent,transparent 3px,rgba(0,0,0,.008) 3px,rgba(0,0,0,.008) 4px)}
     .ws-agent{position:absolute;display:flex;flex-direction:column;align-items:center;transition:all .4s ease;z-index:2;cursor:default}
     .ws-agent:hover{z-index:20}
     .ws-agent.working .pix-lg{filter:drop-shadow(0 0 10px var(--glow));animation:working calc(.7s * var(--rnd-dur,1)) ease-in-out var(--rnd-delay,0s) infinite}
-    .ws-agent.working{animation:agentEnter .5s ease-out,bounce calc(.5s * var(--rnd-dur,1)) ease-in-out var(--rnd-delay,0s) infinite}
+    .ws-agent.working{animation:agentEnter .5s ease-out;transition:none}
     .ws-agent.idle .pix-lg{animation:breathe calc(2s + var(--rnd-delay,0s)) ease-in-out infinite}
     #ws-master.idle{animation:masterWander 8s ease-in-out infinite}
     #ws-master .pix-lg{animation:breathe 3s ease-in-out infinite,masterGlow 4s ease-in-out infinite}
@@ -144,15 +144,12 @@
     .ws-agent.done{animation:doneJump .5s cubic-bezier(.34,1.56,.64,1) forwards}
     .ws-agent.done .pix-lg{filter:drop-shadow(0 0 8px var(--positive))}
     .ws-agent::before{content:'';position:absolute;bottom:-4px;left:50%;transform:translateX(-50%);width:40px;height:6px;background:radial-gradient(ellipse,rgba(0,0,0,.3),transparent);border-radius:50%;z-index:-1;transition:all .3s}
-    .ws-agent.working::before{animation:shadowBounce calc(.5s * var(--rnd-dur,1)) ease-in-out var(--rnd-delay,0s) infinite}
     .ws-agent.done::before{animation:shadowJump .5s cubic-bezier(.34,1.56,.64,1) forwards}
-    @keyframes shadowBounce{0%,100%{transform:translateX(-50%) scaleX(1);opacity:1}50%{transform:translateX(-50%) scaleX(.7);opacity:.5}}
     @keyframes shadowJump{0%{transform:translateX(-50%) scaleX(1)}30%{transform:translateX(-50%) scaleX(.5);opacity:.3}80%{transform:translateX(-50%) scaleX(1.1)}100%{transform:translateX(-50%) scaleX(1);opacity:1}}
     .ws-agent.idle{}
-    .ws-agent.thinking{animation:agentEnter .5s ease-out,bounce .6s ease-in-out infinite}
+    .ws-agent.thinking{animation:agentEnter .5s ease-out;transition:none}
     .ws-agent.thinking .pix-lg{filter:drop-shadow(0 0 10px rgba(251,191,36,.7));animation:working .7s ease-in-out infinite}
     .ws-agent.thinking .ws-bubble{opacity:1;border-color:#fbbf24}
-    .ws-agent.thinking::before{animation:shadowBounce .6s ease-in-out infinite}
     .ws-agent.stale .pix-lg{filter:grayscale(.5);opacity:.5}
     .ws-agent.stale .ws-bubble{opacity:1;border-color:var(--negative)}
     /* Zzz */
@@ -168,7 +165,6 @@
     @keyframes auraFloat{0%{opacity:0;transform:translate(0,0) scale(.5)}30%{opacity:.8}70%{opacity:.8}100%{opacity:0;transform:translate(var(--ax),var(--ay)) scale(0)}}
     @keyframes breathe{0%,100%{transform:translateY(0)}50%{transform:translateY(-3px)}}
     @keyframes working{0%,100%{transform:translateY(0) scale(1);filter:drop-shadow(0 0 8px var(--glow))}50%{transform:translateY(-6px) scale(1.05);filter:drop-shadow(0 0 14px var(--glow))}}
-    @keyframes bounce{0%,100%{transform:translate(-50%,-50%) translateY(0)}50%{transform:translate(-50%,-50%) translateY(-8px)}}
     @keyframes doneJump{0%{transform:translate(-50%,-50%) translateY(0) scale(1)}30%{transform:translate(-50%,-50%) translateY(-18px) scale(1.1)}50%{transform:translate(-50%,-50%) translateY(-18px) scale(1.1)}80%{transform:translate(-50%,-50%) translateY(2px) scale(.97)}100%{transform:translate(-50%,-50%) translateY(0) scale(1)}}
     .ws-label{font-size:.55rem;font-family:monospace;color:var(--text-secondary);margin-top:4px;text-align:center;white-space:nowrap}
     .ws-agent:hover .ws-label{background:var(--surface);padding:1px 6px;border-radius:3px;box-shadow:0 2px 8px rgba(0,0,0,.4)}
@@ -179,8 +175,6 @@
 
     .ws-bubble{position:absolute;bottom:calc(100% + 8px);left:50%;transform:translateX(-50%);background:var(--surface);border:1px solid var(--border);border-radius:5px;padding:3px 8px;font-size:.5rem;font-family:monospace;color:var(--text);white-space:nowrap;opacity:0;transition:opacity .3s;box-shadow:0 2px 8px rgba(0,0,0,.4);pointer-events:none}
     .ws-bubble::after{content:'';position:absolute;top:100%;left:50%;transform:translateX(-50%);border:4px solid transparent;border-top-color:var(--border)}
-    #ws-master .ws-bubble{bottom:auto;top:calc(100% + 8px)}
-    #ws-master .ws-bubble::after{top:auto;bottom:100%;border-top-color:transparent;border-bottom-color:var(--border)}
     .ws-agent.working .ws-bubble,.ws-agent.done .ws-bubble{opacity:1}
     .ws-agent:hover .ws-bubble{opacity:1}
     .ws-empty{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--text-secondary);font-size:.65rem;font-family:monospace;opacity:.3}
@@ -326,7 +320,6 @@
     </header>
 
     <div class="session-tabs" id="sessionTabs">
-      <button class="sess-tab active" data-session="all" onclick="switchSession('all')"><span class="sess-dot" style="background:var(--accent)"></span>All</button>
       <span class="empty-sessions" id="noSessionsHint">Claude Code 세션 대기 중...</span>
     </div>
 
@@ -442,7 +435,7 @@
 
   // === Session ===
   var sessions={};
-  var currentSession='all';
+  var currentSession=null;
   var logEntries=[];
   var MAX_LOGS=100;
 
@@ -454,7 +447,7 @@
 
   function getLiveInstances(){
     var arr=Object.values(liveInstances);
-    if(currentSession!=='all') arr=arr.filter(function(i){return i.sessionPid===currentSession});
+    if(currentSession) arr=arr.filter(function(i){return i.sessionPid===currentSession});
     return arr;
   }
 
@@ -524,7 +517,7 @@
   function registerSession(s){
     if(!s||!s.pid) return;var isNew=!sessions[s.pid];
     sessions[s.pid]={pid:s.pid,name:s.name||'Session '+s.pid,cwd:s.cwd||'',sid:s.sid||'',startTime:s.startTime||new Date().toISOString(),lastActivity:new Date().toISOString(),eventCount:(sessions[s.pid]?sessions[s.pid].eventCount:0)+1,agentCount:(sessions[s.pid]?sessions[s.pid].agentCount:0)||0,alive:true};
-    if(isNew){renderSessionTabs();updateHeaderStat()}return isNew;
+    if(isNew){if(!currentSession)currentSession=s.pid;renderSessionTabs();updateHeaderStat()}return isNew;
   }
   function removeSession(pid){
     if(sessions[pid]){
@@ -535,9 +528,9 @@
   }
   function switchSession(pid){
     currentSession=pid;renderSessionTabs();renderLogs();renderActivity();renderWorkspace();
-    document.getElementById('logFilterLabel').textContent=pid==='all'?'':(sessions[pid]?' ['+sessions[pid].name+']':'');
+    document.getElementById('logFilterLabel').textContent=!pid?'':(sessions[pid]?' ['+sessions[pid].name+']':'');
     // 세션의 프로젝트 CLAUDE.md 로드
-    var cwd=(pid!=='all'&&sessions[pid])?sessions[pid].cwd:'';
+    var cwd=(pid&&sessions[pid])?sessions[pid].cwd:'';
     fetchMaster(cwd);
   }
   var _tabsBuilt=false;
@@ -566,24 +559,15 @@
         if(hasWorking&&!spinEl){var sp=document.createElement('span');sp.className='sess-spinner';tab.insertBefore(sp,tab.querySelector('.sess-close'))}
         if(!hasWorking&&spinEl) spinEl.remove();
       });
-      // All 탭 카운트
-      var allCnt=box.querySelector('[data-session="all"] .sess-count');
-      var te=0;Object.values(sessions).forEach(function(s){te+=s.eventCount||0});
-      if(allCnt) allCnt.textContent=te;
       return;
     }
 
     // 구조 변경 → 전체 재구축
     _tabsBuilt=structKey;
     box.innerHTML='';
-    var allTab=document.createElement('button');allTab.className='sess-tab'+(currentSession==='all'?' active':'');allTab.dataset.session='all';
-    allTab.onclick=function(){switchSession('all')};
-    var ad=document.createElement('span');ad.className='sess-dot';ad.style.background='var(--accent)';allTab.appendChild(ad);
-    allTab.appendChild(document.createTextNode('All'));
-    var te=0;Object.values(sessions).forEach(function(s){te+=s.eventCount||0});
-    if(te>0){var ac=document.createElement('span');ac.className='sess-count';ac.textContent=te;allTab.appendChild(ac)}
-    box.appendChild(allTab);
     if(pids.length===0){var h=document.createElement('span');h.className='empty-sessions';h.textContent='Claude Code \uC138\uC158 \uB300\uAE30 \uC911...';box.appendChild(h);return}
+    // 세션이 있는데 현재 선택이 없거나 삭제된 세션이면 첫 번째 세션 자동 선택
+    if(!currentSession||!sessions[currentSession]){currentSession=pids[0]}
     var nameGroups={};pids.forEach(function(p){var n=sessions[p].name;if(!nameGroups[n])nameGroups[n]=[];nameGroups[n].push(p)});
     pids.forEach(function(pid){
       var s=sessions[pid];var sColor=sessionColor(pid);
@@ -601,7 +585,7 @@
       var cnt=document.createElement('span');cnt.className='sess-count';cnt.textContent=s.agentCount?'\uD83E\uDD16'+s.agentCount:'';tab.appendChild(cnt);
       var hasWorking=Object.values(liveInstances).some(function(i){return i.sessionPid===pid&&i.st==='working'});
       if(hasWorking){var sp=document.createElement('span');sp.className='sess-spinner';tab.appendChild(sp)}
-      var cl=document.createElement('span');cl.className='sess-close';cl.textContent='\u00d7';cl.onclick=function(e){e.stopPropagation();delete sessions[pid];Object.keys(liveInstances).forEach(function(k){if(liveInstances[k].sessionPid===pid)delete liveInstances[k]});if(currentSession===pid){currentSession='all'}_tabsBuilt='';renderAll()};tab.appendChild(cl)
+      var cl=document.createElement('span');cl.className='sess-close';cl.textContent='\u00d7';cl.onclick=function(e){e.stopPropagation();delete sessions[pid];Object.keys(liveInstances).forEach(function(k){if(liveInstances[k].sessionPid===pid)delete liveInstances[k]});if(currentSession===pid){var remaining=Object.keys(sessions);currentSession=remaining.length>0?remaining[0]:null}_tabsBuilt='';renderAll()};tab.appendChild(cl)
       box.appendChild(tab);
     });
   }
@@ -686,7 +670,7 @@
     });
 
     // 정의되지 않은 에이전트(Explore 등)도 활동 중이면 동적 추가
-    var instances=currentSession==='all'?Object.values(liveInstances):getLiveInstances();
+    var instances=!currentSession?Object.values(liveInstances):getLiveInstances();
     var definedIds=nodes.map(function(n){return n.id});
     instances.forEach(function(inst){
       if(inst.agentId&&definedIds.indexOf(inst.agentId)===-1){
@@ -700,7 +684,7 @@
     // 라이브 인스턴스와 매칭 → 상태 결정
     nodes.forEach(function(nd){
       if(nd.id==='master'){
-        var anyWorking=Object.values(liveInstances).some(function(i){return i.st==='working'});
+        var anyWorking=instances.some(function(i){return i.st==='working'});
         nd._st=anyWorking?'working':(masterData._st||'idle');
         nd._task=anyWorking?(masterData._task||''):(masterData._task||'');
         return;
@@ -743,7 +727,7 @@
         el.style.setProperty('--rnd-dur',(0.8+Math.random()*0.6).toFixed(2));
         el.appendChild(buildPix(nd.id,nd.color,'lg',nd.model));
         var lbl=document.createElement('div');lbl.className='ws-label';
-        if(nd.id==='master') lbl.innerHTML='Master<span class="ws-badge" style="background:rgba(251,191,36,.15);color:#fbbf24">SESSION</span>';
+        if(nd.id==='master') lbl.innerHTML='<span style="color:#c084fc">Master</span><span class="ws-badge" style="background:rgba(251,191,36,.15);color:#fbbf24">SESSION</span>';
         else lbl.innerHTML=nd.name+'<span class="ws-badge model-'+(nd.model||'sonnet')+'">'+(nd.model||'').toUpperCase()+'</span>';
         el.appendChild(lbl);
         var bub=document.createElement('div');bub.className='ws-bubble';bub.textContent=nd._task||'';el.appendChild(bub);
@@ -797,7 +781,7 @@
     var stEl=ws.querySelector('.ws-status');
     var working=instances.filter(function(i){return i.st==='working'}).length;
     var statusText='';
-    if(currentSession==='all'){var sc=Object.keys(sessions).length;statusText=sc+' session'+(sc!==1?'s':'')+' \u00b7 '+agents.length+' agents'}
+    if(!currentSession){var sc=Object.keys(sessions).length;statusText=sc+' session'+(sc!==1?'s':'')+' \u00b7 '+agents.length+' agents'}
     else if(working>0){statusText=working+' working'}
     if(statusText){
       if(!stEl){stEl=document.createElement('div');stEl.className='ws-status';ws.appendChild(stEl)}
@@ -830,7 +814,7 @@
     if(n===0) return [];
     if(n===1) return [{x:50,y:45}];
 
-    var pos=[{x:50,y:12}];
+    var pos=[{x:50,y:25}];
     var rest=n-1;
     // 간격: 에이전트 수에 따라 조절 (최소 14%, 최대 22%)
     var gap=Math.max(14,Math.min(22,80/rest));
@@ -867,7 +851,7 @@
     var working=instances.filter(function(i){return i.st==='working'}).length;
     countEl.textContent=working>0?working+' working':'';
 
-    if(currentSession==='all'&&Object.keys(sessions).length===0){
+    if(!currentSession&&Object.keys(sessions).length===0){
       box.innerHTML='<div class="act-empty">\uC138\uC158 \uB300\uAE30 \uC911...</div>';return;
     }
     // Master 항상 표시
@@ -893,7 +877,7 @@
       row.innerHTML+='<span class="act-task">'+(inst.task||'-')+'</span>';
       var labels={idle:'\uB300\uAE30',working:'\uC791\uC5C5 \uC911',done:'\uC644\uB8CC',stale:'\uC751\uB2F5\uC5C6\uC74C'};
       row.innerHTML+='<span class="act-status '+inst.st+'">'+(labels[inst.st]||inst.st)+'</span>';
-      if(currentSession==='all'&&inst.sessionName) row.innerHTML+='<span class="act-session">'+inst.sessionName+'</span>';
+      if(!currentSession&&inst.sessionName) row.innerHTML+='<span class="act-session">'+inst.sessionName+'</span>';
       // 리셋 버튼 (stale 또는 done)
       if(isStale||inst.st==='done'){
         var rb=document.createElement('span');rb.className='act-reset';rb.textContent='\u00d7';rb.title='\uC81C\uAC70';
@@ -951,10 +935,10 @@
   }
   function renderLogs(){
     var box=document.getElementById('logBox');box.innerHTML='';
-    var filtered=currentSession==='all'?logEntries:logEntries.filter(function(l){return!l.sessionPid||l.sessionPid===currentSession});
+    var filtered=!currentSession?logEntries:logEntries.filter(function(l){return!l.sessionPid||l.sessionPid===currentSession});
     filtered.slice(0,50).forEach(function(l){
       var d=document.createElement('div');d.className='log'+(l.cls?' '+l.cls:'');
-      var sl='';if(currentSession==='all'&&l.sessionPid&&l.sessionName) sl='<span class="ls">['+l.sessionName+']</span>';
+      var sl='';if(!currentSession&&l.sessionPid&&l.sessionName) sl='<span class="ls">['+l.sessionName+']</span>';
       d.innerHTML='<span class="lt">'+l.time+'</span>'+sl+'<span class="la" style="color:'+l.agColor+'">['+l.agName+']</span><span class="lm">'+l.msg+'</span>';
       box.appendChild(d);
     });
@@ -1239,7 +1223,7 @@
     var tx=c.x+(Math.random()*40-20);
     var ty=c.y+(Math.random()*30-15);
     c.tx=Math.max(5,Math.min(95,tx));
-    c.ty=Math.max(15,Math.min(88,ty));
+    c.ty=Math.max(25,Math.min(88,ty));
   }
   function isNearOther(id,nx,ny){
     var tooClose=false;
@@ -1266,7 +1250,9 @@
           var aura=el.querySelector('.ws-aura');if(aura)aura.remove();
         }
       }
-      if(agSt!=='idle'){
+      // working/thinking: roam만 허용 (빠른 속도), done/stale: creature 비활성
+      var isWorking=agSt==='working'||agSt==='thinking';
+      if(agSt!=='idle'&&!isWorking){
         if(creatureLife[id]){var zzz=el.querySelector('.ws-zzz');if(zzz)zzz.remove();delete creatureLife[id]}
         return;
       }
@@ -1281,26 +1267,40 @@
         var dx=c.tx-c.x;var dy=c.ty-c.y;
         var dist=Math.sqrt(dx*dx+dy*dy);
         if(dist<0.3){
-          // 도착 → 서기 또는 잠자기
-          c.beh='stand';c.walking=false;
-          c.nextAction=now+2000+Math.random()*4000;
+          if(isWorking){
+            // working: 도착하면 바로 다음 목적지
+            c.beh='roam';c.walking=true;
+            pickTarget(c);
+            if(isNearOther(id,c.tx,c.ty))pickTarget(c);
+          } else {
+            // idle: 도착 → 서기 또는 잠자기
+            c.beh='stand';c.walking=false;
+            c.nextAction=now+2000+Math.random()*4000;
+          }
         } else {
-          // 이동 속도: 느긋하게 (0.015~0.025 per frame)
-          var speed=0.02;
+          // working: 빠르게, idle: 느긋하게
+          var speed=isWorking?0.035:0.02;
           // 충돌 회피: 다른 캐릭터 쪽이면 살짝 비켜감
           var nx=c.x+dx*speed;var ny=c.y+dy*speed;
           if(isNearOther(id,nx,ny)){
             // 90도 방향 전환
             c.tx=Math.max(5,Math.min(95,c.x+dy*0.5));
-            c.ty=Math.max(15,Math.min(88,c.y-dx*0.5));
+            c.ty=Math.max(25,Math.min(88,c.y-dx*0.5));
           } else {
             c.x=nx;c.y=ny;
             el.style.left=c.x.toFixed(2)+'%';
             el.style.top=c.y.toFixed(2)+'%';
           }
         }
+      } else if(isWorking){
+        // working/thinking: 항상 roam 상태 유지
+        c.beh='roam';c.walking=true;
+        pickTarget(c);
+        if(isNearOther(id,c.tx,c.ty))pickTarget(c);
+        eyes.forEach(function(e){e.style.background=normalEye;e.style.transform='';e.style.borderRadius='0'});
+        var zzz=el.querySelector('.ws-zzz');if(zzz)zzz.remove();
       } else if(now>c.nextAction){
-        // 행동 전환
+        // idle: 행동 전환
         var r=Math.random();
         if(r<0.45){
           // roam
