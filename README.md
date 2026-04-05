@@ -5,9 +5,11 @@ Claude Code의 에이전트 활동을 실시간으로 시각화하는 로컬 대
 
 > 💡 **설치가 귀찮다면?** 이 README를 Claude Code에게 보여주고 "설치해줘"라고 하면 됩니다.
 
-![메인 화면 — 우주 모드](./screenshots/main.png)
+https://github.com/user-attachments/assets/b3595469-2546-4624-adf8-9a119ea00c2d
 
-![계절 모드](./screenshots/season.png)
+| 우주 모드 (기본) | 계절 모드 |
+|:---:|:---:|
+| ![우주 모드](./screenshots/main.png) | ![계절 모드](./screenshots/season.png) |
 
 ## 주요 기능
 

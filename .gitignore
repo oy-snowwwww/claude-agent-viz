@@ -3,4 +3,6 @@ sessions/
 CLAUDE.md
 enabled
 *.log
+*.mov
+*.mp4
 .DS_Store
