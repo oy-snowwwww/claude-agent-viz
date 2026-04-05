@@ -17,8 +17,13 @@ const MCP_JSON = path.join(process.env.HOME, '.mcp.json');
 const SETTINGS_JSON = path.join(process.env.HOME, '.claude', 'settings.json');
 const HTML_PATH = path.join(__dirname, 'index.html');
 const GLOBAL_CLAUDE_MD = path.join(process.env.HOME, 'CLAUDE.md');
-const CWD = process.cwd();
-const PROJECT_CLAUDE_MD = path.join(CWD, 'CLAUDE.md');
+
+// Path Traversal 방어: 대상 경로가 허용 디렉토리 하위인지 검증
+function safePath(baseDir, userInput) {
+  var resolved = path.resolve(baseDir, userInput);
+  if (!resolved.startsWith(path.resolve(baseDir) + path.sep) && resolved !== path.resolve(baseDir)) return null;
+  return resolved;
+}
 
 // --- YAML Frontmatter Parser (간단한 파서, 외부 의존성 없음) ---
 function parseFrontmatter(content) {
@@ -170,7 +175,9 @@ function broadcastEvent(eventData) {
 // --- HTTP Server ---
 const server = http.createServer(function(req, res) {
   // CORS
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  var origin = req.headers.origin || '';
+  var allowedOrigin = (origin.startsWith('http://localhost') || origin.startsWith('http://127.0.0.1')) ? origin : 'http://localhost:' + PORT;
+  res.setHeader('Access-Control-Allow-Origin', allowedOrigin);
   res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   if (req.method === 'OPTIONS') { res.writeHead(200); res.end(); return; }
@@ -452,7 +459,8 @@ const server = http.createServer(function(req, res) {
           model: data.model || 'sonnet'
         };
         var content = buildFrontmatter(meta, data.body || '');
-        var filepath = path.join(AGENTS_DIR, id + '.md');
+        var filepath = safePath(AGENTS_DIR, id + '.md');
+        if (!filepath) { res.writeHead(400); res.end(JSON.stringify({error: 'invalid id'})); return; }
         fs.writeFileSync(filepath, content, 'utf8');
         res.writeHead(200, {'Content-Type': 'application/json'});
         res.end(JSON.stringify({ok: true}));
@@ -494,7 +502,8 @@ const server = http.createServer(function(req, res) {
   // API: 에이전트 삭제 (DELETE /api/agents/:id)
   if (url.startsWith('/api/agents/') && req.method === 'DELETE') {
     var id = url.split('/api/agents/')[1];
-    var filepath = path.join(AGENTS_DIR, id + '.md');
+    var filepath = safePath(AGENTS_DIR, id + '.md');
+    if (!filepath) { res.writeHead(400, {'Content-Type': 'application/json'}); res.end(JSON.stringify({error: 'invalid id'})); return; }
     if (fs.existsSync(filepath)) {
       fs.unlinkSync(filepath);
       res.writeHead(200, {'Content-Type': 'application/json'});

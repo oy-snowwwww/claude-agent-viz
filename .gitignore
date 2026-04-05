@@ -1,3 +1,6 @@
 sessions/
 .idea/
 CLAUDE.md
+enabled
+*.log
+.DS_Store
