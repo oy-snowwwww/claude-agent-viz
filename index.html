@@ -36,6 +36,18 @@
     .header-right{margin-left:auto;display:flex;align-items:center;gap:10px}
     .header-stat{font-size:.6rem;font-family:monospace;color:var(--text-secondary);display:flex;align-items:center;gap:4px}
     .header-stat strong{color:var(--accent)}
+    .daily-stat{position:relative;font-size:.6rem;font-family:monospace;color:var(--text);cursor:default;padding:3px 8px;border-radius:4px;border:1px solid var(--border);background:var(--bg)}
+    .daily-stat:hover{border-color:var(--accent);box-shadow:0 0 6px var(--glow)}
+    .daily-stat strong{color:var(--accent)}
+    .daily-dropdown{display:none;position:absolute;top:100%;right:0;margin-top:6px;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:10px 14px;min-width:200px;box-shadow:0 8px 24px rgba(0,0,0,.4);z-index:50}
+    .daily-stat:hover .daily-dropdown{display:block}
+    .daily-title{font-size:.6rem;font-weight:600;color:var(--text);margin-bottom:8px;font-family:-apple-system,'Apple SD Gothic Neo',sans-serif}
+    .daily-section{font-size:.55rem;font-weight:600;color:var(--text);margin-top:8px;margin-bottom:3px}
+    .daily-row{display:flex;justify-content:space-between;font-size:.5rem;color:var(--text-secondary);padding:1px 0}
+    .daily-row span:last-child{color:var(--accent);font-weight:600}
+    .daily-row.sub{padding-left:10px}
+    .daily-row.sub::before{content:'├';color:var(--border);margin-right:4px}
+    .daily-row.sub.last::before{content:'└'}
     .theme-btn{background:var(--surface-hover);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:3px 8px;cursor:pointer;font-size:.65rem;font-family:monospace}
     .theme-btn:hover{border-color:var(--accent)}
     .help-btn,.stop-btn{background:var(--surface-hover);border:1px solid var(--border);border-radius:50%;width:24px;height:24px;cursor:pointer;font-size:.7rem;font-family:monospace;font-weight:700;display:flex;align-items:center;justify-content:center;line-height:1}
@@ -372,6 +384,7 @@
       </div>
       <div class="header-right">
         <div class="header-stat" id="headerStat"></div>
+        <div class="daily-stat" id="dailyStat"></div>
         <button class="help-btn" onclick="toggleHelp()" title="도움말">?</button>
         <button class="help-btn restart-btn" onclick="restartServer()" title="재시작">&#8635;</button>
         <button class="help-btn stop-btn" onclick="shutdownServer()" title="서버 종료">&#9632;</button>
@@ -1247,6 +1260,60 @@
     });
   }
 
+  // === Daily Stats ===
+  var dailyStatsData={prompts:0,totalAgents:0,totalTools:0,agents:{},tools:{}};
+  function fetchDailyStats(){
+    fetch(API+'/api/stats').then(function(r){return r.json()}).then(function(data){
+      dailyStatsData=data;renderDailyStat();
+    }).catch(function(){});
+  }
+  function renderDailyStat(){
+    var el=document.getElementById('dailyStat');if(!el)return;
+    var d=dailyStatsData;
+    var summary='📊 에이전트 <strong>'+d.totalAgents+'</strong> · 도구 <strong>'+d.totalTools+'</strong> · 프롬프트 <strong>'+d.prompts+'</strong>';
+
+    // 드롭다운 상세
+    var dd='<div class="daily-dropdown"><div class="daily-title">오늘의 요약</div>';
+
+    // 에이전트 섹션
+    var agentKeys=Object.keys(d.agents||{}).sort(function(a,b){return d.agents[b]-d.agents[a]});
+    dd+='<div class="daily-section">에이전트 '+d.totalAgents+'회</div>';
+    if(agentKeys.length===0){dd+='<div class="daily-row"><span>없음</span><span>-</span></div>'}
+    agentKeys.forEach(function(k,i){
+      var cls='daily-row sub'+(i===agentKeys.length-1?' last':'');
+      dd+='<div class="'+cls+'"><span>'+k+'</span><span>'+d.agents[k]+'</span></div>';
+    });
+
+    // 도구 섹션
+    var toolKeys=Object.keys(d.tools||{}).sort(function(a,b){return d.tools[b]-d.tools[a]});
+    dd+='<div class="daily-section">도구 '+d.totalTools+'회</div>';
+    var showTools=toolKeys.slice(0,8);
+    showTools.forEach(function(k,i){
+      var cls='daily-row sub'+(i===showTools.length-1?' last':'');
+      dd+='<div class="'+cls+'"><span>'+k+'</span><span>'+d.tools[k]+'</span></div>';
+    });
+    if(toolKeys.length>8){dd+='<div class="daily-row sub last"><span>외 '+(toolKeys.length-8)+'개</span><span></span></div>'}
+
+    // 프롬프트 섹션
+    dd+='<div class="daily-section">프롬프트 '+d.prompts+'회</div>';
+    dd+='</div>';
+
+    el.innerHTML=summary+dd;
+  }
+  // SSE 이벤트 수신 시 실시간 업데이트
+  function updateDailyStatFromEvent(ev){
+    if(ev.event==='thinking_start') dailyStatsData.prompts=(dailyStatsData.prompts||0)+1;
+    if(ev.event==='agent_done'&&ev.agent_type){
+      dailyStatsData.agents[ev.agent_type]=(dailyStatsData.agents[ev.agent_type]||0)+1;
+      dailyStatsData.totalAgents=(dailyStatsData.totalAgents||0)+1;
+    }
+    if(ev.event==='tool_use'&&ev.tool_name){
+      dailyStatsData.tools[ev.tool_name]=(dailyStatsData.tools[ev.tool_name]||0)+1;
+      dailyStatsData.totalTools=(dailyStatsData.totalTools||0)+1;
+    }
+    renderDailyStat();
+  }
+
   function toggleHelp(){document.getElementById('helpOverlay').classList.toggle('show')}
   var restartConfirmTimer=null;
   function restartServer(){
@@ -1312,6 +1379,7 @@
   function handleLiveEvent(data){
     var evt=data.event;var sp=data.session_pid||'';var sn=data.session_name||'';
     if(evt==='connected')return;
+    updateDailyStatFromEvent(data);
     if(evt==='session_registered'){if(data.session)registerSession(data.session);addLog(null,'\uC138\uC158: '+(data.session?data.session.name:''),'ok',data.session?data.session.pid:'',data.session?data.session.name:'');return}
     if(evt==='session_renamed'){if(sessions[data.session_pid]){sessions[data.session_pid].name=data.session_name;renderSessionTabs()}return}
     if(evt==='session_stopped'){
@@ -1936,7 +2004,7 @@
   else{document.getElementById('envBtn').textContent='✨';var ws0=document.getElementById('workspace');if(ws0)createSpaceBackground(ws0)}
 
   // === Init ===
-  fetchMaster();fetchSessions();fetchMcpServers();fetchHooks();
+  fetchMaster();fetchSessions();fetchMcpServers();fetchHooks();fetchDailyStats();
   // fetchAgents 완료 후 SSE 연결 (에이전트 목록 없이 이벤트 수신 시 캐릭터 누락 방지)
   fetch(API+'/api/agents').then(function(r){return r.json()}).then(function(data){
     agents=data.map(function(a,i){a.color=agColor(a.id,i);a.active=true;return a});setConn(true);_wsBuilt=false;renderAll();

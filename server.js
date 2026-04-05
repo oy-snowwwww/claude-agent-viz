@@ -158,6 +158,44 @@ function readHooks() {
   return result;
 }
 
+// --- Daily Stats ---
+var STATS_FILE = path.join(__dirname, 'agent-stats.json');
+
+function todayKey() { return new Date().toISOString().slice(0, 10); }
+
+function loadStats() {
+  try {
+    if (fs.existsSync(STATS_FILE)) {
+      var data = JSON.parse(fs.readFileSync(STATS_FILE, 'utf8'));
+      if (data.date === todayKey()) return data;
+    }
+  } catch(e) {}
+  return { date: todayKey(), prompts: 0, agents: {}, tools: {} };
+}
+
+var dailyStats = loadStats();
+
+function saveStats() {
+  try { fs.writeFileSync(STATS_FILE, JSON.stringify(dailyStats), 'utf8'); } catch(e) {}
+}
+
+function recordStat(event, toolName, agentType) {
+  // 날짜 바뀌면 리셋
+  if (dailyStats.date !== todayKey()) {
+    dailyStats = { date: todayKey(), prompts: 0, agents: {}, tools: {} };
+  }
+  if (event === 'thinking_start') {
+    dailyStats.prompts = (dailyStats.prompts || 0) + 1;
+  }
+  if (event === 'agent_done' && agentType) {
+    dailyStats.agents[agentType] = (dailyStats.agents[agentType] || 0) + 1;
+  }
+  if (event === 'tool_use' && toolName) {
+    dailyStats.tools[toolName] = (dailyStats.tools[toolName] || 0) + 1;
+  }
+  saveStats();
+}
+
 // --- Session Tracking ---
 var sessions = {}; // pid → { pid, name, cwd, startTime, lastActivity, eventCount }
 
@@ -339,6 +377,9 @@ const server = http.createServer(function(req, res) {
             }
           }
         }
+
+        // 일일 통계 기록
+        recordStat(event, parsed.tool_name, parsed.agent_type);
 
         // 모든 SSE 클라이언트에 브로드캐스트
         broadcastEvent(parsed);
@@ -592,6 +633,27 @@ const server = http.createServer(function(req, res) {
   if (url === '/api/hooks' && req.method === 'GET') {
     res.writeHead(200, {'Content-Type': 'application/json; charset=utf-8'});
     res.end(JSON.stringify(readHooks()));
+    return;
+  }
+
+  // API: 일일 통계
+  if (url === '/api/stats' && req.method === 'GET') {
+    if (dailyStats.date !== todayKey()) {
+      dailyStats = { date: todayKey(), prompts: 0, agents: {}, tools: {} };
+    }
+    var totalAgents = 0;
+    Object.keys(dailyStats.agents).forEach(function(k) { totalAgents += dailyStats.agents[k]; });
+    var totalTools = 0;
+    Object.keys(dailyStats.tools).forEach(function(k) { totalTools += dailyStats.tools[k]; });
+    res.writeHead(200, {'Content-Type': 'application/json; charset=utf-8'});
+    res.end(JSON.stringify({
+      date: dailyStats.date,
+      prompts: dailyStats.prompts || 0,
+      totalAgents: totalAgents,
+      totalTools: totalTools,
+      agents: dailyStats.agents,
+      tools: dailyStats.tools
+    }));
     return;
   }
 

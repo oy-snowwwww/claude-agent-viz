@@ -2,6 +2,7 @@ sessions/
 .idea/
 CLAUDE.md
 enabled
+agent-stats.json
 *.log
 *.mov
 *.mp4
