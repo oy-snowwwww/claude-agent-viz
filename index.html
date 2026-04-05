@@ -492,7 +492,7 @@
   <div class="toast" id="toast"></div>
 
   <script>
-  var API='http://localhost:54321';
+  var API='http://localhost:'+(location.port||'54321');
   var agents=[];
   var masterData={global:'',project:'',globalPath:'',projectPath:'',cwd:''};
   var elapsed=0;
@@ -809,7 +809,7 @@
     var ws=document.getElementById('workspace');
 
     // 항상 Master + 활성 에이전트만 표시
-    var nodes=[{wsId:'master',id:'master',name:'Master',color:'#fbbf24',model:'opus'}];
+    var nodes=[{wsId:'master',id:'master',name:'Master',color:'#fbbf24',model:''}];
     agents.filter(function(a){
       if(!a.active) return false;
       if(projectAgents.hasRestriction&&projectAgents.enabled.indexOf(a.id)<0) return false;
@@ -1200,10 +1200,11 @@
   function renderMcpList(){
     var box=document.getElementById('mcpList');box.innerHTML='';
     if(mcpServers.length===0){box.innerHTML='<div class="mcp-empty">MCP 서버 없음</div>';return}
-    var MCP_COLORS={github:'#00ffc8',datadog:'#632ca6','google-calendar':'#4285f4',oracle:'#f80000',teamcity:'#00b4f0','oyoy-jira-confluence':'#0052cc'};
+    // MCP 서버명에서 자동 색상 생성
+    function mcpColor(name){var h=0;for(var i=0;i<name.length;i++)h=name.charCodeAt(i)+((h<<5)-h);return 'hsl('+(Math.abs(h)%360)+',60%,55%)'}
     mcpServers.forEach(function(mcp){
       var el=document.createElement('div');el.className='mcp-item';
-      var color=MCP_COLORS[mcp.id]||'var(--accent)';
+      var color=mcpColor(mcp.id);
       el.innerHTML='<span class="mcp-dot" style="background:'+color+';box-shadow:0 0 4px '+color+'"></span><div><div class="mcp-name">'+mcp.name+'</div><div class="mcp-type">'+mcp.type+'</div></div>';
       box.appendChild(el);
     });

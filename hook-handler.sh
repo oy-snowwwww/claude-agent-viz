@@ -1,6 +1,6 @@
 #!/bin/bash
 # Claude Code Hook Handler
-PORT=54321
+PORT="${AGENT_VIZ_PORT:-54321}"
 EVENT_TYPE="${1:-unknown}"
 
 SESSION_CWD="$(pwd 2>/dev/null || echo '')"

@@ -10,7 +10,7 @@
 DIR="$(cd "$(dirname "$0")" && pwd)"
 ENABLED_FILE="$DIR/enabled"
 SESSIONS_DIR="$DIR/sessions"
-PORT=54321
+PORT="${AGENT_VIZ_PORT:-54321}"
 
 mkdir -p "$SESSIONS_DIR"
 

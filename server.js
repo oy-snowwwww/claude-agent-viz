@@ -11,7 +11,7 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 
-const PORT = 54321;
+const PORT = parseInt(process.env.AGENT_VIZ_PORT || '54321', 10);
 const AGENTS_DIR = path.join(process.env.HOME, '.claude', 'agents');
 const MCP_JSON = path.join(process.env.HOME, '.mcp.json');
 const SETTINGS_JSON = path.join(process.env.HOME, '.claude', 'settings.json');
