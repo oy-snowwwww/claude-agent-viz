@@ -116,6 +116,19 @@
     .ag.disabled{opacity:.4}
     .ag.disabled .ag-name{color:var(--text-secondary) !important}
 
+    /* House */
+    .ws-house{position:absolute;right:6%;bottom:12%;z-index:1;display:flex;flex-direction:column;align-items:center;pointer-events:none}
+    .ws-house-body{display:grid;grid-template-columns:repeat(9,8px);grid-template-rows:repeat(9,8px);image-rendering:pixelated}
+    .ws-house-badge{font-size:.45rem;font-family:monospace;color:var(--text-secondary);margin-top:2px;background:var(--surface);padding:1px 5px;border-radius:3px;border:1px solid var(--border);pointer-events:auto}
+    .ws-house-smoke{position:absolute;top:-8px;right:8px;pointer-events:none}
+    .ws-house-smoke span{display:block;width:4px;height:4px;border-radius:50%;background:var(--text-secondary);opacity:.3;animation:smokeRise 3s ease-out infinite}
+    .ws-house-smoke span:nth-child(2){animation-delay:1s;left:3px}
+    .ws-house-smoke span:nth-child(3){animation-delay:2s;left:-2px}
+    @keyframes smokeRise{0%{transform:translateY(0) scale(1);opacity:.4}100%{transform:translateY(-18px) scale(2);opacity:0}}
+
+    /* Accessory */
+    .ws-accessory{font-size:8px;position:absolute;bottom:-2px;right:-6px;z-index:3;filter:drop-shadow(0 1px 2px rgba(0,0,0,.5))}
+
     /* MCP Servers */
     .mcp-item{background:var(--bg);border:1px solid var(--border);border-radius:4px;padding:6px 8px;margin-bottom:4px;display:flex;align-items:center;gap:6px}
     .mcp-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
@@ -516,6 +529,36 @@
   };
   var currentTheme=localStorage.getItem('viz-theme')||'dark';
   function shade(hex,amt){var n=parseInt(hex.slice(1),16);var r=Math.min(255,Math.max(0,(n>>16)+amt));var g=Math.min(255,Math.max(0,((n>>8)&0xff)+amt));var b=Math.min(255,Math.max(0,(n&0xff)+amt));return '#'+((1<<24)+(r<<16)+(g<<8)+b).toString(16).slice(1)}
+  // 에이전트 악세서리
+  var AGENT_ACCESSORIES={master:'👑',coder:'💻',reviewer:'🔍',qa:'✅',architect:'📐',planner:'📋'};
+  var HOUSE_POS={x:90,y:82};
+  var _enteringAgents={}; // agentId → true (집에서 나오는 중)
+
+  function buildHouse(){
+    // 9x9 픽셀아트 집
+    var t='transparent',r='#8B4513',w='#D2B48C',d='#654321',wi='#87CEEB',g='#228B22';
+    var houseMap=[
+      [t,t,t,t,r,t,t,t,t],
+      [t,t,t,r,r,r,t,t,t],
+      [t,t,r,r,r,r,r,t,t],
+      [t,r,r,r,r,r,r,r,t],
+      [w,w,w,w,w,w,w,w,w],
+      [w,wi,w,w,d,w,w,wi,w],
+      [w,wi,w,w,d,w,w,wi,w],
+      [w,w,w,w,d,w,w,w,w],
+      [g,g,g,g,g,g,g,g,g],
+    ];
+    var el=document.createElement('div');el.className='ws-house';el.id='ws-house';
+    var body=document.createElement('div');body.className='ws-house-body';
+    houseMap.forEach(function(row){row.forEach(function(c){var cell=document.createElement('i');cell.style.background=c;body.appendChild(cell)})});
+    el.appendChild(body);
+    // 연기
+    var smoke=document.createElement('div');smoke.className='ws-house-smoke';
+    for(var s=0;s<3;s++){var sp=document.createElement('span');sp.style.animationDelay=(s*1)+'s';smoke.appendChild(sp)}
+    el.appendChild(smoke);
+    return el;
+  }
+
   function buildPix(id,color,size,model){
     var map=(PMAPS[id]||PMAPS._default).map(function(row){return row.slice()});
     // 모델별 머리 변형 (master 제외 — 이미 왕관)
@@ -700,22 +743,36 @@
             e.stopPropagation();
             var newEnabled;
             if(!projectAgents.hasRestriction){
-              // 제한 없음 → 이 에이전트만 끄기 (나머지 전부 ON)
               newEnabled=agents.map(function(a){return a.id}).filter(function(id){return id!==agId});
             } else if(en){
-              // ON → OFF
               newEnabled=projectAgents.enabled.filter(function(id){return id!==agId});
             } else {
-              // OFF → ON
               newEnabled=projectAgents.enabled.concat([agId]);
             }
-            // 전부 ON이면 제한 해제
-            if(newEnabled.length>=agents.length){
-              fetch(API+'/api/project-agents',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({cwd:(currentSession&&sessions[currentSession])?sessions[currentSession].cwd:'',enabled:[],hasRestriction:false})}).then(function(r){return r.json()}).then(function(r){
-                if(r.ok){projectAgents={hasRestriction:false,enabled:[]};_wsBuilt=false;renderAll();var cwdR=(currentSession&&sessions[currentSession])?sessions[currentSession].cwd:'';fetchMaster(cwdR);toast('에이전트 제한 해제')}
-              }).catch(function(){toast('연결 실패','err')});
+            // OFF → ON: 집에서 나오기 예약
+            if(!en){_enteringAgents[agId]=true}
+            // ON → OFF: 집으로 걸어가기 애니메이션
+            if(en){
+              var wsEl=document.getElementById('ws-'+agId);
+              if(wsEl){
+                wsEl.style.transition='left 0.8s ease, top 0.8s ease, opacity 0.8s ease, transform 0.8s ease';
+                wsEl.style.left=HOUSE_POS.x+'%';wsEl.style.top=HOUSE_POS.y+'%';
+                wsEl.style.opacity='0.3';wsEl.style.transform='translate(-50%,-50%) scale(0.5)';
+                if(creatureLife[agId])delete creatureLife[agId];
+              }
+              setTimeout(function(){
+                if(newEnabled.length>=agents.length){
+                  fetch(API+'/api/project-agents',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({cwd:(currentSession&&sessions[currentSession])?sessions[currentSession].cwd:'',enabled:[],hasRestriction:false})}).then(function(r){return r.json()}).then(function(r){
+                    if(r.ok){projectAgents={hasRestriction:false,enabled:[]};_wsBuilt=false;renderAll();var cwdR=(currentSession&&sessions[currentSession])?sessions[currentSession].cwd:'';fetchMaster(cwdR);toast('에이전트 제한 해제')}
+                  }).catch(function(){toast('연결 실패','err')});
+                } else {saveProjectAgents(newEnabled)}
+              },800);
             } else {
-              saveProjectAgents(newEnabled);
+              if(newEnabled.length>=agents.length){
+                fetch(API+'/api/project-agents',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({cwd:(currentSession&&sessions[currentSession])?sessions[currentSession].cwd:'',enabled:[],hasRestriction:false})}).then(function(r){return r.json()}).then(function(r){
+                  if(r.ok){projectAgents={hasRestriction:false,enabled:[]};_wsBuilt=false;renderAll();var cwdR=(currentSession&&sessions[currentSession])?sessions[currentSession].cwd:'';fetchMaster(cwdR);toast('에이전트 제한 해제')}
+                }).catch(function(){toast('연결 실패','err')});
+              } else {saveProjectAgents(newEnabled)}
             }
           };
         })(ag.id,isEnabled);
@@ -789,6 +846,8 @@
       var positions=getPositions(nodes.length);
       var existingIds={};
       ws.querySelectorAll('.ws-agent').forEach(function(el){existingIds[el.id]=true});
+      // 집 추가 (없으면)
+      if(!ws.querySelector('#ws-house')) ws.appendChild(buildHouse());
       // 삭제된 노드 제거
       ws.querySelectorAll('.ws-agent').forEach(function(el){
         var wid=el.id.replace('ws-','');
@@ -799,10 +858,28 @@
         if(existingIds['ws-'+nd.wsId]) return;
         var el=document.createElement('div');el.className='ws-agent '+(nd._st||'idle');el.id='ws-'+nd.wsId;el.dataset.st=nd._st||'idle';
         var savedPos=creatureLife[nd.wsId];
-        el.style.left=(savedPos?savedPos.x:positions[i].x)+'%';el.style.top=(savedPos?savedPos.y:positions[i].y)+'%';el.style.transform='translate(-50%,-50%)';
+        var isEntering=_enteringAgents[nd.wsId];
+        var startX=isEntering?HOUSE_POS.x:(savedPos?savedPos.x:positions[i].x);
+        var startY=isEntering?HOUSE_POS.y:(savedPos?savedPos.y:positions[i].y);
+        el.style.left=startX+'%';el.style.top=startY+'%';el.style.transform='translate(-50%,-50%)';
+        if(isEntering){
+          el.style.opacity='0.3';el.style.transform='translate(-50%,-50%) scale(0.5)';
+          var targetX=positions[i].x;var targetY=positions[i].y;
+          setTimeout(function(){
+            el.style.transition='left 0.8s ease, top 0.8s ease, opacity 0.8s ease, transform 0.8s ease';
+            el.style.left=targetX+'%';el.style.top=targetY+'%';
+            el.style.opacity='1';el.style.transform='translate(-50%,-50%) scale(1)';
+          },50);
+          delete _enteringAgents[nd.wsId];
+        }
         el.style.setProperty('--rnd-delay',(Math.random()*3).toFixed(2)+'s');
         el.style.setProperty('--rnd-dur',(0.8+Math.random()*0.6).toFixed(2));
-        el.appendChild(buildPix(nd.id,nd.color,'lg',nd.model));
+        var pixWrap=document.createElement('div');pixWrap.style.position='relative';
+        pixWrap.appendChild(buildPix(nd.id,nd.color,'lg',nd.model));
+        // 악세서리
+        var acc=AGENT_ACCESSORIES[nd.id];
+        if(acc){var accEl=document.createElement('span');accEl.className='ws-accessory';accEl.textContent=acc;pixWrap.appendChild(accEl)}
+        el.appendChild(pixWrap);
         var lbl=document.createElement('div');lbl.className='ws-label';
         if(nd.id==='master') lbl.innerHTML='<span style="color:#c084fc">Master</span><span class="ws-badge" style="background:rgba(251,191,36,.15);color:#fbbf24">SESSION</span>';
         else lbl.innerHTML=nd.name+'<span class="ws-badge model-'+(nd.model||'sonnet')+'">'+(nd.model||'').toUpperCase()+'</span>';
@@ -822,6 +899,16 @@
         var bub=el.querySelector('.ws-bubble');
         if(bub) bub.textContent=nd._task||'';
       });
+    }
+    // 집 배지 업데이트 (비활성 에이전트 수)
+    var house=ws.querySelector('#ws-house');
+    if(house){
+      var disabledCount=projectAgents.hasRestriction?agents.filter(function(a){return a.active&&projectAgents.enabled.indexOf(a.id)<0}).length:0;
+      var badge=house.querySelector('.ws-house-badge');
+      if(disabledCount>0){
+        if(!badge){badge=document.createElement('div');badge.className='ws-house-badge';house.appendChild(badge)}
+        badge.textContent='🏠 '+disabledCount;
+      } else {if(badge)badge.remove()}
     }
     // 상태별 이펙트: 아우라 (working), 이모션 (done/stale)
     nodes.forEach(function(nd){
