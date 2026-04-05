@@ -35,7 +35,7 @@ Claude Code의 에이전트 활동을 실시간으로 시각화하는 로컬 대
 
 ```bash
 # ~/.claude/agent-viz/ 에 프로젝트 파일 배치
-git clone <repo-url> ~/.claude/agent-viz
+git clone https://github.com/oy-snowwwww/claude-agent-viz.git ~/.claude/agent-viz
 ```
 
 ### 2. 실행 권한 부여
