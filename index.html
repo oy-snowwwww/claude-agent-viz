@@ -113,8 +113,11 @@
     .ag-toggle::after{content:'';position:absolute;top:2px;left:2px;width:12px;height:12px;border-radius:50%;background:var(--text-secondary);transition:all .2s}
     .ag-toggle.on{background:rgba(0,255,200,.25);border-color:var(--accent);box-shadow:0 0 6px rgba(0,255,200,.3)}
     .ag-toggle.on::after{left:18px;background:var(--accent)}
+    .ag-toggle.locked{opacity:.3;cursor:not-allowed}
     .ag.disabled{opacity:.4}
     .ag.disabled .ag-name{color:var(--text-secondary) !important}
+    .ws-agent{animation:agentFadeIn .4s ease-out}
+    @keyframes agentFadeIn{0%{opacity:0;transform:translate(-50%,-50%) scale(.7)}100%{opacity:1;transform:translate(-50%,-50%) scale(1)}}
 
     /* House */
     .ws-house{position:absolute;right:6%;bottom:15%;z-index:8;display:flex;flex-direction:column;align-items:center;pointer-events:none}
@@ -172,7 +175,8 @@
     @keyframes snowFall{0%{transform:translateY(-10px) rotate(0deg)}100%{transform:translateY(110%) rotate(360deg)}}
     @keyframes leafFall{0%{transform:translateY(-10px) rotate(0deg)}100%{transform:translateY(110%) rotate(720deg)}}
     @keyframes petalFall{0%{transform:translateY(-10px) rotate(0deg) scale(1)}50%{transform:translateY(55%) rotate(180deg) scale(1.2)}100%{transform:translateY(110%) rotate(360deg) scale(0.8)}}
-    @keyframes twinkle{0%{opacity:.3}100%{opacity:.9}}
+    @keyframes twinkle{0%{opacity:.2}50%{opacity:1}100%{opacity:.2}}
+    @keyframes twinkleBright{0%{opacity:.4;transform:scale(1)}50%{opacity:1;transform:scale(1.5);box-shadow:0 0 4px white}100%{opacity:.4;transform:scale(1)}}
     @keyframes fireflyFloat{0%{transform:translate(0,0);opacity:.3}25%{opacity:1}50%{transform:translate(15px,-10px);opacity:.5}75%{opacity:1}100%{transform:translate(-10px,8px);opacity:.2}}
     /* 태양/달 */
     .ws-celestial{position:absolute;font-size:20px;z-index:0;pointer-events:none;transition:left 6s linear,top 6s ease-in-out,opacity 2s ease;filter:drop-shadow(0 0 8px rgba(255,200,50,.5))}
@@ -371,7 +375,7 @@
         <button class="help-btn" onclick="toggleHelp()" title="도움말">?</button>
         <button class="help-btn restart-btn" onclick="restartServer()" title="재시작">&#8635;</button>
         <button class="help-btn stop-btn" onclick="shutdownServer()" title="서버 종료">&#9632;</button>
-        <button class="season-btn" onclick="toggleEnv()" id="envBtn" title="환경 효과 on/off">🌍</button>
+        <button class="season-btn" onclick="toggleEnv()" id="envBtn" title="환경 효과 on/off">✨</button>
         <button class="season-btn" onclick="cycleSeason()" id="seasonBtn">🌸 봄</button>
         <button class="theme-btn" onclick="cycleTheme()" id="themeBtn">Dark</button>
       </div>
@@ -558,8 +562,6 @@
   function shade(hex,amt){var n=parseInt(hex.slice(1),16);var r=Math.min(255,Math.max(0,(n>>16)+amt));var g=Math.min(255,Math.max(0,((n>>8)&0xff)+amt));var b=Math.min(255,Math.max(0,(n&0xff)+amt));return '#'+((1<<24)+(r<<16)+(g<<8)+b).toString(16).slice(1)}
   // 에이전트 악세서리
   var AGENT_ACCESSORIES={master:'👑',coder:'💻',reviewer:'🔍',qa:'✅',architect:'📐',planner:'📋'};
-  var HOUSE_POS={x:90,y:78};
-  var _enteringAgents={}; // agentId → true (집에서 나오는 중)
 
   function buildHouse(){
     // 9x9 픽셀아트 집
@@ -761,13 +763,19 @@
       // 어딘가에서 working 중이면 라이브 dot
       var isLive=Object.values(liveInstances).some(function(inst){return inst.agentId===ag.id&&inst.st==='working'});
       if(isLive){var dot=document.createElement('span');dot.className='ag-live';card.appendChild(dot)}
-      // 프로젝트별 토글
+      // 프로젝트별 토글 (Master idle일 때만)
       if(hasCwd){
-        var toggle=document.createElement('span');toggle.className='ag-toggle'+(isEnabled?' on':'');
-        toggle.title=isEnabled?'이 프로젝트에서 활성':'이 프로젝트에서 비활성';
+        var masterBusy=masterData._st==='thinking'||masterData._st==='working';
+        var isLocked=isLive||masterBusy;
+        var toggle=document.createElement('span');toggle.className='ag-toggle'+(isEnabled?' on':'')+(isLocked?' locked':'');
+        toggle.title=isLocked?'작업 중 — 변경 불가':(isEnabled?'이 프로젝트에서 활성':'이 프로젝트에서 비활성');
         (function(agId,en){
           toggle.onclick=function(e){
             e.stopPropagation();
+            // 클릭 시점에 실시간 체크
+            var busy=masterData._st==='thinking'||masterData._st==='working';
+            var working=Object.values(liveInstances).some(function(i){return i.agentId===agId&&i.st==='working'});
+            if(busy||working){toast('작업 중에는 변경할 수 없습니다');return}
             var newEnabled;
             if(!projectAgents.hasRestriction){
               newEnabled=agents.map(function(a){return a.id}).filter(function(id){return id!==agId});
@@ -776,31 +784,11 @@
             } else {
               newEnabled=projectAgents.enabled.concat([agId]);
             }
-            // OFF → ON: 집에서 나오기 예약
-            if(!en){_enteringAgents[agId]=true}
-            // ON → OFF: 집으로 걸어가기 애니메이션
-            if(en){
-              var wsEl=document.getElementById('ws-'+agId);
-              if(wsEl){
-                wsEl.style.transition='left 0.8s ease, top 0.8s ease, opacity 0.8s ease, transform 0.8s ease';
-                wsEl.style.left=HOUSE_POS.x+'%';wsEl.style.top=HOUSE_POS.y+'%';
-                wsEl.style.opacity='0.3';wsEl.style.transform='translate(-50%,-50%) scale(0.5)';
-                if(creatureLife[agId])delete creatureLife[agId];
-              }
-              setTimeout(function(){
-                if(newEnabled.length>=agents.length){
-                  fetch(API+'/api/project-agents',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({cwd:(currentSession&&sessions[currentSession])?sessions[currentSession].cwd:'',enabled:[],hasRestriction:false})}).then(function(r){return r.json()}).then(function(r){
-                    if(r.ok){projectAgents={hasRestriction:false,enabled:[]};_wsBuilt=false;renderAll();var cwdR=(currentSession&&sessions[currentSession])?sessions[currentSession].cwd:'';fetchMaster(cwdR);toast('에이전트 제한 해제')}
-                  }).catch(function(){toast('연결 실패','err')});
-                } else {saveProjectAgents(newEnabled)}
-              },800);
-            } else {
-              if(newEnabled.length>=agents.length){
-                fetch(API+'/api/project-agents',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({cwd:(currentSession&&sessions[currentSession])?sessions[currentSession].cwd:'',enabled:[],hasRestriction:false})}).then(function(r){return r.json()}).then(function(r){
-                  if(r.ok){projectAgents={hasRestriction:false,enabled:[]};_wsBuilt=false;renderAll();var cwdR=(currentSession&&sessions[currentSession])?sessions[currentSession].cwd:'';fetchMaster(cwdR);toast('에이전트 제한 해제')}
-                }).catch(function(){toast('연결 실패','err')});
-              } else {saveProjectAgents(newEnabled)}
-            }
+            if(newEnabled.length>=agents.length){
+              fetch(API+'/api/project-agents',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({cwd:(currentSession&&sessions[currentSession])?sessions[currentSession].cwd:'',enabled:[],hasRestriction:false})}).then(function(r){return r.json()}).then(function(r){
+                if(r.ok){projectAgents={hasRestriction:false,enabled:[]};_wsBuilt=false;renderAll();var cwdR=(currentSession&&sessions[currentSession])?sessions[currentSession].cwd:'';fetchMaster(cwdR);toast('에이전트 제한 해제')}
+              }).catch(function(){toast('연결 실패','err')});
+            } else {saveProjectAgents(newEnabled)}
           };
         })(ag.id,isEnabled);
         card.appendChild(toggle);
@@ -833,7 +821,10 @@
     // 정의되지 않은 에이전트(Explore 등)도 활동 중이면 동적 추가
     var instances=!currentSession?Object.values(liveInstances):getLiveInstances();
     var definedIds=nodes.map(function(n){return n.id});
+    var knownAgentIds=agents.map(function(a){return a.id});
     instances.forEach(function(inst){
+      // 정의된 에이전트는 토글로 관리하므로 동적 추가 안 함
+      if(inst.agentId&&knownAgentIds.indexOf(inst.agentId)>=0) return;
       if(inst.agentId&&definedIds.indexOf(inst.agentId)===-1){
         if(!nodes.find(function(n){return n.id===inst.agentId})){
           nodes.push({wsId:inst.agentId,id:inst.agentId,name:inst.agentId,color:inst.color||agColor(inst.agentId,nodes.length),model:'',_dynamic:true});
@@ -885,20 +876,7 @@
         if(existingIds['ws-'+nd.wsId]) return;
         var el=document.createElement('div');el.className='ws-agent '+(nd._st||'idle');el.id='ws-'+nd.wsId;el.dataset.st=nd._st||'idle';
         var savedPos=creatureLife[nd.wsId];
-        var isEntering=_enteringAgents[nd.wsId];
-        var startX=isEntering?HOUSE_POS.x:(savedPos?savedPos.x:positions[i].x);
-        var startY=isEntering?HOUSE_POS.y:(savedPos?savedPos.y:positions[i].y);
-        el.style.left=startX+'%';el.style.top=startY+'%';el.style.transform='translate(-50%,-50%)';
-        if(isEntering){
-          el.style.opacity='0.3';el.style.transform='translate(-50%,-50%) scale(0.5)';
-          var targetX=positions[i].x;var targetY=positions[i].y;
-          setTimeout(function(){
-            el.style.transition='left 0.8s ease, top 0.8s ease, opacity 0.8s ease, transform 0.8s ease';
-            el.style.left=targetX+'%';el.style.top=targetY+'%';
-            el.style.opacity='1';el.style.transform='translate(-50%,-50%) scale(1)';
-          },50);
-          delete _enteringAgents[nd.wsId];
-        }
+        el.style.left=(savedPos?savedPos.x:positions[i].x)+'%';el.style.top=(savedPos?savedPos.y:positions[i].y)+'%';el.style.transform='translate(-50%,-50%)';
         el.style.setProperty('--rnd-delay',(Math.random()*3).toFixed(2)+'s');
         el.style.setProperty('--rnd-dur',(0.8+Math.random()*0.6).toFixed(2));
         var pixWrap=document.createElement('div');pixWrap.style.position='relative';
@@ -1815,7 +1793,7 @@
   }catch(e){console.error('[agent-viz] updateEnvironment error:',e)}}
 
   // 계절 자동 순환 (하루 = DAY_CYCLE_MS)
-  var _seasonInterval=setInterval(function(){
+  function seasonCycleCheck(){
     var currentCycle=Math.floor((Date.now()+_dayOffset)/DAY_CYCLE_MS);
     if(currentCycle!==_lastSeasonCycle){
       _lastSeasonCycle=currentCycle;
@@ -1827,7 +1805,8 @@
       updateEnvironment();startWeather();startSparkles();
       _wsBuilt=false;renderAll();
     }
-  },3000);
+  }
+  var _seasonInterval=_envEnabled?setInterval(seasonCycleCheck,3000):null;
 
   // 날씨 파티클
   var _weatherInterval=null;
@@ -1888,27 +1867,51 @@
     },500);
   }
 
-  var _envEnabled=localStorage.getItem('agviz-env')!=='off';
+  var _envEnabled=localStorage.getItem('agviz-env')==='on';
+  function createSpaceBackground(ws){
+    ws.style.background='linear-gradient(180deg,#050510 0%,#0a0a20 40%,#12123a 70%,#1a1a45 100%)';
+    ws.querySelectorAll('.ws-stars').forEach(function(e){e.remove()});
+    var starsEl=document.createElement('div');starsEl.className='ws-stars';
+    starsEl.style.cssText='position:absolute;inset:0;pointer-events:none;z-index:0';
+    var dots='';
+    var starColors=['#ffffff','#ffe8d0','#d0e8ff','#fffde0','#e0d0ff'];
+    // 작은 별 60개
+    for(var s=0;s<60;s++){
+      var sx=Math.random()*100,sy=Math.random()*100,ss=0.5+Math.random()*1.5;
+      var sc=starColors[Math.floor(Math.random()*starColors.length)];
+      dots+='<span style="position:absolute;left:'+sx+'%;top:'+sy+'%;width:'+ss+'px;height:'+ss+'px;background:'+sc+';border-radius:50%;animation:twinkle '+(2+Math.random()*4)+'s ease-in-out infinite;animation-delay:'+(Math.random()*5)+'s"></span>';
+    }
+    // 밝은 별 12개
+    for(var b=0;b<12;b++){
+      var bx=Math.random()*100,by=Math.random()*100,bs=1.5+Math.random()*2;
+      var bc=starColors[Math.floor(Math.random()*starColors.length)];
+      dots+='<span style="position:absolute;left:'+bx+'%;top:'+by+'%;width:'+bs+'px;height:'+bs+'px;background:'+bc+';border-radius:50%;box-shadow:0 0 '+(2+Math.random()*4)+'px '+bc+';animation:twinkleBright '+(1.5+Math.random()*3)+'s ease-in-out infinite;animation-delay:'+(Math.random()*4)+'s"></span>';
+    }
+    starsEl.innerHTML=dots;ws.insertBefore(starsEl,ws.firstChild);
+  }
   function toggleEnv(){
     _envEnabled=!_envEnabled;
     localStorage.setItem('agviz-env',_envEnabled?'on':'off');
     var ws=document.getElementById('workspace');
     var btn=document.getElementById('envBtn');
     if(_envEnabled){
-      btn.textContent='🌍';btn.style.opacity='1';
+      btn.textContent='🌍';
+      // 우주 별 제거 후 환경 시작
+      if(ws)ws.querySelectorAll('.ws-stars').forEach(function(e){e.remove()});
       updateEnvironment();startWeather();startSparkles();
       if(!_envInterval)_envInterval=setInterval(updateEnvironment,8000);
-      if(!_seasonInterval)_seasonInterval=setInterval(function(){var cc=Math.floor((Date.now()+_dayOffset)/DAY_CYCLE_MS);if(cc!==_lastSeasonCycle){_lastSeasonCycle=cc;var idx=SEASONS.indexOf(currentSeason);currentSeason=SEASONS[(idx+1)%SEASONS.length];document.getElementById('seasonBtn').textContent=SEASON_LABELS[currentSeason];if(ws){ws.dataset.groundDetail='';ws.dataset.treeKey='';ws.querySelectorAll('.ws-fireflies').forEach(function(f){f.remove()})}updateEnvironment();startWeather();startSparkles();_wsBuilt=false;renderAll()}},3000);
+      if(!_seasonInterval)_seasonInterval=setInterval(seasonCycleCheck,3000);
     } else {
-      btn.textContent='🌑';btn.style.opacity='.5';
+      btn.textContent='✨';
       if(_weatherInterval){clearInterval(_weatherInterval);_weatherInterval=null}
       if(_sparkleInterval){clearInterval(_sparkleInterval);_sparkleInterval=null}
       if(_envInterval){clearInterval(_envInterval);_envInterval=null}
       if(_seasonInterval){clearInterval(_seasonInterval);_seasonInterval=null}
       if(ws){
         ws.querySelectorAll('.weather-particle,.sparkle-fall,.ws-cloud,.ws-sun,.ws-moon,.ws-stars,.ws-tree,.ws-ground-detail,.ws-fireflies').forEach(function(e){e.remove()});
-        ws._cloudInterval=null;
-        ws.style.background='var(--bg)';
+        if(ws._cloudInterval){clearInterval(ws._cloudInterval);ws._cloudInterval=null}
+        ws.dataset.groundDetail='';ws.dataset.treeKey='';
+        createSpaceBackground(ws);
       }
     }
   }
@@ -1928,7 +1931,7 @@
   // 초기화
   document.getElementById('seasonBtn').textContent=SEASON_LABELS[currentSeason];
   if(_envEnabled){updateEnvironment();startWeather();startSparkles()}
-  else{document.getElementById('envBtn').textContent='🌑';document.getElementById('envBtn').style.opacity='.5'}
+  else{document.getElementById('envBtn').textContent='✨';var ws0=document.getElementById('workspace');if(ws0)createSpaceBackground(ws0)}
 
   // === Init ===
   fetchMaster();fetchSessions();fetchMcpServers();fetchHooks();
@@ -1941,7 +1944,7 @@
   setInterval(checkStaleInstances,30000);
 
   // === Page Visibility: 탭 비활성 시 애니메이션 일시정지 ===
-  var _envInterval=setInterval(updateEnvironment,8000);
+  var _envInterval=_envEnabled?setInterval(updateEnvironment,8000):null;
   document.addEventListener('visibilitychange',function(){
     var ws=document.getElementById('workspace');
     if(document.hidden){
@@ -1956,13 +1959,18 @@
       if(ws)ws.querySelectorAll('.weather-particle,.sparkle-fall').forEach(function(p){p.remove()});
     } else {
       // 탭 활성: 재개
-      startWeather();startSparkles();
-      if(ws)ws._cloudInterval=null;
-      _envInterval=setInterval(updateEnvironment,8000);
       _blinkInterval=setInterval(blinkEyes,1500);
-      _seasonInterval=setInterval(function(){var cc=Math.floor((Date.now()+_dayOffset)/DAY_CYCLE_MS);if(cc!==_lastSeasonCycle){_lastSeasonCycle=cc;var idx=SEASONS.indexOf(currentSeason);currentSeason=SEASONS[(idx+1)%SEASONS.length];document.getElementById('seasonBtn').textContent=SEASON_LABELS[currentSeason];var w=document.getElementById('workspace');if(w){w.dataset.groundDetail='';w.dataset.treeKey='';w.querySelectorAll('.ws-fireflies').forEach(function(f){f.remove()})}updateEnvironment();startWeather();startSparkles();_wsBuilt=false;renderAll()}},3000);
+      if(_envEnabled){
+        startWeather();startSparkles();
+        if(ws)ws._cloudInterval=null;
+        _envInterval=setInterval(updateEnvironment,8000);
+      }
+      if(_envEnabled){
+        _seasonInterval=setInterval(seasonCycleCheck,3000);
+        updateEnvironment();
+      }
       _walkInterval=setInterval(function(){document.querySelectorAll('.ws-agent.working .pix-lg,.ws-agent.idle .pix-lg').forEach(function(pix){var agent=pix.parentElement.parentElement||pix.parentElement;var id=agent.id?agent.id.replace('ws-',''):'';var c=creatureLife[id];if(agent.classList.contains('working')){if(Math.random()>.6)return;walkLegs(pix)}else if(c&&c.beh==='roam'){if(Math.random()>.5)return;walkLegs(pix)}})},350);
-      updateEnvironment();renderAll();
+      renderAll();
     }
   });
   </script>
