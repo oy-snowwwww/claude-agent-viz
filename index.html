@@ -1884,7 +1884,6 @@
   // 초기화
   document.getElementById('seasonBtn').textContent=SEASON_LABELS[currentSeason];
   updateEnvironment();startWeather();startSparkles();
-  setInterval(updateEnvironment,5000); // 5초마다 배경 업데이트
 
   // === Init ===
   fetchMaster();fetchSessions();fetchMcpServers();fetchHooks();
@@ -1895,6 +1894,26 @@
     if(cwd) fetchProjectAgents(cwd);
   }).catch(function(){setConn(false)}).finally(function(){connectSSE()});
   setInterval(checkStaleInstances,30000);
+
+  // === Page Visibility: 탭 비활성 시 애니메이션 일시정지 ===
+  var _envInterval=setInterval(updateEnvironment,5000);
+  document.addEventListener('visibilitychange',function(){
+    var ws=document.getElementById('workspace');
+    if(document.hidden){
+      // 탭 비활성: 모든 파티클/애니메이션 정지
+      if(_weatherInterval){clearInterval(_weatherInterval);_weatherInterval=null}
+      if(_sparkleInterval){clearInterval(_sparkleInterval);_sparkleInterval=null}
+      if(_envInterval){clearInterval(_envInterval);_envInterval=null}
+      if(ws&&ws._cloudInterval){clearInterval(ws._cloudInterval);ws._cloudInterval=null}
+      if(ws)ws.querySelectorAll('.weather-particle,.sparkle-fall').forEach(function(p){p.remove()});
+    } else {
+      // 탭 활성: 재개
+      startWeather();startSparkles();
+      if(ws)ws._cloudInterval=null; // 다음 updateEnvironment에서 재생성
+      _envInterval=setInterval(updateEnvironment,5000);
+      updateEnvironment();renderAll();
+    }
+  });
   </script>
 </body>
 </html>
