@@ -155,6 +155,10 @@ const server = http.createServer(function(req, res) {
           parsed.agent_description = parsed.tool_input.description || '';
           parsed.agent_prompt = (parsed.tool_input.prompt || '').substring(0, 200);
         }
+        // 에이전트 내부 도구 사용 시 agent_type 전달
+        if (toolInput.agent_type && !parsed.agent_type) {
+          parsed.agent_type = toolInput.agent_type;
+        }
 
         // 세션 종료 이벤트 — 무시 (에이전트 종료와 메인 세션 종료를 구분 불가)
         // 세션 정리: UI × 버튼 + 2시간 무활동 자동 제거로 처리
@@ -228,15 +232,32 @@ const server = http.createServer(function(req, res) {
               parsed.session_pid = targetPid;
               parsed.session_name = sessions[targetPid].name;
             } else {
-              targetPid = null;
+              // 매칭 실패 → 새 세션으로 자동 등록 (서버 재시작 후 복구용)
+              targetPid = session.pid;
+              sessions[targetPid] = {
+                pid: targetPid,
+                name: session.name || 'Session ' + targetPid,
+                cwd: session.cwd || '',
+                tty: session.tty || '',
+                sid: session.sid || '',
+                startTime: new Date().toISOString(),
+                lastActivity: new Date().toISOString(),
+                eventCount: 0
+              };
+              broadcastEvent({ event: 'session_registered', session: sessions[targetPid] });
+              console.log('  [SESSION+] auto-recovered:', sessions[targetPid].name);
             }
           }
 
           if (targetPid && sessions[targetPid]) {
             sessions[targetPid].lastActivity = new Date().toISOString();
             sessions[targetPid].eventCount = (sessions[targetPid].eventCount || 0) + 1;
-            if (session.name && session.name !== 'unknown' && event === 'session_start') {
+            if (session.name && session.name !== 'unknown') {
+              var oldName = sessions[targetPid].name;
               sessions[targetPid].name = session.name;
+              if (oldName !== session.name) {
+                broadcastEvent({ event: 'session_renamed', session_pid: targetPid, session_name: session.name });
+              }
             }
           }
         }
