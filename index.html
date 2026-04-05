@@ -1917,6 +1917,7 @@
   }
 
   function cycleSeason(){
+    if(!_envEnabled){toast('환경 효과를 먼저 켜주세요');return}
     var idx=SEASONS.indexOf(currentSeason);
     currentSeason=SEASONS[(idx+1)%SEASONS.length];
     localStorage.setItem('agviz-season',currentSeason);
