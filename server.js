@@ -395,7 +395,7 @@ const server = http.createServer(function(req, res) {
     var qs = req.url.split('?')[1] || '';
     var params = {};
     qs.split('&').forEach(function(p) { var kv = p.split('='); if (kv[0]) params[decodeURIComponent(kv[0])] = decodeURIComponent(kv[1] || ''); });
-    var targetCwd = params.cwd || CWD;
+    var targetCwd = params.cwd || process.cwd();
     var projectPath = path.join(targetCwd, 'CLAUDE.md');
 
     var master = { global: '', project: '', projectPath: '', globalPath: GLOBAL_CLAUDE_MD, cwd: targetCwd };
@@ -423,7 +423,7 @@ const server = http.createServer(function(req, res) {
           filepath = GLOBAL_CLAUDE_MD;
         } else {
           // cwd 기반 프로젝트 CLAUDE.md
-          var targetCwd = data.cwd || CWD;
+          var targetCwd = data.cwd || process.cwd();
           filepath = path.join(targetCwd, 'CLAUDE.md');
         }
         fs.writeFileSync(filepath, data.content, 'utf8');
