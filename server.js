@@ -984,15 +984,18 @@ function checkSessions() {
     }
   });
 
-  // 메모리 세션: PID가 아닌 활동 기반으로 정리
-  // (hook의 $PPID는 임시 프로세스라 바로 죽으므로 PID 체크 불가)
-  // 2시간 이상 무활동 세션만 제거
+  // 메모리 세션 정리
+  // - alive: false → 1분 후 제거 (종료된 세션)
+  // - alive: true → 2시간 무활동 시 제거 (hook의 $PPID는 임시 프로세스라 PID 체크 불가)
+  var DEAD_TIMEOUT = 60 * 1000; // 1분
   var SESSION_TIMEOUT = 2 * 60 * 60 * 1000; // 2시간
   Object.keys(sessions).forEach(function(pid) {
-    var lastActivity = new Date(sessions[pid].lastActivity).getTime();
+    var s = sessions[pid];
+    var lastActivity = new Date(s.lastActivity).getTime();
     var inactiveMs = Date.now() - lastActivity;
-    if (inactiveMs > SESSION_TIMEOUT) {
-      console.log('  [SESSION-]', sessions[pid].name || pid, '(timeout)');
+    var shouldRemove = (s.alive === false && inactiveMs > DEAD_TIMEOUT) || (inactiveMs > SESSION_TIMEOUT);
+    if (shouldRemove) {
+      console.log('  [SESSION-]', s.name || pid, s.alive === false ? '(dead)' : '(timeout)');
       saveSessionHistory(pid);
       var removedSession = sessions[pid];
       delete sessions[pid];
