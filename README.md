@@ -39,22 +39,22 @@ https://github.com/user-attachments/assets/b3595469-2546-4624-adf8-9a119ea00c2d
 ### 1. 파일 배치
 
 ```bash
-# ~/workspace/claude-agent-viz/ 에 프로젝트 파일 배치
-git clone https://github.com/oy-snowwwww/claude-agent-viz.git ~/workspace/claude-agent-viz
+# ~/.claude/agent-viz/ 에 프로젝트 파일 배치
+git clone https://github.com/oy-snowwwww/claude-agent-viz.git ~/.claude/agent-viz
 ```
 
 ### 2. 실행 권한 부여
 
 ```bash
-chmod +x ~/workspace/claude-agent-viz/start.sh
-chmod +x ~/workspace/claude-agent-viz/hook-handler.sh
+chmod +x ~/.claude/agent-viz/start.sh
+chmod +x ~/.claude/agent-viz/hook-handler.sh
 ```
 
 ### 3. CLI 별칭 설정 (선택)
 
 ```bash
 # ~/.zshrc 또는 ~/.bashrc에 추가
-alias claude-agents="bash ~/workspace/claude-agent-viz/start.sh"
+alias claude-agents="bash ~/.claude/agent-viz/start.sh"
 ```
 
 ### 4. Claude Code 훅 설정
@@ -69,11 +69,11 @@ alias claude-agents="bash ~/workspace/claude-agent-viz/start.sh"
         "hooks": [
           {
             "type": "command",
-            "command": "bash ~/workspace/claude-agent-viz/start.sh auto"
+            "command": "bash ~/.claude/agent-viz/start.sh auto"
           },
           {
             "type": "command",
-            "command": "bash ~/workspace/claude-agent-viz/hook-handler.sh session_start"
+            "command": "bash ~/.claude/agent-viz/hook-handler.sh session_start"
           }
         ]
       }
@@ -83,7 +83,7 @@ alias claude-agents="bash ~/workspace/claude-agent-viz/start.sh"
         "hooks": [
           {
             "type": "command",
-            "command": "bash ~/workspace/claude-agent-viz/hook-handler.sh thinking_start"
+            "command": "bash ~/.claude/agent-viz/hook-handler.sh thinking_start"
           }
         ]
       }
@@ -93,7 +93,7 @@ alias claude-agents="bash ~/workspace/claude-agent-viz/start.sh"
         "hooks": [
           {
             "type": "command",
-            "command": "bash ~/workspace/claude-agent-viz/hook-handler.sh thinking_end"
+            "command": "bash ~/.claude/agent-viz/hook-handler.sh thinking_end"
           }
         ]
       }
@@ -103,7 +103,7 @@ alias claude-agents="bash ~/workspace/claude-agent-viz/start.sh"
         "hooks": [
           {
             "type": "command",
-            "command": "bash ~/workspace/claude-agent-viz/hook-handler.sh session_end"
+            "command": "bash ~/.claude/agent-viz/hook-handler.sh session_end"
           }
         ]
       }
@@ -114,7 +114,7 @@ alias claude-agents="bash ~/workspace/claude-agent-viz/start.sh"
         "hooks": [
           {
             "type": "command",
-            "command": "bash ~/workspace/claude-agent-viz/hook-handler.sh agent_start"
+            "command": "bash ~/.claude/agent-viz/hook-handler.sh agent_start"
           }
         ]
       },
@@ -122,7 +122,7 @@ alias claude-agents="bash ~/workspace/claude-agent-viz/start.sh"
         "hooks": [
           {
             "type": "command",
-            "command": "bash ~/workspace/claude-agent-viz/hook-handler.sh tool_use"
+            "command": "bash ~/.claude/agent-viz/hook-handler.sh tool_use"
           }
         ]
       }
@@ -133,7 +133,7 @@ alias claude-agents="bash ~/workspace/claude-agent-viz/start.sh"
         "hooks": [
           {
             "type": "command",
-            "command": "bash ~/workspace/claude-agent-viz/hook-handler.sh agent_done"
+            "command": "bash ~/.claude/agent-viz/hook-handler.sh agent_done"
           }
         ]
       }
@@ -218,7 +218,7 @@ CLAUDE.md
 ### 파일 구조
 
 ```
-~/workspace/claude-agent-viz/
+~/.claude/agent-viz/
 ├── index.html          # 단일 파일 SPA (UI 전체)
 ├── server.js           # Node.js HTTP 서버
 ├── hook-handler.sh     # Claude Code 훅 → 서버 이벤트 브릿지
@@ -265,7 +265,7 @@ CLAUDE.md
     │   ├── coder.md
     │   ├── reviewer.md
     │   └── ...
-    └── agent-viz/                 # 에이전트 대시보드 (별도 경로 가능)
+    └── agent-viz/                 # ← 이 프로젝트
 ```
 
 ### 에이전트 파일 예시 (`~/.claude/agents/coder.md`)
