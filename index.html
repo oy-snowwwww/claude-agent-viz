@@ -1710,8 +1710,15 @@
         renderAll();
         return;
       }
-      // 에이전트 working 중이면 thinking → working 전환
-      if(s){s._masterSt='working';s._masterTask='조율 중...'}
+      // ESC 중단: 에이전트 working 중이지만 thinking_end → working 에이전트 강제 정리
+      Object.keys(liveInstances).forEach(function(k){
+        if(liveInstances[k].sessionPid===sp&&liveInstances[k].st==='working'){
+          liveInstances[k].st='done';liveInstances[k].task='중단됨';liveInstances[k].prog=100;
+        }
+      });
+      var doneMsg='Q'+tc+' 완료'+(sec>0?' ('+sec+'s)':'');
+      addLog({name:'Master',color:'#fbbf24'},'── '+doneMsg+' (중단) ──','ok',sp,sn);
+      if(s){s._masterSt='done';s._masterTask=doneMsg}
       renderAll();return;
     }
     if(evt==='tool_use'){
