@@ -31,7 +31,7 @@ https://github.com/user-attachments/assets/b3595469-2546-4624-adf8-9a119ea00c2d
 ## 요구사항
 
 - macOS (Linux 미테스트)
-- Node.js 16+
+- Node.js 16+ (`node --version`으로 확인)
 - Claude Code CLI
 
 ## 설치
@@ -43,23 +43,33 @@ https://github.com/user-attachments/assets/b3595469-2546-4624-adf8-9a119ea00c2d
 git clone https://github.com/oy-snowwwww/claude-agent-viz.git ~/.claude/agent-viz
 ```
 
-### 2. 실행 권한 부여
+### 2. 에이전트 디렉토리 생성
+
+에이전트 `.md` 파일을 넣을 디렉토리가 없다면 생성합니다 (이미 있으면 건너뛰세요):
+
+```bash
+mkdir -p ~/.claude/agents
+```
+
+### 3. 실행 권한 부여
 
 ```bash
 chmod +x ~/.claude/agent-viz/start.sh
 chmod +x ~/.claude/agent-viz/hook-handler.sh
 ```
 
-### 3. CLI 별칭 설정 (선택)
+### 4. CLI 별칭 설정 (선택)
 
 ```bash
 # ~/.zshrc 또는 ~/.bashrc에 추가
 alias claude-agents="bash ~/.claude/agent-viz/start.sh"
 ```
 
-### 4. Claude Code 훅 설정
+### 5. Claude Code 훅 설정
 
-`~/.claude/settings.json`의 `hooks` 섹션에 아래 내용을 추가합니다:
+`~/.claude/settings.json`을 열고 `hooks` 키 안에 아래 이벤트들을 추가합니다.
+
+> **이미 다른 hooks가 있다면?** 기존 이벤트 배열에 항목을 추가하세요. 예를 들어 `SessionStart`에 이미 훅이 있으면, 해당 배열에 아래 항목을 병합합니다. 처음 설정하는 경우 아래 전체를 그대로 붙여넣으면 됩니다.
 
 ```json
 {
@@ -141,6 +151,8 @@ alias claude-agents="bash ~/.claude/agent-viz/start.sh"
   }
 }
 ```
+
+설정 후 **Claude Code를 재시작하거나 새 세션을 시작**해야 훅이 반영됩니다.
 
 ## 사용법
 
