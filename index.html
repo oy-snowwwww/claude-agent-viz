@@ -28,13 +28,13 @@
     .app{position:relative;z-index:1;display:grid;grid-template-columns:300px 1fr;grid-template-rows:auto auto 1fr;height:100vh}
 
     /* Header */
-    .header{grid-column:1/-1;grid-row:1;display:flex;align-items:center;gap:14px;padding:8px 20px;background:linear-gradient(135deg,var(--surface) 0%,var(--surface-alt) 100%);border-bottom:1px solid var(--border)}
+    .header{grid-column:1/-1;grid-row:1;display:flex;align-items:center;gap:14px;padding:8px 20px;background:linear-gradient(135deg,var(--surface) 0%,var(--surface-alt) 100%);border-bottom:1px solid var(--border);min-width:0}
     .logo{display:grid;grid-template-columns:repeat(5,5px);grid-template-rows:repeat(5,5px);gap:2px}
     .logo i{border-radius:1px}
-    .header h1{font-size:.9rem;font-weight:700;letter-spacing:.02em;font-family:monospace}
+    .header h1{font-size:.9rem;font-weight:700;letter-spacing:.02em;font-family:monospace;white-space:nowrap}
     .header small{font-size:.65rem;color:var(--text-secondary);font-family:monospace}
-    .header-right{margin-left:auto;display:flex;align-items:center;gap:10px}
-    .header-stat{font-size:.6rem;font-family:monospace;color:var(--text-secondary);display:flex;align-items:center;gap:4px}
+    .header-right{margin-left:auto;display:flex;align-items:center;gap:6px;flex-shrink:0;flex-wrap:wrap;justify-content:flex-end}
+    .header-stat{font-size:.6rem;font-family:monospace;color:var(--text-secondary);display:flex;align-items:center;gap:4px;white-space:nowrap}
     .header-stat strong{color:var(--accent)}
     .daily-stat{position:relative;font-size:.6rem;font-family:monospace;color:var(--text);cursor:default;padding:3px 8px;border-radius:4px;border:1px solid var(--border);background:var(--bg)}
     .daily-stat:hover{border-color:var(--accent);box-shadow:0 0 6px var(--glow)}
@@ -48,9 +48,16 @@
     .daily-row.sub{padding-left:10px}
     .daily-row.sub::before{content:'├';color:var(--border);margin-right:4px}
     .daily-row.sub.last::before{content:'└'}
-    .theme-btn{background:var(--surface-hover);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:3px 8px;cursor:pointer;font-size:.65rem;font-family:monospace}
+    .theme-btn{background:var(--surface-hover);border:1px solid var(--border);color:var(--text);border-radius:50%;width:24px;height:24px;cursor:pointer;font-size:.7rem;display:flex;align-items:center;justify-content:center;padding:0}
     .theme-btn:hover{border-color:var(--accent)}
-    .help-btn,.stop-btn{background:var(--surface-hover);border:1px solid var(--border);border-radius:50%;width:24px;height:24px;cursor:pointer;font-size:.7rem;font-family:monospace;font-weight:700;display:flex;align-items:center;justify-content:center;line-height:1}
+    /* 빠른 tooltip */
+    [data-tip]{position:relative}
+    [data-tip]::after{content:attr(data-tip);position:absolute;top:calc(100% + 6px);left:50%;transform:translateX(-50%);background:var(--surface);color:var(--text);font-size:.5rem;font-family:monospace;padding:2px 6px;border-radius:3px;border:1px solid var(--border);white-space:nowrap;pointer-events:none;opacity:0;transition:opacity .1s;z-index:60;box-shadow:0 2px 8px rgba(0,0,0,.3)}
+    [data-tip]:hover::after{opacity:1}
+    .help-btn,.stop-btn,.notif-btn{background:var(--surface-hover);border:1px solid var(--border);border-radius:50%;width:24px;height:24px;cursor:pointer;font-size:.7rem;font-family:monospace;font-weight:700;display:flex;align-items:center;justify-content:center;line-height:1}
+    .notif-btn{color:var(--text-secondary);font-size:.75rem;transition:all .2s;opacity:.4}
+    .notif-btn:hover{border-color:var(--accent);box-shadow:0 0 8px var(--glow);opacity:.7}
+    .notif-btn.on{color:var(--accent);border-color:var(--accent);box-shadow:0 0 6px var(--glow);opacity:1;background:rgba(0,255,200,.1)}
     .help-btn{color:var(--accent)}
     .help-btn:hover{border-color:var(--accent);box-shadow:0 0 8px var(--glow)}
     .stop-btn{color:var(--negative)}
@@ -93,6 +100,12 @@
     .sess-tab:hover .sess-close{opacity:.6}
     .sess-tab .sess-close:hover{opacity:1;color:var(--negative)}
     .sess-spinner{width:12px;height:12px;border:2px solid var(--accent);border-top-color:transparent;border-radius:50%;animation:spin .7s linear infinite;flex-shrink:0;margin-left:4px}
+    .sess-tab.closing{position:relative;overflow:hidden}
+    .sess-tab.closing::after{content:'';position:absolute;bottom:0;left:0;height:2px;background:var(--negative);animation:sessClose 10s linear forwards}
+    @keyframes sessClose{from{width:100%}to{width:0%}}
+    .sess-tab.completed{border-bottom:2px solid #10b981;animation:sessDonePulse 1s ease-in-out 5}
+    .sess-tab.completed.faded{border-bottom-color:transparent;background:transparent;box-shadow:none;transition:all .8s ease-out}
+    @keyframes sessDonePulse{0%,100%{background:rgba(0,255,200,.08);box-shadow:0 0 4px rgba(0,255,200,.3)}50%{background:rgba(0,255,200,.25);box-shadow:0 0 14px rgba(0,255,200,.6)}}
     @keyframes spin{to{transform:rotate(360deg)}}
     .sess-rename{background:var(--bg);border:1px solid var(--accent);border-radius:3px;color:var(--text);font-family:monospace;font-size:.55rem;padding:2px 6px;outline:none;width:110px}
     .empty-sessions{color:var(--text-secondary);font-size:.55rem;font-family:monospace;padding:6px 12px;opacity:.5}
@@ -202,7 +215,7 @@
     /* 땅 디테일 */
     .ws-ground-detail{position:absolute;bottom:2%;pointer-events:none;z-index:1;font-size:10px;opacity:.7}
     /* 계절 버튼 */
-    .season-btn{background:var(--surface-hover);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:3px 8px;cursor:pointer;font-size:.65rem;font-family:monospace}
+    .season-btn{background:var(--surface-hover);border:1px solid var(--border);color:var(--text);border-radius:50%;width:24px;height:24px;cursor:pointer;font-size:.7rem;display:flex;align-items:center;justify-content:center;padding:0}
     .season-btn:hover{border-color:var(--accent)}
     .ws-agent{position:absolute;display:flex;flex-direction:column;align-items:center;transition:all .4s ease;z-index:10;cursor:default}
     .ws-agent:hover{z-index:30}
@@ -372,6 +385,18 @@
 
     @keyframes popFade{0%{transform:scale(0) rotate(0);opacity:1}60%{transform:scale(1.3) rotate(200deg);opacity:.8}100%{transform:scale(0) rotate(360deg);opacity:0}}
     @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+    @media(max-width:900px){
+      .header-stat{display:none}
+      .header-right{gap:5px}
+    }
+    @media(max-width:700px){
+      .header{gap:8px;padding:6px 10px}
+      .header h1{font-size:.75rem}
+      .header-right{gap:4px}
+      .header-stat,.daily-stat{display:none}
+      .app{grid-template-columns:1fr}
+      .left{display:none}
+    }
   </style>
 </head>
 <body>
@@ -385,12 +410,13 @@
       <div class="header-right">
         <div class="header-stat" id="headerStat"></div>
         <div class="daily-stat" id="dailyStat"></div>
-        <button class="help-btn" onclick="toggleHelp()" title="도움말">?</button>
-        <button class="help-btn restart-btn" onclick="restartServer()" title="재시작">&#8635;</button>
-        <button class="help-btn stop-btn" onclick="shutdownServer()" title="서버 종료">&#9632;</button>
-        <button class="season-btn" onclick="toggleEnv()" id="envBtn" title="환경 효과 on/off">✨</button>
-        <button class="season-btn" onclick="cycleSeason()" id="seasonBtn">🌸 봄</button>
-        <button class="theme-btn" onclick="cycleTheme()" id="themeBtn">Dark</button>
+        <button class="notif-btn" onclick="toggleNotif()" id="notifBtn" data-tip="알림">&#128276;</button>
+        <button class="help-btn" onclick="toggleHelp()" data-tip="도움말">?</button>
+        <button class="help-btn restart-btn" onclick="restartServer()" data-tip="재시작">&#8635;</button>
+        <button class="help-btn stop-btn" onclick="shutdownServer()" data-tip="종료">&#9632;</button>
+        <button class="season-btn" onclick="toggleEnv()" id="envBtn" data-tip="환경효과">✨</button>
+        <button class="season-btn" onclick="cycleSeason()" id="seasonBtn" data-tip="봄">🌸</button>
+        <button class="theme-btn" onclick="cycleTheme()" id="themeBtn" data-tip="Dark">🌙</button>
       </div>
     </header>
 
@@ -493,6 +519,13 @@
       </div>
 
       <div class="help-section">
+        <h3>알림</h3>
+        <div class="help-tip"><strong>&#128276; 버튼</strong> &mdash; 브라우저 알림 on/off 토글</div>
+        <div class="help-tip">탭이 비활성일 때 에이전트 완료, 응답 완료 시 알림</div>
+        <div class="help-tip">알림 클릭 시 대시보드 탭으로 포커스 이동</div>
+      </div>
+
+      <div class="help-section">
         <h3>Hook</h3>
         <div class="help-tip">SessionStart &rarr; 서버 시작 + 세션 등록</div>
         <div class="help-tip">PreToolUse (Agent) &rarr; 에이전트 시작 이벤트</div>
@@ -517,7 +550,7 @@
   var sessions={};
   var currentSession=null;
   var logEntries=[];
-  var MAX_LOGS=100;
+  var MAX_LOGS=500;
 
   // === Live Instances ===
   var liveInstances={};
@@ -616,7 +649,7 @@
   }
 
   // === Theme ===
-  function applyTheme(t){document.documentElement.className='theme-'+t;currentTheme=t;localStorage.setItem('viz-theme',t);document.getElementById('themeBtn').textContent=(t==='dark'?'Dark':'Light')}
+  function applyTheme(t){document.documentElement.className='theme-'+t;currentTheme=t;localStorage.setItem('viz-theme',t);var btn=document.getElementById('themeBtn');btn.textContent=(t==='dark'?'🌙':'☀️');btn.dataset.tip=(t==='dark'?'Dark':'Light')}
   function cycleTheme(){applyTheme(currentTheme==='dark'?'light':'dark');renderAll()}
   applyTheme(currentTheme);
 
@@ -635,7 +668,9 @@
     }
   }
   function switchSession(pid){
-    currentSession=pid;masterData._thinkHistory=[];masterData._sessionPid=null;renderSessionTabs();renderLogs();renderActivity();renderWorkspace();
+    currentSession=pid;masterData._sessionPid=null;
+    if(sessions[pid])delete sessions[pid]._completed;
+    renderSessionTabs();renderLogs();renderActivity();renderWorkspace();
     document.getElementById('logFilterLabel').textContent=!pid?'':(sessions[pid]?' ['+sessions[pid].name+']':'');
     // 세션의 프로젝트 CLAUDE.md 로드
     var cwd=(pid&&sessions[pid])?sessions[pid].cwd:'';
@@ -649,23 +684,23 @@
     pids.sort(function(a,b){return(sessions[a].startTime||'').localeCompare(sessions[b].startTime||'')});
 
     // 탭 구조 변경 감지 (세션 추가/삭제/선택 변경 시에만 전체 재구축)
-    var structKey=currentSession+'|'+pids.map(function(p){return p+':'+(sessions[p].alive?'1':'0')}).join(',');
+    var structKey=currentSession+'|'+pids.map(function(p){return p+':'+(sessions[p].alive?'1':'0')+(sessions[p]._completed?'c':'')}).join(',');
     if(_tabsBuilt===structKey){
       // 구조 동일 → 기존 탭의 속성만 업데이트 (DOM 재구축 안 함)
       pids.forEach(function(pid){
         var tab=box.querySelector('[data-session="'+pid+'"]');if(!tab) return;
         var s=sessions[pid];
         // stale 상태
-        var isStale=!s.alive||(Date.now()-new Date(s.lastActivity||s.startTime).getTime())>600000;
-        var cls='sess-tab'+(currentSession===pid?' active':'')+(isStale?' stale':'');
+        var isStale=!s.alive;
+        var cls='sess-tab'+(currentSession===pid?' active':'')+(isStale?' stale':'')+(s._completed?' completed':'');
         if(tab.className!==cls) tab.className=cls;
         // 이벤트 카운트 + 에이전트 카운트
         var cntEl=tab.querySelector('.sess-count');
         if(cntEl) cntEl.textContent=s.agentCount?'\uD83E\uDD16'+s.agentCount:'';
         // 스피너
-        var hasWorking=Object.values(liveInstances).some(function(i){return i.sessionPid===pid&&i.st==='working'})||((masterData._st==='thinking'||masterData._st==='working')&&masterData._sessionPid===pid);
+        var hasWorking=Object.values(liveInstances).some(function(i){return i.sessionPid===pid&&i.st==='working'})||(s._masterSt==='thinking'||s._masterSt==='working');
         var spinEl=tab.querySelector('.sess-spinner');
-        if(hasWorking&&!spinEl){var sp=document.createElement('span');sp.className='sess-spinner';tab.insertBefore(sp,tab.querySelector('.sess-close'))}
+        if(hasWorking&&!spinEl){var sp2=document.createElement('span');sp2.className='sess-spinner';tab.insertBefore(sp2,tab.querySelector('.sess-close'))}
         if(!hasWorking&&spinEl) spinEl.remove();
       });
       return;
@@ -683,8 +718,8 @@
       var displayName=s.name;var group=nameGroups[s.name];
       if(group.length>1){var nums=['\u2460','\u2461','\u2462','\u2463','\u2464','\u2465','\u2466','\u2467','\u2468','\u2469'];var idx=group.indexOf(pid);displayName=s.name+' '+(nums[idx]||'('+(idx+1)+')')}
       var lastAct=new Date(s.lastActivity||s.startTime).getTime();
-      var isStale=!s.alive||(Date.now()-lastAct)>600000;
-      var tab=document.createElement('button');tab.className='sess-tab'+(currentSession===pid?' active':'')+(isStale?' stale':'');tab.dataset.session=pid;
+      var isStale=!s.alive;
+      var tab=document.createElement('button');tab.className='sess-tab'+(currentSession===pid?' active':'')+(isStale?' stale':'')+(s._completed?' completed':'');tab.dataset.session=pid;
       (function(p){
         tab.onclick=function(e){if(e.target.classList.contains('sess-close')||e.target.classList.contains('sess-rename'))return;if(sessClickTimer)return;sessClickTimer=setTimeout(function(){sessClickTimer=null;switchSession(p)},280)};
         tab.ondblclick=function(e){e.preventDefault();if(sessClickTimer){clearTimeout(sessClickTimer);sessClickTimer=null}startRenameSession(p)};
@@ -692,8 +727,8 @@
       var dot=document.createElement('span');dot.className='sess-dot';dot.style.background=s.alive?sColor:'var(--text-secondary)';dot.style.boxShadow=s.alive?'0 0 4px '+sColor:'none';dot.style.opacity=s.alive?'1':'.4';tab.appendChild(dot);
       var ns=document.createElement('span');ns.className='sess-name-text';ns.textContent=displayName;tab.appendChild(ns);
       var cnt=document.createElement('span');cnt.className='sess-count';cnt.textContent=s.agentCount?'\uD83E\uDD16'+s.agentCount:'';tab.appendChild(cnt);
-      var hasWorking=Object.values(liveInstances).some(function(i){return i.sessionPid===pid&&i.st==='working'});
-      if(hasWorking){var sp=document.createElement('span');sp.className='sess-spinner';tab.appendChild(sp)}
+      var hasWorking=Object.values(liveInstances).some(function(i){return i.sessionPid===pid&&i.st==='working'})||(s._masterSt==='thinking'||s._masterSt==='working');
+      if(hasWorking){var sp2=document.createElement('span');sp2.className='sess-spinner';tab.appendChild(sp2)}
       var cl=document.createElement('span');cl.className='sess-close';cl.textContent='\u00d7';cl.onclick=function(e){e.stopPropagation();delete sessions[pid];Object.keys(liveInstances).forEach(function(k){if(liveInstances[k].sessionPid===pid)delete liveInstances[k]});if(currentSession===pid){var remaining=Object.keys(sessions);currentSession=remaining.length>0?remaining[0]:null}_tabsBuilt='';renderAll()};tab.appendChild(cl)
       box.appendChild(tab);
     });
@@ -778,7 +813,8 @@
       if(isLive){var dot=document.createElement('span');dot.className='ag-live';card.appendChild(dot)}
       // 프로젝트별 토글 (Master idle일 때만)
       if(hasCwd){
-        var masterBusy=masterData._st==='thinking'||masterData._st==='working';
+        var csMst=currentSession&&sessions[currentSession]?sessions[currentSession]._masterSt||'idle':'idle';
+        var masterBusy=csMst==='thinking'||csMst==='working';
         var isLocked=isLive||masterBusy;
         var toggle=document.createElement('span');toggle.className='ag-toggle'+(isEnabled?' on':'')+(isLocked?' locked':'');
         toggle.title=isLocked?'작업 중 — 변경 불가':(isEnabled?'이 프로젝트에서 활성':'이 프로젝트에서 비활성');
@@ -786,7 +822,8 @@
           toggle.onclick=function(e){
             e.stopPropagation();
             // 클릭 시점에 실시간 체크
-            var busy=masterData._st==='thinking'||masterData._st==='working';
+            var csMst2=currentSession&&sessions[currentSession]?sessions[currentSession]._masterSt||'idle':'idle';
+            var busy=csMst2==='thinking'||csMst2==='working';
             var working=Object.values(liveInstances).some(function(i){return i.agentId===agId&&i.st==='working'});
             if(busy||working){toast('작업 중에는 변경할 수 없습니다');return}
             var newEnabled;
@@ -850,8 +887,9 @@
     nodes.forEach(function(nd){
       if(nd.id==='master'){
         var anyWorking=instances.some(function(i){return i.st==='working'});
-        nd._st=anyWorking?'working':(masterData._st||'idle');
-        nd._task=anyWorking?(masterData._task||''):(masterData._task||'');
+        var sessMst=currentSession&&sessions[currentSession]?sessions[currentSession]._masterSt||'idle':'idle';
+        nd._st=anyWorking?'working':sessMst;
+        nd._task=anyWorking?(masterData._task||''):(sessMst==='idle'?'':masterData._task||'');
         return;
       }
       // 이 에이전트의 working 인스턴스 찾기
@@ -1037,14 +1075,16 @@
       box.innerHTML='<div class="act-empty">\uC138\uC158 \uB300\uAE30 \uC911...</div>';return;
     }
     // Master 항상 표시
-    var mst=masterData._st||'idle';
+    var curS=currentSession&&sessions[currentSession]?sessions[currentSession]:null;
+    var mst=curS?curS._masterSt||'idle':masterData._st||'idle';
+    var mThinkStart=curS?curS._thinkStart:masterData._thinkStart;
     var mLabels={thinking:'생각 중',done:'완료',working:'조율 중',idle:'대기'};
     var mRow=document.createElement('div');mRow.className='act-row';
     mRow.appendChild(buildPix('master','#fbbf24','sm'));
     mRow.innerHTML+='<span class="act-name" style="color:#fbbf24">Master</span>';
-    var mProg=mst==='done'?100:mst==='thinking'?Math.min(90,10+((Date.now()-(masterData._thinkStart||Date.now()))/1000)*5):mst==='working'?50:0;
+    var mProg=mst==='done'?100:mst==='thinking'?Math.min(90,10+((Date.now()-(mThinkStart||Date.now()))/1000)*5):mst==='working'?50:0;
     mRow.innerHTML+='<div class="act-bar"><div class="act-bar-fill '+mst+'" style="width:'+mProg+'%"></div></div>';
-    mRow.innerHTML+='<span class="act-task">'+(masterData._task||'')+'</span>';
+    mRow.innerHTML+='<span class="act-task">'+(mst==='idle'?'':masterData._task||'')+'</span>';
     mRow.innerHTML+='<span class="act-status '+mst+'">'+(mLabels[mst]||mst)+'</span>';
     box.appendChild(mRow);
 
@@ -1077,9 +1117,11 @@
   function renderTimeline(){
     var box=document.getElementById('timelineBody');if(!box)return;box.innerHTML='';
     var instances=getLiveInstances();
-    // Master thinking 구간 수집
-    var masterEntries=masterData._thinkHistory||[];
-    if(masterData._thinkStart) masterEntries=masterEntries.concat([{start:masterData._thinkStart,end:null}]);
+    // Master thinking 구간 수집 (세션별)
+    var curSess=currentSession&&sessions[currentSession]?sessions[currentSession]:null;
+    var masterEntries=curSess?curSess._thinkHistory||[]:masterData._thinkHistory||[];
+    var curThinkStart=curSess?curSess._thinkStart:masterData._thinkStart;
+    if(curThinkStart) masterEntries=masterEntries.concat([{start:curThinkStart,end:null}]);
     if(instances.length===0&&masterEntries.length===0){box.innerHTML='<div class="tl-empty">\uD65C\uB3D9 \uC5C6\uC74C</div>';return}
     // 시간 범위 계산
     var minStart=Infinity,maxEnd=0,now=Date.now();
@@ -1270,34 +1312,44 @@
   function renderDailyStat(){
     var el=document.getElementById('dailyStat');if(!el)return;
     var d=dailyStatsData;
-    var summary='📊 에이전트 <strong>'+d.totalAgents+'</strong> · 도구 <strong>'+d.totalTools+'</strong> · 프롬프트 <strong>'+d.prompts+'</strong>';
+    var summary='📊 질문 <strong>'+d.prompts+'</strong> · 에이전트 <strong>'+d.totalAgents+'</strong> · 도구 <strong>'+d.totalTools+'</strong>';
 
-    // 드롭다운 상세
-    var dd='<div class="daily-dropdown"><div class="daily-title">오늘의 요약</div>';
+    var dd='<div class="daily-dropdown"><div class="daily-title">📊 오늘</div>';
 
-    // 에이전트 섹션
+    dd+='<div class="daily-section">질문 '+d.prompts+'회</div>';
+
+    // 오늘 에이전트
     var agentKeys=Object.keys(d.agents||{}).sort(function(a,b){return d.agents[b]-d.agents[a]});
     dd+='<div class="daily-section">에이전트 '+d.totalAgents+'회</div>';
     if(agentKeys.length===0){dd+='<div class="daily-row"><span>없음</span><span>-</span></div>'}
-    agentKeys.forEach(function(k,i){
-      var cls='daily-row sub'+(i===agentKeys.length-1?' last':'');
-      dd+='<div class="'+cls+'"><span>'+k+'</span><span>'+d.agents[k]+'</span></div>';
-    });
+    agentKeys.forEach(function(k,i){dd+='<div class="daily-row sub'+(i===agentKeys.length-1?' last':'')+'"><span>'+k+'</span><span>'+d.agents[k]+'</span></div>'});
 
-    // 도구 섹션
+    // 오늘 도구
     var toolKeys=Object.keys(d.tools||{}).sort(function(a,b){return d.tools[b]-d.tools[a]});
     dd+='<div class="daily-section">도구 '+d.totalTools+'회</div>';
     var showTools=toolKeys.slice(0,8);
-    showTools.forEach(function(k,i){
-      var cls='daily-row sub'+(i===showTools.length-1?' last':'');
-      dd+='<div class="'+cls+'"><span>'+k+'</span><span>'+d.tools[k]+'</span></div>';
-    });
+    showTools.forEach(function(k,i){dd+='<div class="daily-row sub'+(i===showTools.length-1?' last':'')+'"><span>'+k+'</span><span>'+d.tools[k]+'</span></div>'});
     if(toolKeys.length>8){dd+='<div class="daily-row sub last"><span>외 '+(toolKeys.length-8)+'개</span><span></span></div>'}
 
-    // 프롬프트 섹션
-    dd+='<div class="daily-section">프롬프트 '+d.prompts+'회</div>';
-    dd+='</div>';
+    // 주간 통계
+    var w=d.weekly||{};
+    var wAgents=0;Object.keys(w.agents||{}).forEach(function(k){wAgents+=w.agents[k]});
+    var wTools=0;Object.keys(w.tools||{}).forEach(function(k){wTools+=w.tools[k]});
+    dd+='<div class="daily-title" style="margin-top:10px;border-top:1px solid var(--border);padding-top:8px">📅 주간 (7일)</div>';
+    dd+='<div class="daily-row"><span>질문</span><span>'+(w.prompts||0)+'</span></div>';
+    dd+='<div class="daily-row"><span>에이전트</span><span>'+wAgents+'</span></div>';
+    dd+='<div class="daily-row"><span>도구</span><span>'+wTools+'</span></div>';
 
+    // 전체 통계
+    var t=d.total||{};
+    var tAgents=0;Object.keys(t.agents||{}).forEach(function(k){tAgents+=t.agents[k]});
+    var tTools=0;Object.keys(t.tools||{}).forEach(function(k){tTools+=t.tools[k]});
+    dd+='<div class="daily-title" style="margin-top:10px;border-top:1px solid var(--border);padding-top:8px">🏆 전체'+(t.since?' ('+t.since+'~)':'')+'</div>';
+    dd+='<div class="daily-row"><span>질문</span><span>'+(t.prompts||0)+'</span></div>';
+    dd+='<div class="daily-row"><span>에이전트</span><span>'+tAgents+'</span></div>';
+    dd+='<div class="daily-row"><span>도구</span><span>'+tTools+'</span></div>';
+
+    dd+='</div>';
     el.innerHTML=summary+dd;
   }
   // SSE 이벤트 수신 시 실시간 업데이트
@@ -1351,6 +1403,37 @@
   }
   function toast(m,t){var el=document.getElementById('toast');el.textContent=m;el.style.background=t==='err'?'var(--negative)':'var(--positive)';el.classList.add('show');setTimeout(function(){el.classList.remove('show')},1800)}
 
+  // === Browser Notification ===
+  var _notifEnabled=localStorage.getItem('agviz-notif')==='on';
+  function initNotifBtn(){var btn=document.getElementById('notifBtn');if(btn)btn.classList.toggle('on',_notifEnabled)}
+  initNotifBtn();
+
+  function enableNotif(){
+    _notifEnabled=true;localStorage.setItem('agviz-notif','on');initNotifBtn();toast('알림 ON');
+    new Notification('Claude Agent Viz',{body:'알림이 활성화되었습니다. 탭을 벗어나면 작업 완료 시 알림을 받습니다.',icon:'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" rx="6" fill="%23111120"/><text x="16" y="22" text-anchor="middle" font-size="18">🤖</text></svg>'});
+  }
+  function toggleNotif(){
+    if(!_notifEnabled){
+      if(!('Notification' in window)){toast('이 브라우저는 알림을 지원하지 않습니다','err');return}
+      if(Notification.permission==='granted'){enableNotif();return}
+      // default 또는 denied 모두 한번 요청 시도 (일부 환경에서 denied도 재요청 가능)
+      Notification.requestPermission().then(function(p){
+        if(p==='granted'){enableNotif()}
+        else{toast('알림 권한이 필요합니다. 주소창 왼쪽 아이콘 > 알림 > 허용','err')}
+      });
+    } else {
+      _notifEnabled=false;localStorage.setItem('agviz-notif','off');initNotifBtn();toast('알림 OFF');
+    }
+  }
+
+  function sendNotif(title,body){
+    if(!_notifEnabled||!document.hidden)return;
+    if(!('Notification' in window)||Notification.permission!=='granted')return;
+    var n=new Notification(title,{body:body,icon:'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" rx="6" fill="%23111120"/><text x="16" y="22" text-anchor="middle" font-size="18">🤖</text></svg>',tag:'agviz-'+Date.now()});
+    n.onclick=function(){window.focus();n.close()};
+    setTimeout(function(){n.close()},8000);
+  }
+
   // === Animations ===
   function sparks(wid,color){
     var el=document.getElementById('ws-'+wid);var ws=document.getElementById('workspace');if(!el||!ws)return;
@@ -1383,8 +1466,22 @@
     if(evt==='session_registered'){if(data.session)registerSession(data.session);addLog(null,'\uC138\uC158: '+(data.session?data.session.name:''),'ok',data.session?data.session.pid:'',data.session?data.session.name:'');return}
     if(evt==='session_renamed'){if(sessions[data.session_pid]){sessions[data.session_pid].name=data.session_name;renderSessionTabs()}return}
     if(evt==='session_stopped'){
-      if(sessions[data.session_pid]){sessions[data.session_pid].alive=false;renderAll()}
-      addLog(null,'\uC138\uC158 \uC885\uB8CC: '+(data.session_name||data.session_pid),'err',data.session_pid,data.session_name);return;
+      var stoppedPid=data.session_pid;
+      if(sessions[stoppedPid]){sessions[stoppedPid].alive=false;renderAll()}
+      addLog(null,'\uC138\uC158 \uC885\uB8CC: '+(data.session_name||stoppedPid),'err',stoppedPid,data.session_name);
+      // 탭에 closing 애니메이션 (10초 카운트다운 바)
+      var closingTab=document.querySelector('.sess-tab[data-session="'+stoppedPid+'"]');
+      if(closingTab){closingTab.classList.add('closing');var spinEl=closingTab.querySelector('.sess-spinner');if(spinEl)spinEl.remove()}
+      // 10초 후 자동 제거
+      if(stoppedPid)(function(pid){setTimeout(function(){
+        if(sessions[pid]&&sessions[pid].alive===false&&currentSession!==pid){
+          delete sessions[pid];
+          Object.keys(liveInstances).forEach(function(k){if(liveInstances[k].sessionPid===pid)delete liveInstances[k]});
+          renderAll();
+          addLog(null,'\uC138\uC158 \uD0ED \uC81C\uAC70: '+(data.session_name||pid),'','','');
+        }
+      },10000)})(stoppedPid);
+      return;
     }
     if(evt==='session_removed'){removeSession(data.session_pid);addLog(null,'\uC138\uC158 \uC81C\uAC70: '+(data.session_name||data.session_pid),'err',data.session_pid,data.session_name);return}
     if(evt==='server_shutdown'){
@@ -1399,21 +1496,43 @@
     if(evt==='thinking_start'){
       masterData._turnCount=(masterData._turnCount||0)+1;
       masterData._st='thinking';masterData._task='생각 중...';masterData._thinkStart=Date.now();masterData._sessionPid=sp;
+      // 세션별 마스터 상태 추적
+      if(sp&&sessions[sp]){sessions[sp]._masterSt='thinking';delete sessions[sp]._completed;sessions[sp]._thinkStart=Date.now();sessions[sp]._thinkHistory=[]}
       masterData._thinkHistory=[];
       // 이전 done/stale 에이전트 정리 (새 질문 경계)
       // 새 질문 시작 → 이전 done/stale 에이전트 정리 (이력은 이벤트 로그에 유지)
       Object.keys(liveInstances).forEach(function(k){if(liveInstances[k].sessionPid===sp&&liveInstances[k].st!=='working')delete liveInstances[k]});
-      addLog({name:'Master',color:'#fbbf24'},'── Q'+masterData._turnCount+(sn?' ['+sn+']':'')+' ──','','',sn);
+      addLog({name:'Master',color:'#fbbf24'},'── Q'+masterData._turnCount+(sn?' ['+sn+']':'')+' ──','',sp,sn);
+      if(!_tlOpen){_tlOpen=true;document.getElementById('timelineBody').style.display='';document.getElementById('tlToggle').textContent='\u25BC'}
       renderAll();return;
     }
     if(evt==='thinking_end'){
-      var anyWorking=Object.values(liveInstances).some(function(i){return i.st==='working'});
-      var sec=masterData._thinkStart?Math.round((Date.now()-masterData._thinkStart)/1000):0;
+      var anyWorking=Object.values(liveInstances).some(function(i){return i.sessionPid===sp&&i.st==='working'});
+      var sessThinkStart=sp&&sessions[sp]?sessions[sp]._thinkStart:masterData._thinkStart;
+      var sec=sessThinkStart?Math.round((Date.now()-sessThinkStart)/1000):0;
       if(masterData._thinkStart){if(!masterData._thinkHistory)masterData._thinkHistory=[];masterData._thinkHistory.push({start:masterData._thinkStart,end:Date.now()})}
-      masterData._thinkStart=null; // thinking 종료 표시
+      // 세션별 히스토리에도 저장
+      if(sp&&sessions[sp]&&sessions[sp]._thinkStart){
+        if(!sessions[sp]._thinkHistory)sessions[sp]._thinkHistory=[];
+        sessions[sp]._thinkHistory.push({start:sessions[sp]._thinkStart,end:Date.now()});
+        sessions[sp]._thinkStart=null;
+      }
+      masterData._thinkStart=null;
       if(!anyWorking){
         masterData._st='done';masterData._task='Q'+masterData._turnCount+' 완료'+(sec>0?' ('+sec+'s)':'');
-        addLog({name:'Master',color:'#fbbf24'},'── Q'+masterData._turnCount+' 완료 ('+sec+'s) ──','ok','',sn);
+        addLog({name:'Master',color:'#fbbf24'},'── Q'+masterData._turnCount+' 완료 ('+sec+'s) ──','ok',sp,sn);
+        sendNotif('Q'+masterData._turnCount+' 응답 완료',(sn?'['+sn+'] ':'')+(sec>0?sec+'초 소요':''));
+        // 세션별 마스터 상태 + 완료 표시
+        if(sp&&sessions[sp]){sessions[sp]._masterSt='done';if(currentSession!==sp){sessions[sp]._completed=true;
+          // 10초 후 fade-out
+          (function(pid){setTimeout(function(){
+            if(sessions[pid]&&sessions[pid]._completed){
+              var t=document.querySelector('.sess-tab[data-session="'+pid+'"]');
+              if(t){t.classList.add('faded');setTimeout(function(){delete sessions[pid]._completed;t.classList.remove('completed','faded');_tabsBuilt=''},800)}
+              else delete sessions[pid]._completed;
+            }
+          },5000)})(sp)
+        }}
         renderAll();
         return;
       }
@@ -1458,6 +1577,7 @@
       liveInstances[key]={key:key,agentId:at,sessionPid:sp,sessionName:sn,st:'working',task:taskDesc,desc:taskDesc,prog:10,startTime:Date.now(),color:color};
       addLog({name:name,color:color},(sn?'['+sn+'] ':'')+name+' \uC2DC\uC791 \u2014 '+taskDesc,'',sp,sn);
       masterData._st='working';masterData._task=(sn?'['+sn+'] ':'')+'\uC870\uC728 \uC911...';masterData._sessionPid=sp;
+      if(sp&&sessions[sp])sessions[sp]._masterSt='working';
       // 타임라인 자동 펼침
       if(!_tlOpen){_tlOpen=true;document.getElementById('timelineBody').style.display='';document.getElementById('tlToggle').textContent='\u25BC'}
       renderAll();setTimeout(function(){sparks('inst-'+key,color);flyDot('master','inst-'+key)},50);
@@ -1475,13 +1595,17 @@
       var inst=liveInstances[key];
       if(inst){
         var sec=Math.round((Date.now()-inst.startTime)/1000);inst.st='done';inst.doneTime=Date.now();inst.task=inst.desc+' \u2014 \uC644\uB8CC ('+sec+'s)';inst.prog=100;
-        var ai=getAgentInfo(at);addLog({name:ai?ai.name:at,color:inst.color},(sn?'['+sn+'] ':'')+inst.desc+' \uC644\uB8CC ('+sec+'s)','ok',sp,sn);
+        var ai=getAgentInfo(at);var doneAgentName=ai?ai.name:at;
+        addLog({name:doneAgentName,color:inst.color},(sn?'['+sn+'] ':'')+inst.desc+' \uC644\uB8CC ('+sec+'s)','ok',sp,sn);
         renderAll();setTimeout(function(){sparks('inst-'+key,inst.color);flyDot('inst-'+key,'master')},50);
-        if(!Object.values(liveInstances).some(function(i){return i.st==='working'})){
+        if(!Object.values(liveInstances).some(function(i){return i.sessionPid===sp&&i.st==='working'})){
           // 아직 응답 작성 중이면 thinking으로 복귀, 아니면 idle
-          if(masterData._thinkStart){masterData._st='thinking';masterData._task='생각 중...'}
-          else{masterData._st='idle';masterData._task=''}
-          masterData._lastDoneTime=Date.now();renderAll();celebrate()
+          if(masterData._thinkStart){masterData._st='thinking';masterData._task='생각 중...';if(sp&&sessions[sp])sessions[sp]._masterSt='thinking'}
+          else{masterData._st='idle';masterData._task='';if(sp&&sessions[sp])sessions[sp]._masterSt='idle'}
+          masterData._lastDoneTime=Date.now();renderAll();celebrate();
+          sendNotif('모든 에이전트 완료',doneAgentName+' 완료 ('+sec+'s) — 모든 작업이 끝났습니다');
+        } else {
+          sendNotif(doneAgentName+' 완료 ('+sec+'s)',inst.desc);
         }
       } else {addLog({name:at,color:'var(--accent)'},at+' \uC644\uB8CC','ok',sp,sn);renderAll()}
     }
@@ -1682,7 +1806,8 @@
 
   // === Day/Night + Weather + Season ===
   var SEASONS=['spring','summer','autumn','winter'];
-  var SEASON_LABELS={spring:'🌸 봄',summer:'☀️ 여름',autumn:'🍂 가을',winter:'❄️ 겨울'};
+  var SEASON_LABELS={spring:'🌸',summer:'☀️',autumn:'🍂',winter:'❄️'};
+  var SEASON_TITLES={spring:'봄',summer:'여름',autumn:'가을',winter:'겨울'};
   var currentSeason=SEASONS[Math.floor(Math.random()*SEASONS.length)];
   var DAY_CYCLE_MS=60000; // 1분 = 하루
   var _dayOffset=Math.random()*DAY_CYCLE_MS; // 랜덤 시간부터 시작
@@ -1868,7 +1993,7 @@
       _lastSeasonCycle=currentCycle;
       var idx=SEASONS.indexOf(currentSeason);
       currentSeason=SEASONS[(idx+1)%SEASONS.length];
-      document.getElementById('seasonBtn').textContent=SEASON_LABELS[currentSeason];
+      var _sb=document.getElementById('seasonBtn');_sb.textContent=SEASON_LABELS[currentSeason];_sb.dataset.tip=SEASON_TITLES[currentSeason];
       var ws=document.getElementById('workspace');
       if(ws){ws.dataset.groundDetail='';ws.dataset.treeKey='';ws.querySelectorAll('.ws-fireflies').forEach(function(f){f.remove()})}
       updateEnvironment();startWeather();startSparkles();
@@ -1990,7 +2115,7 @@
     var idx=SEASONS.indexOf(currentSeason);
     currentSeason=SEASONS[(idx+1)%SEASONS.length];
     localStorage.setItem('agviz-season',currentSeason);
-    document.getElementById('seasonBtn').textContent=SEASON_LABELS[currentSeason];
+    var _sb2=document.getElementById('seasonBtn');_sb2.textContent=SEASON_LABELS[currentSeason];_sb2.dataset.tip=SEASON_TITLES[currentSeason];
     // 계절 변경 시 환경 갱신
     var ws=document.getElementById('workspace');
     if(ws){ws.dataset.groundDetail='';ws.dataset.treeKey='';ws.querySelectorAll('.ws-fireflies').forEach(function(f){f.remove()})}
@@ -1999,7 +2124,7 @@
   }
 
   // 초기화
-  document.getElementById('seasonBtn').textContent=SEASON_LABELS[currentSeason];
+  var _sb3=document.getElementById('seasonBtn');_sb3.textContent=SEASON_LABELS[currentSeason];_sb3.dataset.tip=SEASON_TITLES[currentSeason];
   if(_envEnabled){updateEnvironment();startWeather();startSparkles()}
   else{document.getElementById('envBtn').textContent='✨';var ws0=document.getElementById('workspace');if(ws0)createSpaceBackground(ws0)}
 

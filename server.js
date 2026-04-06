@@ -161,43 +161,69 @@ function readHooks() {
 // --- Daily Stats ---
 var STATS_FILE = path.join(__dirname, 'agent-stats.json');
 
-function todayKey() { return new Date().toISOString().slice(0, 10); }
+function todayKey() {
+  var d = new Date();
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
 
 function loadStats() {
   try {
     if (fs.existsSync(STATS_FILE)) {
       var data = JSON.parse(fs.readFileSync(STATS_FILE, 'utf8'));
-      if (data.date === todayKey()) return data;
+      // 구 형식 마이그레이션 (date 필드가 최상위에 있으면 구 형식)
+      if (data.date && !data.today) {
+        return { today: data, history: [], total: { since: data.date, prompts: data.prompts || 0, agents: data.agents || {}, tools: data.tools || {} } };
+      }
+      return data;
     }
   } catch(e) {}
-  return { date: todayKey(), prompts: 0, agents: {}, tools: {} };
+  return {};
 }
 
-var dailyStats = loadStats();
+var statsData = loadStats();
+ensureToday();
+saveStats();
+
+function ensureToday() {
+  var today = todayKey();
+  if (!statsData.today || statsData.today.date !== today) {
+    // 이전 today를 history로 이동
+    if (statsData.today && statsData.today.date) {
+      if (!statsData.history) statsData.history = [];
+      statsData.history.push(statsData.today);
+      // 최근 90일만 보관
+      if (statsData.history.length > 90) statsData.history = statsData.history.slice(-90);
+    }
+    statsData.today = { date: today, prompts: 0, agents: {}, tools: {} };
+  }
+  if (!statsData.total) statsData.total = { since: today, prompts: 0, agents: {}, tools: {}, days: 0 };
+  if (!statsData.history) statsData.history = [];
+}
 
 function saveStats() {
-  try { fs.writeFileSync(STATS_FILE, JSON.stringify(dailyStats), 'utf8'); } catch(e) {}
+  try { fs.writeFileSync(STATS_FILE, JSON.stringify(statsData), 'utf8'); } catch(e) {}
 }
 
 function recordStat(event, toolName, agentType) {
-  // 날짜 바뀌면 리셋
-  if (dailyStats.date !== todayKey()) {
-    dailyStats = { date: todayKey(), prompts: 0, agents: {}, tools: {} };
-  }
+  ensureToday();
   if (event === 'thinking_start') {
-    dailyStats.prompts = (dailyStats.prompts || 0) + 1;
+    statsData.today.prompts = (statsData.today.prompts || 0) + 1;
+    statsData.total.prompts = (statsData.total.prompts || 0) + 1;
   }
   if (event === 'agent_done' && agentType) {
-    dailyStats.agents[agentType] = (dailyStats.agents[agentType] || 0) + 1;
+    statsData.today.agents[agentType] = (statsData.today.agents[agentType] || 0) + 1;
+    statsData.total.agents[agentType] = (statsData.total.agents[agentType] || 0) + 1;
   }
   if (event === 'tool_use' && toolName) {
-    dailyStats.tools[toolName] = (dailyStats.tools[toolName] || 0) + 1;
+    statsData.today.tools[toolName] = (statsData.today.tools[toolName] || 0) + 1;
+    statsData.total.tools[toolName] = (statsData.total.tools[toolName] || 0) + 1;
   }
   saveStats();
 }
 
 // --- Session Tracking ---
 var sessions = {}; // pid → { pid, name, cwd, startTime, lastActivity, eventCount }
+var pendingEnds = {}; // pid → setTimeout handle (세션 종료 디바운스)
 
 // --- SSE (Server-Sent Events) for real-time ---
 var sseClients = [];
@@ -276,10 +302,37 @@ const server = http.createServer(function(req, res) {
           parsed.agent_type = toolInput.agent_type;
         }
 
-        // 세션 종료 이벤트 — 무시 (에이전트 종료와 메인 세션 종료를 구분 불가)
-        // 세션 정리: UI × 버튼 + 2시간 무활동 자동 제거로 처리
+        // 세션 종료 이벤트 — 디바운스로 메인 세션 종료만 처리
+        // 에이전트 서브세션 종료 후 메인 세션 이벤트가 이어지면 타이머 취소
         if (event === 'session_end') {
-          console.log('  [SESSION-] ignored session_end:', session.pid, session.name || '');
+          var endPid = session.pid || '';
+          // TTY → 기존 세션 매칭
+          var endTarget = sessions[endPid] ? endPid : null;
+          if (!endTarget && session.sid) {
+            endTarget = Object.keys(sessions).find(function(pid) {
+              return sessions[pid].sid === session.sid && sessions[pid].alive !== false;
+            }) || null;
+          }
+          if (endTarget && sessions[endTarget]) {
+            // 이전 대기 중인 타이머 취소 후 재설정
+            if (pendingEnds[endTarget]) clearTimeout(pendingEnds[endTarget]);
+            var endName = sessions[endTarget].name || endTarget;
+            console.log('  [SESSION-] pending session_end (3s):', endTarget, endName);
+            pendingEnds[endTarget] = setTimeout(function() {
+              delete pendingEnds[endTarget];
+              if (sessions[endTarget]) {
+                sessions[endTarget].alive = false;
+                broadcastEvent({
+                  event: 'session_stopped',
+                  session_pid: endTarget,
+                  session_name: sessions[endTarget].name || endTarget,
+                });
+                console.log('  [SESSION-] stopped:', endTarget, sessions[endTarget].name || '');
+              }
+            }, 3000);
+          } else {
+            console.log('  [SESSION-] ignored session_end (no match):', endPid);
+          }
           res.writeHead(200, {'Content-Type': 'application/json'});
           res.end(JSON.stringify({ok: true}));
           return;
@@ -289,6 +342,17 @@ const server = http.createServer(function(req, res) {
         if (session.pid) {
           var targetPid = session.pid;
           var isNew = !sessions[targetPid];
+
+          if (!isNew && event === 'session_start') {
+            // 같은 TTY에서 새 세션 시작 → 기존 세션 재활성화
+            if (sessions[targetPid].alive === false) {
+              sessions[targetPid].alive = true;
+              sessions[targetPid].startTime = new Date().toISOString();
+              if (session.sid) sessions[targetPid].sid = session.sid;
+              broadcastEvent({ event: 'session_registered', session: sessions[targetPid] });
+              console.log('  [SESSION+] revived:', sessions[targetPid].name);
+            }
+          }
 
           if (isNew && event === 'session_start') {
             // 에이전트 세션 감지: 기존 활성 세션으로 라우팅 (별도 탭 안 만듦)
@@ -313,7 +377,7 @@ const server = http.createServer(function(req, res) {
                 pid: targetPid,
                 name: session.name || 'Session ' + targetPid,
                 cwd: session.cwd || '',
-                tty: session.tty || '',
+                tty: session.pid || session.tty || '',
                 sid: session.sid || '',
                 startTime: new Date().toISOString(),
                 lastActivity: new Date().toISOString(),
@@ -323,49 +387,67 @@ const server = http.createServer(function(req, res) {
               console.log('  [SESSION+]', session.name || targetPid, 'sid=' + (session.sid || '?').substring(0, 8));
             }
           } else if (isNew) {
-            // agent_start/done — PID 불일치 시 TTY → cwd 순서로 매칭
-            var tty = session.tty || '';
-            var candidates = [];
+            // session_start 없이 도착한 이벤트 → 세션 자동 복구
+            // session.pid = TTY (hook-handler.sh에서 ps -o tty=로 추출)
+            var ttyId = session.pid || '';
+            var validTty = ttyId && ttyId !== 'none' && ttyId !== 'unknown';
 
-            // 1순위: 같은 TTY
-            if (tty && tty !== 'none') {
-              candidates = Object.keys(sessions).filter(function(pid) {
-                return sessions[pid].tty === tty;
-              });
-            }
-            // 2순위: 같은 cwd (TTY 매칭 실패 시)
-            if (candidates.length === 0 && session.cwd) {
-              candidates = Object.keys(sessions).filter(function(pid) {
-                return sessions[pid].cwd === session.cwd;
-              });
-            }
-
-            if (candidates.length > 0) {
-              candidates.sort(function(a, b) {
-                return (sessions[b].lastActivity || '').localeCompare(sessions[a].lastActivity || '');
-              });
-              targetPid = candidates[0];
-              parsed.session_pid = targetPid;
-              parsed.session_name = sessions[targetPid].name;
-            } else {
-              // 매칭 실패 → 새 세션으로 자동 등록 (서버 재시작 후 복구용)
-              targetPid = session.pid;
+            if (validTty) {
+              // 유효한 TTY → 새 세션으로 등록 (CWD 매칭으로 다른 세션에 합치지 않음)
+              targetPid = ttyId;
               sessions[targetPid] = {
                 pid: targetPid,
                 name: session.name || 'Session ' + targetPid,
                 cwd: session.cwd || '',
-                tty: session.tty || '',
+                tty: ttyId,
                 sid: session.sid || '',
                 startTime: new Date().toISOString(),
                 lastActivity: new Date().toISOString(),
                 eventCount: 0
               };
               broadcastEvent({ event: 'session_registered', session: sessions[targetPid] });
-              console.log('  [SESSION+] auto-recovered:', sessions[targetPid].name);
+              console.log('  [SESSION+] auto-recovered by TTY:', ttyId, sessions[targetPid].name);
+            } else {
+              // TTY 없음 → CWD 매칭 시도 (fallback)
+              var candidates = [];
+              if (session.cwd) {
+                candidates = Object.keys(sessions).filter(function(pid) {
+                  return sessions[pid].cwd === session.cwd;
+                });
+              }
+              if (candidates.length > 0) {
+                candidates.sort(function(a, b) {
+                  return (sessions[b].lastActivity || '').localeCompare(sessions[a].lastActivity || '');
+                });
+                targetPid = candidates[0];
+                parsed.session_pid = targetPid;
+                parsed.session_name = sessions[targetPid].name;
+              } else {
+                // 매칭 실패 → 새 세션으로 자동 등록
+                targetPid = session.pid;
+                sessions[targetPid] = {
+                  pid: targetPid,
+                  name: session.name || 'Session ' + targetPid,
+                  cwd: session.cwd || '',
+                  tty: '',
+                  sid: session.sid || '',
+                  startTime: new Date().toISOString(),
+                  lastActivity: new Date().toISOString(),
+                  eventCount: 0
+                };
+                broadcastEvent({ event: 'session_registered', session: sessions[targetPid] });
+                console.log('  [SESSION+] auto-recovered (no TTY):', sessions[targetPid].name);
+              }
             }
           }
 
           if (targetPid && sessions[targetPid]) {
+            // 새 상호작용 이벤트만 종료 타이머 취소 (thinking_end 등 잔여 이벤트는 무시)
+            if (pendingEnds[targetPid] && (event === 'session_start' || event === 'thinking_start')) {
+              clearTimeout(pendingEnds[targetPid]);
+              delete pendingEnds[targetPid];
+              console.log('  [SESSION-] cancelled pending end:', targetPid, '(new event:', event, ')');
+            }
             sessions[targetPid].lastActivity = new Date().toISOString();
             sessions[targetPid].eventCount = (sessions[targetPid].eventCount || 0) + 1;
             if (session.name && session.name !== 'unknown') {
@@ -636,23 +718,40 @@ const server = http.createServer(function(req, res) {
     return;
   }
 
-  // API: 일일 통계
+  // API: 통계
   if (url === '/api/stats' && req.method === 'GET') {
-    if (dailyStats.date !== todayKey()) {
-      dailyStats = { date: todayKey(), prompts: 0, agents: {}, tools: {} };
-    }
+    ensureToday();
+    var d = statsData.today;
     var totalAgents = 0;
-    Object.keys(dailyStats.agents).forEach(function(k) { totalAgents += dailyStats.agents[k]; });
+    Object.keys(d.agents || {}).forEach(function(k) { totalAgents += d.agents[k]; });
     var totalTools = 0;
-    Object.keys(dailyStats.tools).forEach(function(k) { totalTools += dailyStats.tools[k]; });
+    Object.keys(d.tools || {}).forEach(function(k) { totalTools += d.tools[k]; });
+
+    // 주간 합산 (최근 7일)
+    var weekly = { prompts: d.prompts || 0, agents: {}, tools: {} };
+    var weekDays = statsData.history.filter(function(h) {
+      var diff = (new Date(todayKey()) - new Date(h.date)) / 86400000;
+      return diff < 7;
+    });
+    weekDays.forEach(function(h) {
+      weekly.prompts += (h.prompts || 0);
+      Object.keys(h.agents || {}).forEach(function(k) { weekly.agents[k] = (weekly.agents[k] || 0) + h.agents[k]; });
+      Object.keys(h.tools || {}).forEach(function(k) { weekly.tools[k] = (weekly.tools[k] || 0) + h.tools[k]; });
+    });
+    // 오늘 에이전트/도구도 주간에 합산
+    Object.keys(d.agents || {}).forEach(function(k) { weekly.agents[k] = (weekly.agents[k] || 0) + d.agents[k]; });
+    Object.keys(d.tools || {}).forEach(function(k) { weekly.tools[k] = (weekly.tools[k] || 0) + d.tools[k]; });
+
     res.writeHead(200, {'Content-Type': 'application/json; charset=utf-8'});
     res.end(JSON.stringify({
-      date: dailyStats.date,
-      prompts: dailyStats.prompts || 0,
+      date: d.date,
+      prompts: d.prompts || 0,
       totalAgents: totalAgents,
       totalTools: totalTools,
-      agents: dailyStats.agents,
-      tools: dailyStats.tools
+      agents: d.agents || {},
+      tools: d.tools || {},
+      weekly: weekly,
+      total: statsData.total || {},
     }));
     return;
   }
