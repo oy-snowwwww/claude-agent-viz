@@ -22,6 +22,9 @@ https://github.com/user-attachments/assets/b3595469-2546-4624-adf8-9a119ea00c2d
 - **Hooks 현황** — 설정된 훅 핸들러 목록 표시
 - **타임라인** — Master + 에이전트 실행 시간 바 차트
 - **세션 관리** — 멀티 세션 탭, 이름 변경, 상태 추적
+- **세션 히스토리** — 종료된 세션의 질문 수, 응답 시간, 에이전트/도구/파일 통계 자동 저장 (7일 보관)
+- **브라우저 알림** — 탭 비활성 시 에이전트 완료, 응답 완료 알림 (on/off 토글)
+- **일일 통계** — 오늘의 질문 수, 에이전트별/도구별 사용 횟수, 주간/누적 통계
 - **환경 효과** — 낮/밤 사이클, 4계절 순환, 날씨 파티클, 우주 배경 모드
 - **성능 최적화** — 탭 비활성 시 애니메이션 자동 정지, renderAll 디바운스
 
@@ -36,22 +39,22 @@ https://github.com/user-attachments/assets/b3595469-2546-4624-adf8-9a119ea00c2d
 ### 1. 파일 배치
 
 ```bash
-# ~/.claude/agent-viz/ 에 프로젝트 파일 배치
-git clone https://github.com/oy-snowwwww/claude-agent-viz.git ~/.claude/agent-viz
+# ~/workspace/claude-agent-viz/ 에 프로젝트 파일 배치
+git clone https://github.com/oy-snowwwww/claude-agent-viz.git ~/workspace/claude-agent-viz
 ```
 
 ### 2. 실행 권한 부여
 
 ```bash
-chmod +x ~/.claude/agent-viz/start.sh
-chmod +x ~/.claude/agent-viz/hook-handler.sh
+chmod +x ~/workspace/claude-agent-viz/start.sh
+chmod +x ~/workspace/claude-agent-viz/hook-handler.sh
 ```
 
 ### 3. CLI 별칭 설정 (선택)
 
 ```bash
 # ~/.zshrc 또는 ~/.bashrc에 추가
-alias claude-agents="bash ~/.claude/agent-viz/start.sh"
+alias claude-agents="bash ~/workspace/claude-agent-viz/start.sh"
 ```
 
 ### 4. Claude Code 훅 설정
@@ -66,11 +69,11 @@ alias claude-agents="bash ~/.claude/agent-viz/start.sh"
         "hooks": [
           {
             "type": "command",
-            "command": "bash ~/.claude/agent-viz/start.sh auto"
+            "command": "bash ~/workspace/claude-agent-viz/start.sh auto"
           },
           {
             "type": "command",
-            "command": "bash ~/.claude/agent-viz/hook-handler.sh session_start"
+            "command": "bash ~/workspace/claude-agent-viz/hook-handler.sh session_start"
           }
         ]
       }
@@ -80,7 +83,7 @@ alias claude-agents="bash ~/.claude/agent-viz/start.sh"
         "hooks": [
           {
             "type": "command",
-            "command": "bash ~/.claude/agent-viz/hook-handler.sh thinking_start"
+            "command": "bash ~/workspace/claude-agent-viz/hook-handler.sh thinking_start"
           }
         ]
       }
@@ -90,7 +93,7 @@ alias claude-agents="bash ~/.claude/agent-viz/start.sh"
         "hooks": [
           {
             "type": "command",
-            "command": "bash ~/.claude/agent-viz/hook-handler.sh thinking_end"
+            "command": "bash ~/workspace/claude-agent-viz/hook-handler.sh thinking_end"
           }
         ]
       }
@@ -100,7 +103,7 @@ alias claude-agents="bash ~/.claude/agent-viz/start.sh"
         "hooks": [
           {
             "type": "command",
-            "command": "bash ~/.claude/agent-viz/hook-handler.sh session_end"
+            "command": "bash ~/workspace/claude-agent-viz/hook-handler.sh session_end"
           }
         ]
       }
@@ -111,7 +114,7 @@ alias claude-agents="bash ~/.claude/agent-viz/start.sh"
         "hooks": [
           {
             "type": "command",
-            "command": "bash ~/.claude/agent-viz/hook-handler.sh agent_start"
+            "command": "bash ~/workspace/claude-agent-viz/hook-handler.sh agent_start"
           }
         ]
       },
@@ -119,7 +122,7 @@ alias claude-agents="bash ~/.claude/agent-viz/start.sh"
         "hooks": [
           {
             "type": "command",
-            "command": "bash ~/.claude/agent-viz/hook-handler.sh tool_use"
+            "command": "bash ~/workspace/claude-agent-viz/hook-handler.sh tool_use"
           }
         ]
       }
@@ -130,7 +133,7 @@ alias claude-agents="bash ~/.claude/agent-viz/start.sh"
         "hooks": [
           {
             "type": "command",
-            "command": "bash ~/.claude/agent-viz/hook-handler.sh agent_done"
+            "command": "bash ~/workspace/claude-agent-viz/hook-handler.sh agent_done"
           }
         ]
       }
@@ -160,17 +163,20 @@ claude-agents off      # 세션 시작 시 자동 실행 OFF
 | **액티비티** | 에이전트별 프로그레스 바 + 상태 |
 | **타임라인** | Master + 에이전트 실행 시간 시각화 |
 | **로그** | 실시간 이벤트 로그 |
+| **히스토리** | 종료된 세션 요약 (🕐 버튼으로 열기) |
 
 ### 헤더 버튼
 
 | 버튼 | 기능 |
 |------|------|
-| ✨/🌍 | 환경 효과 on/off (우주 모드 ↔ 계절 모드) |
-| 🌸/☀️/🍂/❄️ | 계절 전환 |
-| Dark/Light | 테마 전환 |
+| 🔔 | 브라우저 알림 on/off |
+| 🕐 | 세션 히스토리 |
 | ? | 도움말 |
 | ↻ | 서버 재시작 |
 | ■ | 서버 종료 |
+| ✨/🌍 | 환경 효과 on/off (우주 모드 ↔ 계절 모드) |
+| 🌸/☀️/🍂/❄️ | 계절 전환 |
+| 🌙/☀️ | 테마 전환 (Dark/Light) |
 
 ### 에이전트 토글
 
@@ -185,7 +191,7 @@ claude-agents off      # 세션 시작 시 자동 실행 OFF
 
 Claude는 이 주석을 읽고 해당 에이전트만 사용합니다. 기존 CLAUDE.md 내용은 건드리지 않습니다.
 
-- Master 작업 중에는 토글 변경 불가 (잠금)
+- Master 작업 중이거나 해당 에이전트가 실행 중일 때 토글 변경 불가 (잠금)
 - 전체 ON 시 제한 해제 (마커 제거)
 - 전체 OFF 시 에이전트 미사용 (`none`)
 
@@ -212,13 +218,15 @@ CLAUDE.md
 ### 파일 구조
 
 ```
-~/.claude/agent-viz/
+~/workspace/claude-agent-viz/
 ├── index.html          # 단일 파일 SPA (UI 전체)
 ├── server.js           # Node.js HTTP 서버
 ├── hook-handler.sh     # Claude Code 훅 → 서버 이벤트 브릿지
 ├── start.sh            # 서버 시작/종료/상태 CLI
 ├── enabled             # 자동 실행 플래그 (파일 존재 여부)
-└── sessions/           # 활성 세션 PID 파일
+├── sessions/           # 활성 세션 PID 파일
+├── history/            # 세션 히스토리 JSON (7일 보관)
+└── agent-stats.json    # 일일/주간/누적 통계
 ```
 
 ## 화면에 뭐가 어디서 오는가
@@ -257,7 +265,7 @@ CLAUDE.md
     │   ├── coder.md
     │   ├── reviewer.md
     │   └── ...
-    └── agent-viz/                 # ← 이 프로젝트
+    └── agent-viz/                 # 에이전트 대시보드 (별도 경로 가능)
 ```
 
 ### 에이전트 파일 예시 (`~/.claude/agents/coder.md`)

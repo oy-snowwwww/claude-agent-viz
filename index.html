@@ -126,6 +126,8 @@
     .sess-tab:hover{color:var(--text);background:var(--surface-hover)}
     .sess-dot{width:5px;height:5px;border-radius:50%;flex-shrink:0}
     .sess-count{font-size:.45rem;padding:1px 4px;border-radius:8px;background:rgba(0,255,200,.08);color:var(--accent)}
+    .sess-tab.inactive{border-color:var(--warning,#fbbf24);color:var(--warning,#fbbf24);opacity:.7}
+    .sess-tab.inactive .sess-dot{background:var(--warning,#fbbf24)!important;box-shadow:0 0 4px var(--warning,#fbbf24)!important}
     .sess-tab.stale{border-color:var(--negative);color:var(--negative);opacity:.6}
     .sess-tab.stale .sess-dot{background:var(--negative)!important;box-shadow:0 0 4px var(--negative)!important}
     .sess-tab.stale .sess-close{opacity:.8}
@@ -136,9 +138,11 @@
     .sess-tab.closing{position:relative;overflow:hidden}
     .sess-tab.closing::after{content:'';position:absolute;bottom:0;left:0;height:2px;background:var(--negative);animation:sessClose 10s linear forwards}
     @keyframes sessClose{from{width:100%}to{width:0%}}
-    .sess-tab.completed{border-bottom:2px solid #10b981;animation:sessDonePulse 1s ease-in-out 5}
-    .sess-tab.completed.faded{border-bottom-color:transparent;background:transparent;box-shadow:none;transition:all .8s ease-out}
-    @keyframes sessDonePulse{0%,100%{background:rgba(0,255,200,.08);box-shadow:0 0 4px rgba(0,255,200,.3)}50%{background:rgba(0,255,200,.25);box-shadow:0 0 14px rgba(0,255,200,.6)}}
+    .sess-tab.completed{border-bottom:2px solid #10b981;color:#10b981;animation:sessDonePulse 1s ease-in-out 5}
+    .sess-tab.completed .sess-dot{background:#10b981!important;box-shadow:0 0 4px #10b981!important}
+    .sess-tab.completed .sess-name-text{color:#10b981}
+    .sess-tab.completed.faded{border-bottom-color:transparent;background:transparent;box-shadow:none;color:var(--text-secondary);transition:all .8s ease-out}
+    @keyframes sessDonePulse{0%,100%{background:rgba(16,185,129,.08);box-shadow:0 0 4px rgba(16,185,129,.3)}50%{background:rgba(16,185,129,.25);box-shadow:0 0 14px rgba(16,185,129,.6)}}
     @keyframes spin{to{transform:rotate(360deg)}}
     .sess-rename{background:var(--bg);border:1px solid var(--accent);border-radius:3px;color:var(--text);font-family:monospace;font-size:.55rem;padding:2px 6px;outline:none;width:110px}
     .empty-sessions{color:var(--text-secondary);font-size:.55rem;font-family:monospace;padding:6px 12px;opacity:.5}
@@ -268,8 +272,6 @@
     .ws-agent.thinking{animation:agentEnter .5s ease-out;transition:none}
     .ws-agent.thinking .pix-lg{filter:drop-shadow(0 0 10px rgba(251,191,36,.7));animation:working .7s ease-in-out infinite}
     .ws-agent.thinking .ws-bubble{opacity:1;border-color:#fbbf24}
-    .ws-agent.stale .pix-lg{filter:grayscale(.5);opacity:.5}
-    .ws-agent.stale .ws-bubble{opacity:1;border-color:var(--negative)}
     /* Zzz */
     .ws-zzz{position:absolute;top:-8px;right:-12px;pointer-events:none;font-family:monospace;font-weight:700;z-index:5}
     .ws-zzz span{position:absolute;opacity:0;font-size:.5rem;animation:zzFloat 3s ease-in-out infinite}
@@ -331,7 +333,6 @@
     @keyframes barFlow{0%{background-position:0% 0}100%{background-position:200% 0}}
     .act-bar-fill.done{background:var(--positive)}
     .act-bar-fill.idle{background:var(--surface-hover)}
-    .act-bar-fill.stale{background:var(--negative);opacity:.4}
 
     .act-task{font-size:.55rem;color:var(--text-secondary);font-family:monospace;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
     .act-status{font-size:.5rem;padding:2px 6px;border-radius:3px;font-family:monospace;font-weight:500;flex-shrink:0}
@@ -339,8 +340,6 @@
     .act-status.done{background:rgba(16,185,129,.12);color:var(--positive)}
     .act-status.idle{background:rgba(255,255,255,.04);color:var(--text-secondary)}
     .act-session{font-size:.45rem;padding:2px 5px;border-radius:3px;background:rgba(251,191,36,.08);color:var(--warning);flex-shrink:0}
-    .act-status.stale{background:rgba(244,63,94,.12);color:var(--negative)}
-    .act-row.stale{opacity:.6}
     .act-reset{font-size:.45rem;color:var(--text-secondary);cursor:pointer;padding:1px 4px;border-radius:3px;flex-shrink:0;opacity:0;transition:opacity .15s}
     .act-row:hover .act-reset{opacity:1}
     .act-reset:hover{color:var(--negative);background:rgba(244,63,94,.1)}
@@ -352,14 +351,14 @@
     .timeline-header:hover{background:var(--surface-hover)}
     .timeline-body{padding:8px 12px;overflow-x:auto;scrollbar-width:thin}
     .tl-row{display:flex;align-items:center;gap:6px;height:18px;margin-bottom:2px}
-    .tl-label{width:75px;font-size:.5rem;font-family:monospace;font-weight:600;text-align:right;flex-shrink:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .tl-label{width:55px;font-size:.5rem;font-family:monospace;font-weight:600;text-align:right;flex-shrink:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
     .tl-track{flex:1;height:12px;position:relative;background:rgba(255,255,255,.02);border-radius:3px;min-width:200px}
     .tl-bar{position:absolute;height:100%;border-radius:3px;opacity:.85;transition:width .3s,left .3s;min-width:3px}
     .tl-bar.working{animation:tlPulse 1s ease-in-out infinite}
     @keyframes tlPulse{0%,100%{opacity:.85}50%{opacity:.5}}
     .tl-bar:hover{opacity:1}
-    .tl-bar-label{position:absolute;right:4px;top:50%;transform:translateY(-50%);font-size:.4rem;font-family:monospace;color:rgba(0,0,0,.7);font-weight:600}
-    .tl-scale{display:flex;justify-content:space-between;margin-left:81px;margin-top:4px;font-size:.4rem;color:var(--text-secondary);font-family:monospace;opacity:.6}
+    .tl-bar-label{font-size:.4rem;font-family:monospace;color:var(--text);font-weight:600;white-space:nowrap;flex-shrink:0;min-width:25px}
+    .tl-scale{display:flex;justify-content:space-between;margin-top:4px;font-size:.4rem;color:var(--text);font-family:monospace;opacity:.8;flex:1;min-width:200px}
     .tl-empty{padding:8px;text-align:center;font-size:.5rem;color:var(--text-secondary);font-family:monospace;opacity:.5}
 
     /* Log Panel */
@@ -605,29 +604,19 @@
   var liveInstances={};
   function instKey(sp,ai){return sp+'_'+ai}
   function getAgentInfo(aid){return agents.find(function(a){return a.id===aid||a.name===aid})||null}
-  var STALE_TIMEOUT=600000; // 10분
-
   function getLiveInstances(){
     var arr=Object.values(liveInstances);
     if(currentSession) arr=arr.filter(function(i){return i.sessionPid===currentSession});
     return arr;
   }
 
-  function checkStaleInstances(){
-    var now=Date.now();var changed=false;
-    Object.keys(liveInstances).forEach(function(k){
-      var inst=liveInstances[k];
-      if(inst.st==='working'&&(now-inst.startTime)>STALE_TIMEOUT){
-        inst.st='stale';inst.task='\uC751\uB2F5 \uC5C6\uC74C (ESC/\uC911\uB2E8?)';inst.prog=0;changed=true;
-      }
-    });
-    if(changed) renderAll();
-  }
-
   function clearInstance(key){
+    var inst=liveInstances[key];var pid=inst?inst.sessionPid:'';
     delete liveInstances[key];
-    var anyWorking=Object.values(liveInstances).some(function(i){return i.st==='working'});
-    if(!anyWorking){masterData._st='idle';masterData._task=''}
+    if(pid&&sessions[pid]){
+      var anyWorking=Object.values(liveInstances).some(function(i){return i.sessionPid===pid&&i.st==='working'});
+      if(!anyWorking){sessions[pid]._masterSt='idle';sessions[pid]._masterTask=''}
+    }
     renderAll();
   }
 
@@ -697,6 +686,9 @@
     return el;
   }
 
+  // === Util ===
+  function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#x27;')}
+
   // === Theme ===
   function applyTheme(t){document.documentElement.className='theme-'+t;currentTheme=t;localStorage.setItem('viz-theme',t);var btn=document.getElementById('themeBtn');btn.textContent=(t==='dark'?'🌙':'☀️');btn.dataset.tip=(t==='dark'?'Dark':'Light')}
   function cycleTheme(){applyTheme(currentTheme==='dark'?'light':'dark');renderAll()}
@@ -704,9 +696,34 @@
 
   // === Session Tabs ===
   var sessClickTimer=null;
+  function mergeSessionData(s, overrides) {
+    var prev = sessions[s.pid] || {};
+    return {
+      pid: s.pid,
+      name: s.name || prev.name || 'Session ' + s.pid,
+      cwd: s.cwd || prev.cwd || '',
+      sid: s.sid || prev.sid || '',
+      startTime: s.startTime || prev.startTime || '',
+      lastActivity: overrides.lastActivity || prev.lastActivity || '',
+      eventCount: overrides.eventCount != null ? overrides.eventCount : (prev.eventCount || 0),
+      agentCount: prev.agentCount || 0,
+      alive: true,
+      _masterSt: prev._masterSt || 'idle',
+      _masterTask: prev._masterTask || '',
+      _turnCount: prev._turnCount || 0,
+      _thinkStart: prev._thinkStart || null,
+      _thinkHistory: prev._thinkHistory || [],
+      _lastDoneTime: prev._lastDoneTime || null,
+      _completed: false,
+    };
+  }
   function registerSession(s){
     if(!s||!s.pid) return;var isNew=!sessions[s.pid];
-    sessions[s.pid]={pid:s.pid,name:s.name||'Session '+s.pid,cwd:s.cwd||'',sid:s.sid||'',startTime:s.startTime||new Date().toISOString(),lastActivity:new Date().toISOString(),eventCount:(sessions[s.pid]?sessions[s.pid].eventCount:0)+1,agentCount:(sessions[s.pid]?sessions[s.pid].agentCount:0)||0,alive:true};
+    sessions[s.pid]=mergeSessionData(s, {
+      lastActivity: new Date().toISOString(),
+      eventCount: ((sessions[s.pid] || {}).eventCount || 0) + 1,
+    });
+    if(!sessions[s.pid].startTime) sessions[s.pid].startTime = new Date().toISOString();
     if(isNew){var wasEmpty=!currentSession;if(wasEmpty)currentSession=s.pid;renderSessionTabs();updateHeaderStat();if(wasEmpty&&s.cwd)fetchProjectAgents(s.cwd)}return isNew;
   }
   function removeSession(pid){
@@ -717,7 +734,7 @@
     }
   }
   function switchSession(pid){
-    currentSession=pid;masterData._sessionPid=null;
+    currentSession=pid;
     if(sessions[pid])delete sessions[pid]._completed;
     renderSessionTabs();renderLogs();renderActivity();renderWorkspace();
     document.getElementById('logFilterLabel').textContent=!pid?'':(sessions[pid]?' ['+sessions[pid].name+']':'');
@@ -739,13 +756,10 @@
       pids.forEach(function(pid){
         var tab=box.querySelector('[data-session="'+pid+'"]');if(!tab) return;
         var s=sessions[pid];
-        // stale 상태
         var isStale=!s.alive;
-        var cls='sess-tab'+(currentSession===pid?' active':'')+(isStale?' stale':'')+(s._completed?' completed':'');
+        var isInactive=s.alive&&(Date.now()-new Date(s.lastActivity||s.startTime).getTime())>600000;
+        var cls='sess-tab'+(currentSession===pid?' active':'')+(isStale?' stale':isInactive?' inactive':'')+(s._completed?' completed':'');
         if(tab.className!==cls) tab.className=cls;
-        // 이벤트 카운트 + 에이전트 카운트
-        var cntEl=tab.querySelector('.sess-count');
-        if(cntEl) cntEl.textContent=s.agentCount?'\uD83E\uDD16'+s.agentCount:'';
         // 스피너
         var hasWorking=Object.values(liveInstances).some(function(i){return i.sessionPid===pid&&i.st==='working'})||(s._masterSt==='thinking'||s._masterSt==='working');
         var spinEl=tab.querySelector('.sess-spinner');
@@ -768,14 +782,14 @@
       if(group.length>1){var nums=['\u2460','\u2461','\u2462','\u2463','\u2464','\u2465','\u2466','\u2467','\u2468','\u2469'];var idx=group.indexOf(pid);displayName=s.name+' '+(nums[idx]||'('+(idx+1)+')')}
       var lastAct=new Date(s.lastActivity||s.startTime).getTime();
       var isStale=!s.alive;
-      var tab=document.createElement('button');tab.className='sess-tab'+(currentSession===pid?' active':'')+(isStale?' stale':'')+(s._completed?' completed':'');tab.dataset.session=pid;
+      var isInactive=s.alive&&(Date.now()-lastAct)>600000;
+      var tab=document.createElement('button');tab.className='sess-tab'+(currentSession===pid?' active':'')+(isStale?' stale':isInactive?' inactive':'')+(s._completed?' completed':'');tab.dataset.session=pid;
       (function(p){
         tab.onclick=function(e){if(e.target.classList.contains('sess-close')||e.target.classList.contains('sess-rename'))return;if(sessClickTimer)return;sessClickTimer=setTimeout(function(){sessClickTimer=null;switchSession(p)},280)};
         tab.ondblclick=function(e){e.preventDefault();if(sessClickTimer){clearTimeout(sessClickTimer);sessClickTimer=null}startRenameSession(p)};
       })(pid);
       var dot=document.createElement('span');dot.className='sess-dot';dot.style.background=s.alive?sColor:'var(--text-secondary)';dot.style.boxShadow=s.alive?'0 0 4px '+sColor:'none';dot.style.opacity=s.alive?'1':'.4';tab.appendChild(dot);
       var ns=document.createElement('span');ns.className='sess-name-text';ns.textContent=displayName;tab.appendChild(ns);
-      var cnt=document.createElement('span');cnt.className='sess-count';cnt.textContent=s.agentCount?'\uD83E\uDD16'+s.agentCount:'';tab.appendChild(cnt);
       var hasWorking=Object.values(liveInstances).some(function(i){return i.sessionPid===pid&&i.st==='working'})||(s._masterSt==='thinking'||s._masterSt==='working');
       if(hasWorking){var sp2=document.createElement('span');sp2.className='sess-spinner';tab.appendChild(sp2)}
       var cl=document.createElement('span');cl.className='sess-close';cl.textContent='\u00d7';cl.onclick=function(e){e.stopPropagation();delete sessions[pid];Object.keys(liveInstances).forEach(function(k){if(liveInstances[k].sessionPid===pid)delete liveInstances[k]});if(currentSession===pid){var remaining=Object.keys(sessions);currentSession=remaining.length>0?remaining[0]:null}_tabsBuilt='';renderAll()};tab.appendChild(cl)
@@ -830,9 +844,21 @@
   function fetchMaster(cwd){
     var url=API+'/api/master';
     if(cwd) url+='?cwd='+encodeURIComponent(cwd);
-    fetch(url).then(function(r){return r.json()}).then(function(d){var keep={_st:masterData._st,_task:masterData._task,_thinkStart:masterData._thinkStart,_thinkHistory:masterData._thinkHistory,_turnCount:masterData._turnCount,_sessionPid:masterData._sessionPid,_lastDoneTime:masterData._lastDoneTime};masterData=d;Object.keys(keep).forEach(function(k){if(keep[k]!==undefined)masterData[k]=keep[k]});renderMasterCard()}).catch(function(){});
+    fetch(url).then(function(r){return r.json()}).then(function(d){masterData=d;renderMasterCard()}).catch(function(){});
   }
-  function fetchSessions(){fetch(API+'/api/sessions').then(function(r){return r.json()}).then(function(d){d.forEach(function(s){sessions[s.pid]={pid:s.pid,name:s.name||'Session '+s.pid,cwd:s.cwd||'',startTime:s.startTime||'',lastActivity:s.lastActivity||'',eventCount:s.eventCount||0,alive:true}});renderSessionTabs();updateHeaderStat();var cwd=(currentSession&&sessions[currentSession])?sessions[currentSession].cwd:'';if(cwd&&agents.length>0)fetchProjectAgents(cwd)}).catch(function(){})}
+  function fetchSessions(){
+    fetch(API+'/api/sessions').then(function(r){return r.json()}).then(function(d){
+      d.forEach(function(s){
+        sessions[s.pid] = mergeSessionData(s, {
+          lastActivity: s.lastActivity,
+          eventCount: s.eventCount || ((sessions[s.pid] || {}).eventCount || 0),
+        });
+      });
+      renderSessionTabs();updateHeaderStat();
+      var cwd=(currentSession&&sessions[currentSession])?sessions[currentSession].cwd:'';
+      if(cwd&&agents.length>0)fetchProjectAgents(cwd);
+    }).catch(function(){});
+  }
 
   function renderMasterCard(){
     var box=document.getElementById('masterCard');var card=document.createElement('div');card.className='master-card';card.onclick=function(){openMaster()};
@@ -841,7 +867,7 @@
     row.appendChild(info);card.appendChild(row);
     var files=document.createElement('div');files.className='master-files';
     var projLabel=masterData.projectPath?masterData.projectPath.replace(/^\/Users\/[^/]+/,'~'):'';
-    files.innerHTML='<div class="mf"><span class="dot" style="background:var(--positive)"></span>~/CLAUDE.md</div>'+(masterData.project?'<div class="mf"><span class="dot" style="background:var(--accent)"></span>'+projLabel+'</div>':'<div class="mf"><span class="dot" style="background:var(--text-secondary)"></span>\uD504\uB85C\uC81D\uD2B8 CLAUDE.md \uC5C6\uC74C</div>');
+    files.innerHTML='<div class="mf"><span class="dot" style="background:var(--positive)"></span>~/CLAUDE.md</div>'+(masterData.project?'<div class="mf"><span class="dot" style="background:var(--accent)"></span>'+esc(projLabel)+'</div>':'<div class="mf"><span class="dot" style="background:var(--text-secondary)"></span>\uD504\uB85C\uC81D\uD2B8 CLAUDE.md \uC5C6\uC74C</div>');
     card.appendChild(files);box.innerHTML='';box.appendChild(card);
   }
   function setConn(ok){}
@@ -893,10 +919,10 @@
         card.appendChild(toggle);
       }
       var row=document.createElement('div');row.className='ag-row';row.appendChild(buildPix(ag.id,ag.color,'sm',ag.model));
-      var info=document.createElement('div');info.innerHTML='<div class="ag-name" style="color:'+ag.color+'">'+ag.name+'</div><div class="ag-desc">'+ag.description+'</div>';
+      var info=document.createElement('div');info.innerHTML='<div class="ag-name" style="color:'+esc(ag.color)+'">'+esc(ag.name)+'</div><div class="ag-desc">'+esc(ag.description)+'</div>';
       row.appendChild(info);card.appendChild(row);
-      var meta=document.createElement('div');meta.className='ag-meta';meta.innerHTML='<span class="ag-tag model-'+ag.model+'">'+ag.model+'</span>';
-      (ag.tools||[]).forEach(function(t){meta.innerHTML+='<span class="ag-tag">'+t+'</span>'});
+      var meta=document.createElement('div');meta.className='ag-meta';meta.innerHTML='<span class="ag-tag model-'+esc(ag.model)+'">'+esc(ag.model)+'</span>';
+      (ag.tools||[]).forEach(function(t){meta.innerHTML+='<span class="ag-tag">'+esc(t)+'</span>'});
       card.appendChild(meta);
       box.appendChild(card);
     });
@@ -935,10 +961,11 @@
     // 라이브 인스턴스와 매칭 → 상태 결정
     nodes.forEach(function(nd){
       if(nd.id==='master'){
+        var cs=currentSession&&sessions[currentSession]?sessions[currentSession]:null;
         var anyWorking=instances.some(function(i){return i.st==='working'});
-        var sessMst=currentSession&&sessions[currentSession]?sessions[currentSession]._masterSt||'idle':'idle';
+        var sessMst=cs?cs._masterSt||'idle':'idle';
         nd._st=anyWorking?'working':sessMst;
-        nd._task=anyWorking?(masterData._task||''):(sessMst==='idle'?'':masterData._task||'');
+        nd._task=cs?cs._masterTask||'':'';
         return;
       }
       // 이 에이전트의 working 인스턴스 찾기
@@ -987,9 +1014,9 @@
         el.appendChild(pixWrap);
         var lbl=document.createElement('div');lbl.className='ws-label';
         if(nd.id==='master') lbl.innerHTML='<span style="color:#c084fc">Master</span><span class="ws-badge" style="background:rgba(251,191,36,.15);color:#fbbf24">SESSION</span>';
-        else lbl.innerHTML=nd.name+'<span class="ws-badge model-'+(nd.model||'sonnet')+'">'+(nd.model||'').toUpperCase()+'</span>';
+        else lbl.innerHTML=esc(nd.name)+'<span class="ws-badge model-'+esc(nd.model||'sonnet')+'">'+esc((nd.model||'').toUpperCase())+'</span>';
         el.appendChild(lbl);
-        var bub=document.createElement('div');bub.className='ws-bubble';bub.textContent=nd._task||'';el.appendChild(bub);
+        var bub=document.createElement('div');bub.className='ws-bubble';bub.textContent=nd._task||'';if(!nd._task)bub.style.display='none';el.appendChild(bub);
         ws.appendChild(el);
       });
       startAmbient(ws);
@@ -1002,7 +1029,7 @@
         el.dataset.st=nd._st||'idle';
         // idle → working 전환 시 현재 위치 그대로 (그 자리에서 일 시작)
         var bub=el.querySelector('.ws-bubble');
-        if(bub) bub.textContent=nd._task||'';
+        if(bub){bub.textContent=nd._task||'';bub.style.display=nd._task?'':'none'}
       });
     }
     // 집 배지 업데이트 (비활성 에이전트 수)
@@ -1015,7 +1042,7 @@
         badge.textContent='🏠 '+disabledCount;
       } else {if(badge)badge.remove()}
     }
-    // 상태별 이펙트: 아우라 (working), 이모션 (done/stale)
+    // 상태별 이펙트: 아우라 (working), 이모션 (done)
     nodes.forEach(function(nd){
       var el=document.getElementById('ws-'+nd.wsId);if(!el)return;
       var st=nd._st||'idle';
@@ -1030,17 +1057,14 @@
           el.appendChild(aura);
         }
       } else {if(aura)aura.remove()}
-      // 이모션: working/done/stale (idle은 creature 시스템에서 제어)
+      // 이모션: working/done (idle은 creature 시스템에서 제어)
       if(st!=='idle'){
-        var zzz=el.querySelector('.ws-zzz');
-        if(st==='stale'){if(!zzz){zzz=document.createElement('div');zzz.className='ws-zzz';zzz.style.color='var(--negative)';var rOff=Math.random()*2;zzz.innerHTML='<span style="animation-delay:'+rOff.toFixed(1)+'s">z</span><span style="animation-delay:'+(rOff+1).toFixed(1)+'s">z</span><span style="animation-delay:'+(rOff+2).toFixed(1)+'s">z</span>';el.appendChild(zzz)}}
-        else{if(zzz)zzz.remove()}
+        var zzz=el.querySelector('.ws-zzz');if(zzz)zzz.remove();
         var pix=el.querySelector('.pix-lg');if(!pix)return;
         var eyes=pix.querySelectorAll('i[data-eye]');
         var normalEye=currentTheme==='dark'?'#080810':'#1a1a1a';
         eyes.forEach(function(eye){
           if(st==='done'){eye.style.background='#10b981';eye.style.borderRadius='50%';eye.style.transform='scaleY(.4)'}
-          else if(st==='stale'){eye.style.background='#666';eye.style.borderRadius='0';eye.style.transform='scaleY(.2)'}
           else{eye.style.background=normalEye;eye.style.borderRadius='0';eye.style.transform=''}
         });
       }
@@ -1125,32 +1149,32 @@
     }
     // Master 항상 표시
     var curS=currentSession&&sessions[currentSession]?sessions[currentSession]:null;
-    var mst=curS?curS._masterSt||'idle':masterData._st||'idle';
-    var mThinkStart=curS?curS._thinkStart:masterData._thinkStart;
+    var mst=curS?curS._masterSt||'idle':'idle';
+    var mThinkStart=curS?curS._thinkStart:null;
     var mLabels={thinking:'생각 중',done:'완료',working:'조율 중',idle:'대기'};
     var mRow=document.createElement('div');mRow.className='act-row';
     mRow.appendChild(buildPix('master','#fbbf24','sm'));
     mRow.innerHTML+='<span class="act-name" style="color:#fbbf24">Master</span>';
     var mProg=mst==='done'?100:mst==='thinking'?Math.min(90,10+((Date.now()-(mThinkStart||Date.now()))/1000)*5):mst==='working'?50:0;
     mRow.innerHTML+='<div class="act-bar"><div class="act-bar-fill '+mst+'" style="width:'+mProg+'%"></div></div>';
-    mRow.innerHTML+='<span class="act-task">'+(mst==='idle'?'':masterData._task||'')+'</span>';
+    var mTaskText=curS?curS._masterTask||'':'';
+    mRow.innerHTML+='<span class="act-task">'+esc(mTaskText)+'</span>';
     mRow.innerHTML+='<span class="act-status '+mst+'">'+(mLabels[mst]||mst)+'</span>';
     box.appendChild(mRow);
 
     if(instances.length===0&&mst==='idle'){return;}
     instances.forEach(function(inst){
       var ai=getAgentInfo(inst.agentId);var name=ai?ai.name:inst.agentId;
-      var isStale=inst.st==='stale';
-      var row=document.createElement('div');row.className='act-row'+(isStale?' stale':'');
+      var row=document.createElement('div');row.className='act-row';
       row.appendChild(buildPix(inst.agentId,inst.color,'sm'));
-      row.innerHTML+='<span class="act-name" style="color:'+inst.color+'">'+name+'</span>';
+      row.innerHTML+='<span class="act-name" style="color:'+esc(inst.color)+'">'+esc(name)+'</span>';
       row.innerHTML+='<div class="act-bar"><div class="act-bar-fill '+inst.st+'" style="width:'+(inst.prog||0)+'%"></div></div>';
-      row.innerHTML+='<span class="act-task">'+(inst.task||'-')+'</span>';
-      var labels={idle:'\uB300\uAE30',working:'\uC791\uC5C5 \uC911',done:'\uC644\uB8CC',stale:'\uC751\uB2F5\uC5C6\uC74C'};
+      row.innerHTML+='<span class="act-task">'+esc(inst.task||'-')+'</span>';
+      var labels={idle:'\uB300\uAE30',working:'\uC791\uC5C5 \uC911',done:'\uC644\uB8CC'};
       row.innerHTML+='<span class="act-status '+inst.st+'">'+(labels[inst.st]||inst.st)+'</span>';
-      if(!currentSession&&inst.sessionName) row.innerHTML+='<span class="act-session">'+inst.sessionName+'</span>';
-      // 리셋 버튼 (stale 또는 done)
-      if(isStale||inst.st==='done'){
+      if(!currentSession&&inst.sessionName) row.innerHTML+='<span class="act-session">'+esc(inst.sessionName)+'</span>';
+      // 리셋 버튼 (done)
+      if(inst.st==='done'){
         var rb=document.createElement('span');rb.className='act-reset';rb.textContent='\u00d7';rb.title='\uC81C\uAC70';
         (function(k){rb.onclick=function(e){e.stopPropagation();clearInstance(k)}})(inst.key);
         row.appendChild(rb);
@@ -1168,8 +1192,8 @@
     var instances=getLiveInstances();
     // Master thinking 구간 수집 (세션별)
     var curSess=currentSession&&sessions[currentSession]?sessions[currentSession]:null;
-    var masterEntries=curSess?curSess._thinkHistory||[]:masterData._thinkHistory||[];
-    var curThinkStart=curSess?curSess._thinkStart:masterData._thinkStart;
+    var masterEntries=curSess?curSess._thinkHistory||[]:[];
+    var curThinkStart=curSess?curSess._thinkStart:null;
     if(curThinkStart) masterEntries=masterEntries.concat([{start:curThinkStart,end:null}]);
     if(instances.length===0&&masterEntries.length===0){box.innerHTML='<div class="tl-empty">\uD65C\uB3D9 \uC5C6\uC74C</div>';return}
     // 시간 범위 계산
@@ -1185,7 +1209,7 @@
     if(masterEntries.length>0){
       var row=document.createElement('div');row.className='tl-row';
       var lbl=document.createElement('span');lbl.className='tl-label';lbl.style.color='#c084fc';lbl.textContent='Master';
-      var track=document.createElement('div');track.className='tl-track';
+      var track=document.createElement('div');track.className='tl-track';var lastSec=0;
       masterEntries.forEach(function(m){
         var bar=document.createElement('div');bar.className='tl-bar'+(m.end?'':' working');
         var startPct=((m.start-minStart)/totalMs)*100;
@@ -1193,11 +1217,12 @@
         var widthPct=((endTime-m.start)/totalMs)*100;
         bar.style.left=startPct+'%';bar.style.width=Math.max(widthPct,1)+'%';bar.style.background='#c084fc';
         var sec=Math.round((endTime-m.start)/1000);
-        if(widthPct>15){var bl=document.createElement('span');bl.className='tl-bar-label';bl.textContent=sec+'s';bar.appendChild(bl)}
         bar.title='Master '+sec+'s';
         track.appendChild(bar);
+        lastSec=sec;
       });
-      row.appendChild(lbl);row.appendChild(track);box.appendChild(row);
+      var timeLabel=document.createElement('span');timeLabel.className='tl-bar-label';timeLabel.textContent=lastSec+'s';
+      row.appendChild(lbl);row.appendChild(track);row.appendChild(timeLabel);box.appendChild(row);
     }
     // 각 에이전트 바 렌더링
     instances.forEach(function(inst){
@@ -1211,15 +1236,20 @@
       var widthPct=((endTime-inst.startTime)/totalMs)*100;
       bar.style.left=startPct+'%';bar.style.width=Math.max(widthPct,1)+'%';bar.style.background=inst.color;
       var sec=Math.round((endTime-inst.startTime)/1000);
-      if(widthPct>15){var bl=document.createElement('span');bl.className='tl-bar-label';bl.textContent=sec+'s';bar.appendChild(bl)}
       bar.title=name+' '+sec+'s';
-      track.appendChild(bar);row.appendChild(lbl);row.appendChild(track);box.appendChild(row);
+      track.appendChild(bar);
+      var timeLabel=document.createElement('span');timeLabel.className='tl-bar-label';timeLabel.textContent=sec+'s';
+      row.appendChild(lbl);row.appendChild(track);row.appendChild(timeLabel);box.appendChild(row);
     });
     // 시간 눈금
+    var scaleRow=document.createElement('div');scaleRow.className='tl-row';scaleRow.style.height='auto';
+    var scaleLabel=document.createElement('span');scaleLabel.className='tl-label';scaleLabel.textContent='';
     var scale=document.createElement('div');scale.className='tl-scale';
+    var scalePad=document.createElement('span');scalePad.className='tl-bar-label';scalePad.textContent='';
     var totalSec=Math.round(totalMs/1000);
     for(var i=0;i<=4;i++){var s=document.createElement('span');s.textContent=Math.round(totalSec*i/4)+'s';scale.appendChild(s)}
-    box.appendChild(scale);
+    scaleRow.appendChild(scaleLabel);scaleRow.appendChild(scale);scaleRow.appendChild(scalePad);
+    box.appendChild(scaleRow);
   }
 
   // === Logs ===
@@ -1232,8 +1262,8 @@
     var filtered=!currentSession?logEntries:logEntries.filter(function(l){return!l.sessionPid||l.sessionPid===currentSession});
     filtered.slice(0,50).forEach(function(l){
       var d=document.createElement('div');d.className='log'+(l.cls?' '+l.cls:'');
-      var sl='';if(!currentSession&&l.sessionPid&&l.sessionName) sl='<span class="ls">['+l.sessionName+']</span>';
-      d.innerHTML='<span class="lt">'+l.time+'</span>'+sl+'<span class="la" style="color:'+l.agColor+'">['+l.agName+']</span><span class="lm">'+l.msg+'</span>';
+      var sl='';if(!currentSession&&l.sessionPid&&l.sessionName) sl='<span class="ls">['+esc(l.sessionName)+']</span>';
+      d.innerHTML='<span class="lt">'+l.time+'</span>'+sl+'<span class="la" style="color:'+esc(l.agColor)+'">['+esc(l.agName)+']</span><span class="lm">'+esc(l.msg)+'</span>';
       box.appendChild(d);
     });
   }
@@ -1309,7 +1339,7 @@
     mcpServers.forEach(function(mcp){
       var el=document.createElement('div');el.className='mcp-item';
       var color=mcpColor(mcp.id);
-      el.innerHTML='<span class="mcp-dot" style="background:'+color+';box-shadow:0 0 4px '+color+'"></span><div><div class="mcp-name">'+mcp.name+'</div><div class="mcp-type">'+mcp.type+'</div></div>';
+      el.innerHTML='<span class="mcp-dot" style="background:'+esc(color)+';box-shadow:0 0 4px '+esc(color)+'"></span><div><div class="mcp-name">'+esc(mcp.name)+'</div><div class="mcp-type">'+esc(mcp.type)+'</div></div>';
       box.appendChild(el);
     });
   }
@@ -1334,7 +1364,7 @@
     Object.keys(groups).forEach(function(evt){
       var g=document.createElement('div');g.className='hook-group';
       var color=EVENT_COLORS[evt]||'var(--accent)';
-      var header='<div class="hook-event"><span class="hook-event-dot" style="background:'+color+'"></span>'+evt+' <span style="font-size:.4rem;color:var(--text-secondary);font-weight:400">('+groups[evt].length+')</span></div>';
+      var header='<div class="hook-event"><span class="hook-event-dot" style="background:'+color+'"></span>'+esc(evt)+' <span style="font-size:.4rem;color:var(--text-secondary);font-weight:400">('+groups[evt].length+')</span></div>';
       g.innerHTML=header;
       groups[evt].forEach(function(h){
         var cmd=h.command||'';
@@ -1437,50 +1467,62 @@
     if(!list||list.length===0){el.innerHTML='<div class="hist-empty">히스토리가 없습니다<br>세션이 종료되면 여기에 기록됩니다</div>';return}
 
     var html='';
-    list.forEach(function(s,idx){
+    list.forEach(function(s){
       var start=s.startTime?new Date(s.startTime):null;
       var end=s.endTime?new Date(s.endTime):null;
       var duration='';
-      if(start&&end){var sec=Math.round((end-start)/1000);if(sec>=60){duration=Math.floor(sec/60)+'분 '+(sec%60)+'초'}else{duration=sec+'초'}}
+      if(start&&end){var sec=Math.round((end-start)/1000);if(sec>=3600){duration=Math.floor(sec/3600)+'시간 '+Math.floor((sec%3600)/60)+'분'}else if(sec>=60){duration=Math.floor(sec/60)+'분 '+(sec%60)+'초'}else{duration=sec+'초'}}
       var timeStr=start?String(start.getHours()).padStart(2,'0')+':'+String(start.getMinutes()).padStart(2,'0'):'';
       var dateStr=start?(start.getMonth()+1)+'/'+start.getDate():'';
 
-      // 이벤트 요약
-      var agents={};var tools={};var questions=0;
-      (s.events||[]).forEach(function(ev){
-        if(ev.event==='thinking_start')questions++;
-        if(ev.event==='agent_start'&&ev.agent_type)agents[ev.agent_type]=(agents[ev.agent_type]||0)+1;
-        if(ev.event==='agent_done'&&ev.agent_type)agents[ev.agent_type]=(agents[ev.agent_type]||0)+1;
-        if(ev.event==='tool_use'&&ev.tool_name)tools[ev.tool_name]=(tools[ev.tool_name]||0)+1;
-      });
-
+      // 태그
       var tags='';
-      Object.keys(agents).forEach(function(a){tags+='<span class="hist-tag agent">'+a+'</span>'});
-      var topTools=Object.keys(tools).sort(function(a,b){return tools[b]-tools[a]}).slice(0,4);
-      topTools.forEach(function(t){tags+='<span class="hist-tag tool">'+t+' '+tools[t]+'</span>'});
+      var agentKeys=Object.keys(s.agents||{});
+      agentKeys.forEach(function(a){var info=s.agents[a];tags+='<span class="hist-tag agent">'+esc(a)+' '+info.count+'회'+(info.avgSec>0?' · '+info.avgSec+'s':'')+'</span>'});
+      var toolKeys=Object.keys(s.tools||{}).sort(function(a,b){return s.tools[b]-s.tools[a]}).slice(0,5);
+      toolKeys.forEach(function(t){tags+='<span class="hist-tag tool">'+esc(t)+' '+s.tools[t]+'</span>'});
 
-      // 이벤트 목록
-      var evHtml='';
-      (s.events||[]).forEach(function(ev){
-        var t=ev.timestamp?new Date(ev.timestamp):null;
-        var tStr=t?String(t.getHours()).padStart(2,'0')+':'+String(t.getMinutes()).padStart(2,'0')+':'+String(t.getSeconds()).padStart(2,'0'):'';
-        var typeClass='tool';var label=ev.event;var detail=ev.tool_name||'';
-        if(ev.event==='thinking_start'||ev.event==='thinking_end'){typeClass='thinking';label=ev.event==='thinking_start'?'생각':'완료';detail=''}
-        else if(ev.event==='agent_start'){typeClass='agent';label='에이전트';detail=(ev.agent_type||'')+(ev.agent_description?' — '+ev.agent_description:'')}
-        else if(ev.event==='agent_done'){typeClass='agent';label='완료';detail=ev.agent_type||''}
-        else if(ev.event==='tool_use'){label='도구';detail=ev.tool_name||''}
-        else{detail=ev.agent_type||ev.tool_name||''}
-        evHtml+='<div class="hist-ev"><span class="hist-ev-time">'+tStr+'</span><span class="hist-ev-type '+typeClass+'">'+label+'</span><span class="hist-ev-detail">'+detail+'</span></div>';
+      // 상세 (펼침)
+      var detHtml='';
+
+      // 응답 시간
+      if(s.avgResponseSec>0){
+        detHtml+='<div class="hist-ev"><span class="hist-ev-time"></span><span class="hist-ev-type thinking">응답</span><span class="hist-ev-detail">평균 '+(s.avgResponseSec||0)+'초';
+        if(s.longestQuestion){detHtml+=' · 최대 Q'+(s.longestQuestion.q||0)+' ('+(s.longestQuestion.sec||0)+'초)'}
+        detHtml+='</span></div>';
+      }
+
+      // 에이전트
+      agentKeys.forEach(function(a){
+        var info=s.agents[a];
+        detHtml+='<div class="hist-ev"><span class="hist-ev-time"></span><span class="hist-ev-type agent">에이전트</span><span class="hist-ev-detail">'+esc(a)+' — '+info.count+'회'+(info.avgSec>0?' · 평균 '+info.avgSec+'초':'')+'</span></div>';
       });
+
+      // 도구
+      var allTools=Object.keys(s.tools||{}).sort(function(a,b){return s.tools[b]-s.tools[a]});
+      if(allTools.length>0){
+        var toolSummary=allTools.map(function(k){return esc(k)+' '+s.tools[k]}).join(' · ');
+        detHtml+='<div class="hist-ev"><span class="hist-ev-time"></span><span class="hist-ev-type tool">도구</span><span class="hist-ev-detail">'+toolSummary+'</span></div>';
+      }
+
+      // 파일
+      var fileKeys=Object.keys(s.files||{}).sort(function(a,b){var fa=s.files[a],fb=s.files[b];return(fb.read+fb.edit)-(fa.read+fa.edit)}).slice(0,10);
+      if(fileKeys.length>0){
+        fileKeys.forEach(function(f,i){
+          var info=s.files[f];var short=f.split('/').slice(-2).join('/');
+          var ops=[];if(info.edit>0)ops.push('Edit '+info.edit);if(info.read>0)ops.push('Read '+info.read);
+          detHtml+='<div class="hist-ev"><span class="hist-ev-time"></span><span class="hist-ev-type" style="background:rgba(251,191,36,.1);color:#fbbf24">'+(i===0?'파일':'')+'</span><span class="hist-ev-detail">'+esc(short)+' <span style="color:var(--text-secondary)">'+ops.join(' · ')+'</span></span></div>';
+        });
+      }
 
       html+='<div class="hist-item" onclick="this.classList.toggle(\'expanded\')">'
         +'<div class="hist-row">'
-        +'<span class="hist-name">'+((s.name||'Session')).replace(/</g,'&lt;')+'</span>'
-        +'<span class="hist-meta"><span>Q <strong>'+questions+'</strong></span><span>이벤트 <strong>'+s.eventCount+'</strong></span>'+(duration?'<span>'+duration+'</span>':'')+'</span>'
+        +'<span class="hist-name">'+esc(s.name||'Session')+'</span>'
+        +'<span class="hist-meta"><span>질문 <strong>'+(s.questions||0)+'</strong></span>'+(s.avgResponseSec>0?'<span>평균 <strong>'+(s.avgResponseSec||0)+'</strong>초</span>':'')+(duration?'<span>세션 <strong>'+esc(duration)+'</strong></span>':'')+'</span>'
         +'</div>'
         +'<div class="hist-time">'+dateStr+' '+timeStr+(end?' ~ '+String(end.getHours()).padStart(2,'0')+':'+String(end.getMinutes()).padStart(2,'0'):'')+'</div>'
         +(tags?'<div class="hist-summary">'+tags+'</div>':'')
-        +'<div class="hist-events">'+evHtml+'</div>'
+        +'<div class="hist-events">'+detHtml+'</div>'
         +'</div>';
     });
     el.innerHTML=html;
@@ -1528,7 +1570,7 @@
 
   function enableNotif(){
     _notifEnabled=true;localStorage.setItem('agviz-notif','on');initNotifBtn();toast('알림 ON');
-    new Notification('Claude Agent Viz',{body:'알림이 활성화되었습니다. 탭을 벗어나면 작업 완료 시 알림을 받습니다.',icon:'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" rx="6" fill="%23111120"/><text x="16" y="22" text-anchor="middle" font-size="18">🤖</text></svg>'});
+    new Notification('Claude Agent Viz',{body:'알림이 활성화되었습니다. 탭을 벗어나면 작업 완료 시 알림을 받습니다.'});
   }
   function toggleNotif(){
     if(!_notifEnabled){
@@ -1547,7 +1589,7 @@
   function sendNotif(title,body){
     if(!_notifEnabled||!document.hidden)return;
     if(!('Notification' in window)||Notification.permission!=='granted')return;
-    var n=new Notification(title,{body:body,icon:'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" rx="6" fill="%23111120"/><text x="16" y="22" text-anchor="middle" font-size="18">🤖</text></svg>',tag:'agviz-'+Date.now()});
+    var n=new Notification(title,{body:body,tag:'agviz'});
     n.onclick=function(){window.focus();n.close()};
     setTimeout(function(){n.close()},8000);
   }
@@ -1573,7 +1615,17 @@
     if(evtSource){try{evtSource.close()}catch(e){}}
     evtSource=new EventSource(API+'/api/stream');
     evtSource.onmessage=function(e){try{handleLiveEvent(JSON.parse(e.data))}catch(ex){console.error('[agent-viz] SSE event error:',ex,'data:',e.data)}};
-    evtSource.onopen=function(){setConn(true)};
+    var _lastSyncTime=0;
+    evtSource.onopen=function(){setConn(true);
+      // 재연결 시 서버에 없는 세션 정리 (5초 디바운스)
+      var now=Date.now();if(now-_lastSyncTime<5000)return;_lastSyncTime=now;
+      fetch(API+'/api/sessions').then(function(r){return r.json()}).then(function(serverSessions){
+        var serverPids={};serverSessions.forEach(function(s){serverPids[s.pid]=true});
+        var removed=false;
+        Object.keys(sessions).forEach(function(pid){if(!serverPids[pid]){delete sessions[pid];Object.keys(liveInstances).forEach(function(k){if(liveInstances[k].sessionPid===pid)delete liveInstances[k]});removed=true}});
+        if(removed){if(currentSession&&!sessions[currentSession]){var remaining=Object.keys(sessions);currentSession=remaining.length>0?remaining[0]:null}_tabsBuilt='';renderAll()}
+      }).catch(function(){})
+    };
     evtSource.onerror=function(){setConn(false)};
   }
 
@@ -1612,36 +1664,40 @@
     if(sp&&sessions[sp]){sessions[sp].lastActivity=new Date().toISOString()}
 
     if(evt==='thinking_start'){
-      masterData._turnCount=(masterData._turnCount||0)+1;
-      masterData._st='thinking';masterData._task='생각 중...';masterData._thinkStart=Date.now();masterData._sessionPid=sp;
-      // 세션별 마스터 상태 추적
-      if(sp&&sessions[sp]){sessions[sp]._masterSt='thinking';delete sessions[sp]._completed;sessions[sp]._thinkStart=Date.now();sessions[sp]._thinkHistory=[]}
-      masterData._thinkHistory=[];
-      // 이전 done/stale 에이전트 정리 (새 질문 경계)
-      // 새 질문 시작 → 이전 done/stale 에이전트 정리 (이력은 이벤트 로그에 유지)
+      // 세션이 없으면 자동 생성 (서버 재시작 복구/경합 대비)
+      if(sp&&!sessions[sp]){
+        registerSession({pid:sp,name:sn||'Session '+sp,cwd:data.session_cwd||''});
+      }
+      if(sp&&sessions[sp]){
+        sessions[sp]._turnCount=(sessions[sp]._turnCount||0)+1;
+        sessions[sp]._masterSt='thinking';sessions[sp]._masterTask='생각 중...';
+        sessions[sp]._thinkStart=Date.now();sessions[sp]._thinkHistory=[];
+        delete sessions[sp]._completed;
+      }
+      var tc=sp&&sessions[sp]?sessions[sp]._turnCount:0;
       Object.keys(liveInstances).forEach(function(k){if(liveInstances[k].sessionPid===sp&&liveInstances[k].st!=='working')delete liveInstances[k]});
-      addLog({name:'Master',color:'#fbbf24'},'── Q'+masterData._turnCount+(sn?' ['+sn+']':'')+' ──','',sp,sn);
+      addLog({name:'Master',color:'#fbbf24'},'── Q'+tc+(sn?' ['+sn+']':'')+' ──','',sp,sn);
       if(!_tlOpen){_tlOpen=true;document.getElementById('timelineBody').style.display='';document.getElementById('tlToggle').textContent='\u25BC'}
       renderAll();return;
     }
     if(evt==='thinking_end'){
+      var s=sp&&sessions[sp]?sessions[sp]:null;
+      if(!s){addLog(null,'thinking_end (세션 없음)','',sp,sn);renderAll();return}
+      if(!s._thinkStart){renderAll();return}
       var anyWorking=Object.values(liveInstances).some(function(i){return i.sessionPid===sp&&i.st==='working'});
-      var sessThinkStart=sp&&sessions[sp]?sessions[sp]._thinkStart:masterData._thinkStart;
-      var sec=sessThinkStart?Math.round((Date.now()-sessThinkStart)/1000):0;
-      if(masterData._thinkStart){if(!masterData._thinkHistory)masterData._thinkHistory=[];masterData._thinkHistory.push({start:masterData._thinkStart,end:Date.now()})}
-      // 세션별 히스토리에도 저장
-      if(sp&&sessions[sp]&&sessions[sp]._thinkStart){
-        if(!sessions[sp]._thinkHistory)sessions[sp]._thinkHistory=[];
-        sessions[sp]._thinkHistory.push({start:sessions[sp]._thinkStart,end:Date.now()});
-        sessions[sp]._thinkStart=null;
+      var sec=Math.round((Date.now()-s._thinkStart)/1000);
+      var tc=s._turnCount||0;
+      // 세션별 히스토리 저장
+      if(s&&s._thinkStart){
+        if(!s._thinkHistory)s._thinkHistory=[];
+        s._thinkHistory.push({start:s._thinkStart,end:Date.now()});
+        s._thinkStart=null;
       }
-      masterData._thinkStart=null;
       if(!anyWorking){
-        masterData._st='done';masterData._task='Q'+masterData._turnCount+' 완료'+(sec>0?' ('+sec+'s)':'');
-        addLog({name:'Master',color:'#fbbf24'},'── Q'+masterData._turnCount+' 완료 ('+sec+'s) ──','ok',sp,sn);
-        sendNotif('Q'+masterData._turnCount+' 응답 완료',(sn?'['+sn+'] ':'')+(sec>0?sec+'초 소요':''));
-        // 세션별 마스터 상태 + 완료 표시
-        if(sp&&sessions[sp]){sessions[sp]._masterSt='done';if(currentSession!==sp){sessions[sp]._completed=true;
+        var doneMsg='Q'+tc+' 완료'+(sec>0?' ('+sec+'s)':'');
+        addLog({name:'Master',color:'#fbbf24'},'── '+doneMsg+' ──','ok',sp,sn);
+        sendNotif('Q'+tc+' 응답 완료',(sn?'['+sn+'] ':'')+(sec>0?sec+'초 소요':''));
+        if(s){s._masterSt='done';s._masterTask=doneMsg;if(currentSession!==sp){s._completed=true;
           // 10초 후 fade-out
           (function(pid){setTimeout(function(){
             if(sessions[pid]&&sessions[pid]._completed){
@@ -1654,6 +1710,8 @@
         renderAll();
         return;
       }
+      // 에이전트 working 중이면 thinking → working 전환
+      if(s){s._masterSt='working';s._masterTask='조율 중...'}
       renderAll();return;
     }
     if(evt==='tool_use'){
@@ -1669,8 +1727,8 @@
           if(candidates.length>0) inst=liveInstances[candidates[candidates.length-1]];
         }
         if(inst&&inst.st==='working'){inst.task=inst.desc+' — '+tn;renderAll()}
-      } else if(masterData._st==='thinking'){
-        masterData._task=tn;renderAll();
+      } else if(sp&&sessions[sp]&&sessions[sp]._masterSt==='thinking'){
+        sessions[sp]._masterTask=tn;renderAll();
       }
       return;
     }
@@ -1682,8 +1740,9 @@
     if(evt==='agent_start'){
       // 에이전트 카운터 증가
       if(sp&&sessions[sp]){sessions[sp].agentCount=(sessions[sp].agentCount||0)+1;renderSessionTabs()}
-      // 새 라운드 감지: master가 idle이고 마지막 done 후 5초 이상 경과 → 이전 done/stale 정리
-      if(masterData._st!=='working'){var sinceDone=masterData._lastDoneTime?Date.now()-masterData._lastDoneTime:Infinity;if(sinceDone>5000){Object.keys(liveInstances).forEach(function(k){if(liveInstances[k].sessionPid===sp&&liveInstances[k].st!=='working')delete liveInstances[k]})}}
+      // 새 라운드 감지: master가 idle이고 마지막 done 후 5초 이상 경과 → 이전 done 정리
+      var ss=sp&&sessions[sp]?sessions[sp]:null;
+      if(ss&&ss._masterSt!=='working'){var sinceDone=ss._lastDoneTime?Date.now()-ss._lastDoneTime:Infinity;if(sinceDone>5000){Object.keys(liveInstances).forEach(function(k){if(liveInstances[k].sessionPid===sp&&liveInstances[k].st!=='working')delete liveInstances[k]})}}
       var at=data.agent_type||'';var desc=data.agent_description||data.agent_prompt||'';
       var ai=getAgentInfo(at);var color=ai?ai.color:agColor(at,Object.keys(liveInstances).length);var name=ai?ai.name:at;
       var baseKey=instKey(sp,at);
@@ -1694,8 +1753,7 @@
       var taskDesc=desc||name;
       liveInstances[key]={key:key,agentId:at,sessionPid:sp,sessionName:sn,st:'working',task:taskDesc,desc:taskDesc,prog:10,startTime:Date.now(),color:color};
       addLog({name:name,color:color},(sn?'['+sn+'] ':'')+name+' \uC2DC\uC791 \u2014 '+taskDesc,'',sp,sn);
-      masterData._st='working';masterData._task=(sn?'['+sn+'] ':'')+'\uC870\uC728 \uC911...';masterData._sessionPid=sp;
-      if(sp&&sessions[sp])sessions[sp]._masterSt='working';
+      if(sp&&sessions[sp]){sessions[sp]._masterSt='working';sessions[sp]._masterTask=(sn?'['+sn+'] ':'')+'\uC870\uC728 \uC911...'}
       // 타임라인 자동 펼침
       if(!_tlOpen){_tlOpen=true;document.getElementById('timelineBody').style.display='';document.getElementById('tlToggle').textContent='\u25BC'}
       renderAll();setTimeout(function(){sparks('inst-'+key,color);flyDot('master','inst-'+key)},50);
@@ -1718,9 +1776,11 @@
         renderAll();setTimeout(function(){sparks('inst-'+key,inst.color);flyDot('inst-'+key,'master')},50);
         if(!Object.values(liveInstances).some(function(i){return i.sessionPid===sp&&i.st==='working'})){
           // 아직 응답 작성 중이면 thinking으로 복귀, 아니면 idle
-          if(masterData._thinkStart){masterData._st='thinking';masterData._task='생각 중...';if(sp&&sessions[sp])sessions[sp]._masterSt='thinking'}
-          else{masterData._st='idle';masterData._task='';if(sp&&sessions[sp])sessions[sp]._masterSt='idle'}
-          masterData._lastDoneTime=Date.now();renderAll();celebrate();
+          var sd=sp&&sessions[sp]?sessions[sp]:null;
+          if(sd&&sd._thinkStart){sd._masterSt='thinking';sd._masterTask='생각 중...'}
+          else if(sd){sd._masterSt='idle';sd._masterTask=''}
+          if(sd)sd._lastDoneTime=Date.now();
+          renderAll();celebrate();
           sendNotif('모든 에이전트 완료',doneAgentName+' 완료 ('+sec+'s) — 모든 작업이 끝났습니다');
         } else {
           sendNotif(doneAgentName+' 완료 ('+sec+'s)',inst.desc);
@@ -1815,7 +1875,7 @@
           var aura=el.querySelector('.ws-aura');if(aura)aura.remove();
         }
       }
-      // working/thinking: roam만 허용 (빠른 속도), done/stale: creature 비활성
+      // working/thinking: roam만 허용 (빠른 속도), done: creature 비활성
       var isWorking=agSt==='working'||agSt==='thinking';
       if(agSt!=='idle'&&!isWorking){
         if(creatureLife[id]){var zzz=el.querySelector('.ws-zzz');if(zzz)zzz.remove();delete creatureLife[id]}
@@ -2248,13 +2308,14 @@
 
   // === Init ===
   fetchMaster();fetchSessions();fetchMcpServers();fetchHooks();fetchDailyStats();
+  // inactive 상태 주기적 갱신 (60초마다 세션 탭 re-render)
+  setInterval(function(){if(Object.keys(sessions).length>0)renderSessionTabs()},60000);
   // fetchAgents 완료 후 SSE 연결 (에이전트 목록 없이 이벤트 수신 시 캐릭터 누락 방지)
   fetch(API+'/api/agents').then(function(r){return r.json()}).then(function(data){
     agents=data.map(function(a,i){a.color=agColor(a.id,i);a.active=true;return a});setConn(true);_wsBuilt=false;renderAll();
     var cwd=(currentSession&&sessions[currentSession])?sessions[currentSession].cwd:'';
     if(cwd) fetchProjectAgents(cwd);
   }).catch(function(){setConn(false)}).finally(function(){connectSSE()});
-  setInterval(checkStaleInstances,30000);
 
   // === Page Visibility: 탭 비활성 시 애니메이션 일시정지 ===
   var _envInterval=_envEnabled?setInterval(updateEnvironment,8000):null;

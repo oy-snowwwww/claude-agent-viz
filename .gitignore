@@ -1,5 +1,7 @@
 sessions/
+history/
 .idea/
+.claude/
 CLAUDE.md
 enabled
 agent-stats.json

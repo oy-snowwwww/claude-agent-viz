@@ -158,6 +158,137 @@ function readHooks() {
   return result;
 }
 
+// --- Session History ---
+var HISTORY_DIR = path.join(__dirname, 'history');
+if (!fs.existsSync(HISTORY_DIR)) fs.mkdirSync(HISTORY_DIR, { recursive: true });
+
+// 세션별 요약 트래커 (메모리) — 세션 종료 시 요약 파일로 저장
+var sessionTrackers = {}; // pid -> tracker
+
+function getTracker(pid) {
+  if (!sessionTrackers[pid]) {
+    sessionTrackers[pid] = {
+      questions: 0,
+      thinkStart: null,
+      responseTimes: [],
+      agents: {},       // type -> { count, totalSec, startTime }
+      tools: {},        // name -> count
+      files: {},        // path -> { read: n, edit: n }
+    };
+  }
+  return sessionTrackers[pid];
+}
+
+function recordSessionEvent(pid, parsed) {
+  if (!pid) return;
+  var t = getTracker(pid);
+
+  if (parsed.event === 'thinking_start') {
+    t.questions++;
+    t.thinkStart = Date.now();
+  }
+  if (parsed.event === 'thinking_end' && t.thinkStart) {
+    t.responseTimes.push(Math.round((Date.now() - t.thinkStart) / 1000));
+    t.thinkStart = null;
+  }
+  if (parsed.event === 'agent_start' && parsed.agent_type) {
+    var aKey = parsed.agent_type;
+    if (!t.agents[aKey]) t.agents[aKey] = { count: 0, totalSec: 0, starts: [] };
+    t.agents[aKey].count++;
+    t.agents[aKey].starts.push(Date.now());
+  }
+  if (parsed.event === 'agent_done' && parsed.agent_type) {
+    var aKey = parsed.agent_type;
+    if (t.agents[aKey] && t.agents[aKey].starts && t.agents[aKey].starts.length > 0) {
+      var st = t.agents[aKey].starts.shift();
+      t.agents[aKey].totalSec += Math.round((Date.now() - st) / 1000);
+    }
+  }
+  if (parsed.event === 'tool_use' && parsed.tool_name) {
+    t.tools[parsed.tool_name] = (t.tools[parsed.tool_name] || 0) + 1;
+    // 파일 경로 추출
+    var input = parsed.tool_input || {};
+    var fp = input.file_path || input.path || '';
+    if (fp && (parsed.tool_name === 'Read' || parsed.tool_name === 'Edit' || parsed.tool_name === 'Write')) {
+      if (!t.files[fp] && Object.keys(t.files).length < 500) t.files[fp] = { read: 0, edit: 0 };
+      if (t.files[fp]) {
+        if (parsed.tool_name === 'Read') t.files[fp].read++;
+        else t.files[fp].edit++;
+      }
+    }
+  }
+}
+
+function saveSessionHistory(pid) {
+  var t = sessionTrackers[pid];
+  if (!t) return;
+  var sess = sessions[pid];
+  if (!sess || t.questions === 0) { delete sessionTrackers[pid]; return; }
+
+  var avgSec = t.responseTimes.length > 0 ? Math.round(t.responseTimes.reduce(function(a, b) { return a + b; }, 0) / t.responseTimes.length) : 0;
+  var maxSec = t.responseTimes.length > 0 ? Math.max.apply(null, t.responseTimes) : 0;
+  var maxQ = maxSec > 0 ? t.responseTimes.indexOf(maxSec) + 1 : 0;
+
+  // 에이전트 요약
+  var agentSummary = {};
+  Object.keys(t.agents).forEach(function(k) {
+    var a = t.agents[k];
+    agentSummary[k] = { count: a.count, avgSec: a.count > 0 ? Math.round(a.totalSec / a.count) : 0 };
+  });
+
+  // 파일 Top 10
+  var fileKeys = Object.keys(t.files).sort(function(a, b) {
+    return (t.files[b].read + t.files[b].edit) - (t.files[a].read + t.files[a].edit);
+  }).slice(0, 10);
+  var fileSummary = {};
+  fileKeys.forEach(function(k) { fileSummary[k] = t.files[k]; });
+
+  var record = {
+    name: sess.name || pid,
+    cwd: sess.cwd || '',
+    startTime: sess.startTime,
+    endTime: new Date().toISOString(),
+    questions: t.questions,
+    avgResponseSec: avgSec,
+    longestQuestion: maxSec > 0 ? { q: maxQ, sec: maxSec } : null,
+    agents: agentSummary,
+    tools: t.tools,
+    files: fileSummary,
+  };
+
+  // 파일명: YYYY-MM-DD_HHmmss_sessionName.json
+  var now = new Date();
+  var ts = now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0') + '-' + String(now.getDate()).padStart(2,'0')
+    + '_' + String(now.getHours()).padStart(2,'0') + String(now.getMinutes()).padStart(2,'0') + String(now.getSeconds()).padStart(2,'0');
+  var safeName = (sess.name || pid).replace(/[^a-zA-Z0-9가-힣_-]/g, '_').substring(0, 40);
+  var filename = ts + '_' + safeName + '.json';
+
+  try {
+    var json = JSON.stringify(record);
+    fs.writeFileSync(path.join(HISTORY_DIR, filename), json, 'utf8');
+    console.log('  [HISTORY] saved:', filename, '(' + json.length + 'B)');
+  } catch(e) { console.log('  [HISTORY] save error:', e.message); }
+
+  delete sessionTrackers[pid];
+}
+
+function cleanHistory() {
+  // 7일 이상 된 히스토리 파일 삭제
+  var MAX_AGE = 7 * 24 * 60 * 60 * 1000;
+  try {
+    var files = fs.readdirSync(HISTORY_DIR);
+    files.filter(function(f) { return f.endsWith('.json'); }).forEach(function(f) {
+      var fpath = path.join(HISTORY_DIR, f);
+      var stat = fs.statSync(fpath);
+      if (Date.now() - stat.mtimeMs > MAX_AGE) {
+        fs.unlinkSync(fpath);
+        console.log('  [HISTORY] cleaned:', f);
+      }
+    });
+  } catch(e) { console.log('  [HISTORY] clean error:', e.message); }
+}
+cleanHistory();
+
 // --- Daily Stats ---
 var STATS_FILE = path.join(__dirname, 'agent-stats.json');
 
@@ -322,6 +453,7 @@ const server = http.createServer(function(req, res) {
               delete pendingEnds[endTarget];
               if (sessions[endTarget]) {
                 sessions[endTarget].alive = false;
+                saveSessionHistory(endTarget);
                 broadcastEvent({
                   event: 'session_stopped',
                   session_pid: endTarget,
@@ -459,6 +591,10 @@ const server = http.createServer(function(req, res) {
             }
           }
         }
+
+        // 세션 이벤트 기록 (히스토리)
+        var targetPidForLog = parsed.session_pid || session.pid || '';
+        if (targetPidForLog) recordSessionEvent(targetPidForLog, parsed);
 
         // 일일 통계 기록
         recordStat(event, parsed.tool_name, parsed.agent_type);
@@ -756,6 +892,41 @@ const server = http.createServer(function(req, res) {
     return;
   }
 
+  // API: 세션 히스토리 목록
+  if (url === '/api/history' && req.method === 'GET') {
+    fs.readdir(HISTORY_DIR, function(err, allFiles) {
+      if (err) {
+        console.log('  [HISTORY] read error:', err.message);
+        res.writeHead(200, {'Content-Type': 'application/json; charset=utf-8'});
+        res.end('[]');
+        return;
+      }
+      var files = allFiles.filter(function(f) { return f.endsWith('.json'); });
+      files.sort().reverse();
+      var targets = files.slice(0, 50);
+      var list = [];
+      var done = 0;
+      if (targets.length === 0) {
+        res.writeHead(200, {'Content-Type': 'application/json; charset=utf-8'});
+        res.end('[]');
+        return;
+      }
+      targets.forEach(function(f, idx) {
+        fs.readFile(path.join(HISTORY_DIR, f), 'utf8', function(e, content) {
+          if (!e) {
+            try { list[idx] = JSON.parse(content); } catch(pe) { console.log('  [HISTORY] parse error:', f, pe.message); }
+          }
+          done++;
+          if (done === targets.length) {
+            res.writeHead(200, {'Content-Type': 'application/json; charset=utf-8'});
+            res.end(JSON.stringify(list.filter(Boolean)));
+          }
+        });
+      });
+    });
+    return;
+  }
+
   // API: 서버 재시작
   if (url === '/api/restart' && req.method === 'POST') {
     console.log('\n  \x1b[33mUI에서 재시작 요청\x1b[0m\n');
@@ -822,6 +993,7 @@ function checkSessions() {
     var inactiveMs = Date.now() - lastActivity;
     if (inactiveMs > SESSION_TIMEOUT) {
       console.log('  [SESSION-]', sessions[pid].name || pid, '(timeout)');
+      saveSessionHistory(pid);
       var removedSession = sessions[pid];
       delete sessions[pid];
       broadcastEvent({ event: 'session_removed', session_pid: pid, session_name: removedSession.name });
@@ -839,6 +1011,17 @@ function checkSessions() {
     if (stat.size > 100 * 1024) { fs.writeFileSync(logPath, ''); console.log('  [LOG] truncated:', logPath); }
   } catch(e) {}
 });
+
+// 서버 종료 시 모든 활성 세션 히스토리 저장
+function saveAllTrackers() {
+  var pids = Object.keys(sessionTrackers);
+  if (pids.length === 0) return;
+  console.log('  [HISTORY] saving ' + pids.length + ' tracker(s) before exit...');
+  pids.forEach(function(pid) { saveSessionHistory(pid); });
+}
+
+process.on('SIGTERM', function() { saveAllTrackers(); process.exit(0); });
+process.on('SIGINT', function() { saveAllTrackers(); process.exit(0); });
 
 server.listen(PORT, function() {
   console.log('\n  \x1b[36m╔══════════════════════════════════════════╗\x1b[0m');
