@@ -1642,6 +1642,8 @@
       // 탭에 closing 애니메이션 (10초 카운트다운 바)
       var closingTab=document.querySelector('.sess-tab[data-session="'+stoppedPid+'"]');
       if(closingTab){closingTab.classList.add('closing');var spinEl=closingTab.querySelector('.sess-spinner');if(spinEl)spinEl.remove()}
+      // 히스토리 패널 열려있으면 갱신 (서버 저장 완료 대기 후)
+      setTimeout(function(){if(document.getElementById('histOverlay').classList.contains('show'))fetchHistory()},1000);
       // 10초 후 자동 제거
       if(stoppedPid)(function(pid){setTimeout(function(){
         if(sessions[pid]&&sessions[pid].alive===false&&currentSession!==pid){
@@ -1653,7 +1655,8 @@
       },10000)})(stoppedPid);
       return;
     }
-    if(evt==='session_removed'){removeSession(data.session_pid);addLog(null,'\uC138\uC158 \uC81C\uAC70: '+(data.session_name||data.session_pid),'err',data.session_pid,data.session_name);return}
+    if(evt==='session_removed'){removeSession(data.session_pid);addLog(null,'\uC138\uC158 \uC81C\uAC70: '+(data.session_name||data.session_pid),'err',data.session_pid,data.session_name);
+      setTimeout(function(){if(document.getElementById('histOverlay').classList.contains('show'))fetchHistory()},1000);return}
     if(evt==='server_shutdown'){
       // 모든 세션을 종료 상태로
       Object.keys(sessions).forEach(function(pid){sessions[pid].alive=false});
