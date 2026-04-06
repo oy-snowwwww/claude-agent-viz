@@ -66,6 +66,39 @@
     .restart-btn{color:var(--warning)}
     .restart-btn:hover{border-color:var(--warning);box-shadow:0 0 8px rgba(251,191,36,.3)}
     .restart-btn.confirm{border-radius:6px;width:auto;padding:3px 10px;background:var(--warning);color:#080810;border-color:var(--warning);animation:pulse .8s ease-in-out infinite}
+    /* History Panel */
+    .hist-overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:150;display:none;align-items:center;justify-content:center;backdrop-filter:blur(4px)}
+    .hist-overlay.show{display:flex}
+    .hist-modal{background:var(--surface);border:1px solid var(--border);border-radius:12px;width:680px;max-width:92vw;max-height:85vh;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.5);display:flex;flex-direction:column}
+    .hist-header{padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+    .hist-header h2{font-size:.8rem;font-weight:700;font-family:monospace;display:flex;align-items:center;gap:6px}
+    .hist-header button{background:none;border:none;color:var(--text-secondary);cursor:pointer;font-size:1rem;padding:2px 6px;border-radius:4px}
+    .hist-header button:hover{color:var(--negative)}
+    .hist-body{flex:1;overflow-y:auto;scrollbar-width:thin}
+    .hist-list{padding:8px}
+    .hist-item{background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:10px 12px;margin-bottom:6px;cursor:pointer;transition:all .15s}
+    .hist-item:hover{border-color:var(--accent);box-shadow:0 0 8px var(--glow)}
+    .hist-item.expanded{border-color:var(--accent)}
+    .hist-row{display:flex;align-items:center;gap:10px}
+    .hist-name{font-size:.65rem;font-weight:600;font-family:monospace;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .hist-meta{font-size:.5rem;font-family:monospace;color:var(--text-secondary);display:flex;gap:8px;flex-shrink:0}
+    .hist-meta strong{color:var(--accent)}
+    .hist-time{font-size:.45rem;font-family:monospace;color:var(--text-secondary);margin-top:2px}
+    .hist-events{margin-top:8px;border-top:1px solid var(--border);padding-top:6px;display:none;max-height:250px;overflow-y:auto;scrollbar-width:thin}
+    .hist-item.expanded .hist-events{display:block}
+    .hist-ev{display:flex;align-items:center;gap:6px;padding:2px 0;font-size:.5rem;font-family:monospace;color:var(--text-secondary)}
+    .hist-ev-time{color:var(--text-secondary);flex-shrink:0;width:55px}
+    .hist-ev-type{padding:1px 4px;border-radius:2px;font-weight:600;flex-shrink:0}
+    .hist-ev-type.thinking{background:rgba(251,191,36,.12);color:#fbbf24}
+    .hist-ev-type.agent{background:rgba(0,255,200,.1);color:var(--accent)}
+    .hist-ev-type.tool{background:rgba(167,139,250,.1);color:var(--accent2)}
+    .hist-ev-detail{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .hist-empty{text-align:center;padding:30px;font-size:.6rem;font-family:monospace;color:var(--text-secondary);opacity:.5}
+    .hist-summary{display:flex;gap:6px;margin-top:4px;flex-wrap:wrap}
+    .hist-tag{font-size:.4rem;padding:1px 5px;border-radius:3px;font-family:monospace}
+    .hist-tag.agent{background:rgba(0,255,200,.08);color:var(--accent)}
+    .hist-tag.tool{background:rgba(167,139,250,.08);color:var(--accent2)}
+
     .help-overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:150;display:none;align-items:center;justify-content:center;backdrop-filter:blur(4px)}
     .help-overlay.show{display:flex}
     .help-modal{background:var(--surface);border:1px solid var(--border);border-radius:12px;width:520px;max-width:90vw;max-height:80vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.5);padding:20px 24px}
@@ -411,6 +444,7 @@
         <div class="header-stat" id="headerStat"></div>
         <div class="daily-stat" id="dailyStat"></div>
         <button class="notif-btn" onclick="toggleNotif()" id="notifBtn" data-tip="알림">&#128276;</button>
+        <button class="help-btn" onclick="toggleHistory()" data-tip="히스토리">&#128337;</button>
         <button class="help-btn" onclick="toggleHelp()" data-tip="도움말">?</button>
         <button class="help-btn restart-btn" onclick="restartServer()" data-tip="재시작">&#8635;</button>
         <button class="help-btn stop-btn" onclick="shutdownServer()" data-tip="종료">&#9632;</button>
@@ -482,6 +516,21 @@
       </div>
     </div>
   </div>
+  <!-- History -->
+  <div class="hist-overlay" id="histOverlay" onclick="if(event.target===this)toggleHistory()">
+    <div class="hist-modal">
+      <div class="hist-header">
+        <h2>&#128337; 세션 히스토리</h2>
+        <button onclick="toggleHistory()">&times;</button>
+      </div>
+      <div class="hist-body">
+        <div class="hist-list" id="histList">
+          <div class="hist-empty">히스토리가 없습니다</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Help -->
   <div class="help-overlay" id="helpOverlay" onclick="if(event.target===this)toggleHelp()">
     <div class="help-modal">
@@ -1367,6 +1416,75 @@
   }
 
   function toggleHelp(){document.getElementById('helpOverlay').classList.toggle('show')}
+
+  // === Session History ===
+  function toggleHistory(){
+    var el=document.getElementById('histOverlay');
+    var isOpen=el.classList.toggle('show');
+    if(isOpen)fetchHistory();
+  }
+
+  function fetchHistory(){
+    fetch(API+'/api/history').then(function(r){return r.json()}).then(function(data){
+      renderHistory(data);
+    }).catch(function(){
+      document.getElementById('histList').innerHTML='<div class="hist-empty">서버 연결 실패</div>';
+    });
+  }
+
+  function renderHistory(list){
+    var el=document.getElementById('histList');
+    if(!list||list.length===0){el.innerHTML='<div class="hist-empty">히스토리가 없습니다<br>세션이 종료되면 여기에 기록됩니다</div>';return}
+
+    var html='';
+    list.forEach(function(s,idx){
+      var start=s.startTime?new Date(s.startTime):null;
+      var end=s.endTime?new Date(s.endTime):null;
+      var duration='';
+      if(start&&end){var sec=Math.round((end-start)/1000);if(sec>=60){duration=Math.floor(sec/60)+'분 '+(sec%60)+'초'}else{duration=sec+'초'}}
+      var timeStr=start?String(start.getHours()).padStart(2,'0')+':'+String(start.getMinutes()).padStart(2,'0'):'';
+      var dateStr=start?(start.getMonth()+1)+'/'+start.getDate():'';
+
+      // 이벤트 요약
+      var agents={};var tools={};var questions=0;
+      (s.events||[]).forEach(function(ev){
+        if(ev.event==='thinking_start')questions++;
+        if(ev.event==='agent_start'&&ev.agent_type)agents[ev.agent_type]=(agents[ev.agent_type]||0)+1;
+        if(ev.event==='agent_done'&&ev.agent_type)agents[ev.agent_type]=(agents[ev.agent_type]||0)+1;
+        if(ev.event==='tool_use'&&ev.tool_name)tools[ev.tool_name]=(tools[ev.tool_name]||0)+1;
+      });
+
+      var tags='';
+      Object.keys(agents).forEach(function(a){tags+='<span class="hist-tag agent">'+a+'</span>'});
+      var topTools=Object.keys(tools).sort(function(a,b){return tools[b]-tools[a]}).slice(0,4);
+      topTools.forEach(function(t){tags+='<span class="hist-tag tool">'+t+' '+tools[t]+'</span>'});
+
+      // 이벤트 목록
+      var evHtml='';
+      (s.events||[]).forEach(function(ev){
+        var t=ev.timestamp?new Date(ev.timestamp):null;
+        var tStr=t?String(t.getHours()).padStart(2,'0')+':'+String(t.getMinutes()).padStart(2,'0')+':'+String(t.getSeconds()).padStart(2,'0'):'';
+        var typeClass='tool';var label=ev.event;var detail=ev.tool_name||'';
+        if(ev.event==='thinking_start'||ev.event==='thinking_end'){typeClass='thinking';label=ev.event==='thinking_start'?'생각':'완료';detail=''}
+        else if(ev.event==='agent_start'){typeClass='agent';label='에이전트';detail=(ev.agent_type||'')+(ev.agent_description?' — '+ev.agent_description:'')}
+        else if(ev.event==='agent_done'){typeClass='agent';label='완료';detail=ev.agent_type||''}
+        else if(ev.event==='tool_use'){label='도구';detail=ev.tool_name||''}
+        else{detail=ev.agent_type||ev.tool_name||''}
+        evHtml+='<div class="hist-ev"><span class="hist-ev-time">'+tStr+'</span><span class="hist-ev-type '+typeClass+'">'+label+'</span><span class="hist-ev-detail">'+detail+'</span></div>';
+      });
+
+      html+='<div class="hist-item" onclick="this.classList.toggle(\'expanded\')">'
+        +'<div class="hist-row">'
+        +'<span class="hist-name">'+((s.name||'Session')).replace(/</g,'&lt;')+'</span>'
+        +'<span class="hist-meta"><span>Q <strong>'+questions+'</strong></span><span>이벤트 <strong>'+s.eventCount+'</strong></span>'+(duration?'<span>'+duration+'</span>':'')+'</span>'
+        +'</div>'
+        +'<div class="hist-time">'+dateStr+' '+timeStr+(end?' ~ '+String(end.getHours()).padStart(2,'0')+':'+String(end.getMinutes()).padStart(2,'0'):'')+'</div>'
+        +(tags?'<div class="hist-summary">'+tags+'</div>':'')
+        +'<div class="hist-events">'+evHtml+'</div>'
+        +'</div>';
+    });
+    el.innerHTML=html;
+  }
   var restartConfirmTimer=null;
   function restartServer(){
     var btn=document.querySelector('.restart-btn');
@@ -1478,7 +1596,7 @@
           delete sessions[pid];
           Object.keys(liveInstances).forEach(function(k){if(liveInstances[k].sessionPid===pid)delete liveInstances[k]});
           renderAll();
-          addLog(null,'\uC138\uC158 \uD0ED \uC81C\uAC70: '+(data.session_name||pid),'','','');
+          addLog(null,'\uC138\uC158 \uD0ED \uC81C\uAC70: '+(data.session_name||pid),'',pid,data.session_name||'');
         }
       },10000)})(stoppedPid);
       return;
