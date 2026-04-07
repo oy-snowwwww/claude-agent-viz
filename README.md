@@ -292,19 +292,27 @@ CLAUDE.md
 
 ```
 ~/.claude/agent-viz/
-├── public/             # 클라이언트 정적 파일 (브라우저에 서빙)
-│   ├── index.html      # UI 마크업
+├── public/                    # 클라이언트 정적 파일 (브라우저에 서빙)
+│   ├── index.html             # UI 마크업 + 인라인 메인 스크립트
 │   ├── css/
-│   │   └── styles.css  # 전체 스타일
-│   └── js/             # JS 모듈 (분리 예정)
-├── server.js           # Node.js HTTP 서버
-├── hook-handler.sh     # Claude Code 훅 → 서버 이벤트 브릿지
-├── start.sh            # 서버 시작/종료/상태 CLI
-├── enabled             # 자동 실행 플래그 (파일 존재 여부)
-├── privacy             # Privacy 모드 플래그 (파일 존재 여부)
-├── sessions/           # 활성 세션 PID 파일
-├── history/            # 세션 히스토리 JSON (7일·10MB 가드, 1시간 주기 정리)
-└── agent-stats.json    # 일일/주간/누적 통계
+│   │   └── styles.css         # 전체 스타일
+│   └── js/                    # JS 모듈 (8개, <script> 순서 로딩)
+│       ├── constants.js       # 상수 (색상, 도구 목록, 픽셀맵)
+│       ├── state.js           # 전역 상태 (sessions, liveInstances 등)
+│       ├── utils.js           # 순수 헬퍼 (esc, shade, buildPix)
+│       ├── environment.js     # 환경 효과 (낮/밤·계절·날씨·우주)
+│       ├── creature.js        # 픽셀 캐릭터 자율 행동 (roam/sleep/blink)
+│       ├── history.js         # 세션 히스토리 UI (검색·필터·Privacy)
+│       ├── notifications.js   # 브라우저 알림
+│       └── animations.js      # 시각 이펙트 (sparks/flyDot/celebrate)
+├── server.js                  # Node.js HTTP 서버
+├── hook-handler.sh            # Claude Code 훅 → 서버 이벤트 브릿지
+├── start.sh                   # 서버 시작/종료/상태 CLI
+├── enabled                    # 자동 실행 플래그 (파일 존재 여부)
+├── privacy                    # Privacy 모드 플래그 (파일 존재 여부)
+├── sessions/                  # 활성 세션 PID 파일
+├── history/                   # 세션 히스토리 JSON (7일·10MB 가드, 1시간 주기 정리)
+└── agent-stats.json           # 일일/주간/누적 통계
 ```
 
 ## 화면에 뭐가 어디서 오는가
@@ -396,7 +404,7 @@ model: sonnet
 - **의존성 없음** — npm 패키지, 외부 CDN 없이 Node.js 내장 모듈만 사용
 - **정적 파일 서빙** — `public/` 하위에 클라이언트 자산 (HTML/CSS/JS) 분리, 서버가 직접 서빙
 - **SSE (Server-Sent Events)** — 실시간 이벤트 스트리밍
-- **Vanilla JavaScript** — 프레임워크 없는 순수 JS, 빌드 시스템 없음
+- **Vanilla JavaScript** — 프레임워크 없는 순수 JS, 빌드 시스템 없음 (ES 모듈 대신 `<script>` 순서 로딩으로 8개 파일 분리)
 
 ## 라이선스
 
