@@ -1,0 +1,1228 @@
+<!DOCTYPE html>
+<html lang="ko" class="theme-dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Claude Agent Orchestrator</title>
+  <link rel="stylesheet" href="/css/styles.css">
+</head>
+<body>
+  <div class="app">
+    <header class="header">
+      <div class="logo" id="logo"></div>
+      <div>
+        <h1>CLAUDE AGENTS</h1>
+        <small id="connStatus"></small>
+      </div>
+      <div class="header-right">
+        <div class="header-stat" id="headerStat"></div>
+        <div class="daily-stat" id="dailyStat"></div>
+        <button class="notif-btn" onclick="toggleNotif()" id="notifBtn" data-tip="알림">&#128276;</button>
+        <button class="help-btn" onclick="toggleHistory()" data-tip="히스토리">&#128337;</button>
+        <button class="help-btn" onclick="toggleHelp()" data-tip="도움말">?</button>
+        <button class="help-btn restart-btn" onclick="restartServer()" data-tip="재시작">&#8635;</button>
+        <button class="help-btn stop-btn" onclick="shutdownServer()" data-tip="종료">&#9632;</button>
+        <button class="season-btn" onclick="toggleEnv()" id="envBtn" data-tip="환경효과">✨</button>
+        <button class="season-btn" onclick="cycleSeason()" id="seasonBtn" data-tip="봄">🌸</button>
+        <button class="theme-btn" onclick="cycleTheme()" id="themeBtn" data-tip="Dark">🌙</button>
+      </div>
+    </header>
+
+    <div class="session-tabs" id="sessionTabs">
+      <span class="empty-sessions" id="noSessionsHint">Claude Code 세션 대기 중...</span>
+    </div>
+
+    <section class="left">
+      <div class="stitle"><span>MASTER</span></div>
+      <div id="masterCard"></div>
+      <div class="stitle" style="margin-top:10px"><span>AGENTS</span><button onclick="openNew()">+ New</button></div>
+      <div id="agentList"></div>
+      <div class="stitle" style="margin-top:10px"><span>MCP SERVERS</span></div>
+      <div id="mcpList"></div>
+      <div class="stitle" style="margin-top:10px"><span>HOOKS</span></div>
+      <div id="hooksList"></div>
+    </section>
+
+    <div class="main">
+      <section class="workspace" id="workspace"></section>
+      <div class="activity" id="activityPanel">
+        <div class="act-header"><span>ACTIVITY</span><span id="actCount"></span></div>
+        <div id="activityList"></div>
+      </div>
+      <div class="timeline" id="timelinePanel">
+        <div class="timeline-header" onclick="toggleTimeline()"><span>TIMELINE</span><span id="tlToggle">▶</span></div>
+        <div class="timeline-body" id="timelineBody" style="display:none"></div>
+      </div>
+      <div class="log-panel">
+        <div class="log-header"><span>LOG</span><span class="log-filter" id="logFilterLabel"></span></div>
+        <div class="log-scroll" id="logBox"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal -->
+  <div class="overlay" id="overlay" onclick="if(event.target===this)closeModal()">
+    <div class="modal">
+      <div class="modal-header">
+        <h2 id="modalTitle">설정</h2>
+        <button class="modal-close" onclick="closeModal()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div id="agentFields">
+          <div class="field"><label>Name</label><input id="fName" placeholder="my-agent" /><div class="hint">영문 소문자, 하이픈만 사용</div></div>
+          <div class="field"><label>Description</label><input id="fDesc" placeholder="에이전트 설명" /></div>
+          <div class="field"><label>Model</label><select id="fModel"><option value="sonnet">Sonnet</option><option value="opus">Opus</option><option value="haiku">Haiku</option></select></div>
+          <div class="field"><label>Tools</label><div class="tools-grid" id="toolsGrid"></div></div>
+          <div class="field"><label>System Prompt</label><textarea id="fBody" rows="8" placeholder="시스템 프롬프트..."></textarea></div>
+        </div>
+        <div id="masterFields" style="display:none">
+          <div class="tab-bar" id="masterTabs">
+            <button class="active" onclick="switchMasterTab('global')">~/CLAUDE.md</button>
+            <button onclick="switchMasterTab('project')">프로젝트 CLAUDE.md</button>
+          </div>
+          <div class="field"><label id="masterFileLabel">~/CLAUDE.md</label><textarea id="fMaster" rows="16" style="min-height:280px"></textarea></div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-del" id="btnDel" onclick="deleteAgent()" style="display:none">삭제</button>
+        <button class="btn-cancel" onclick="closeModal()">취소</button>
+        <button class="btn-save" id="btnSave" onclick="saveAgent()">저장</button>
+      </div>
+    </div>
+  </div>
+  <!-- History -->
+  <div class="hist-overlay" id="histOverlay" onclick="if(event.target===this)toggleHistory()">
+    <div class="hist-modal">
+      <div class="hist-header">
+        <h2>&#128337; 세션 히스토리</h2>
+        <div class="hist-tools">
+          <label class="hist-privacy" title="프롬프트 기록 on/off">
+            <input type="checkbox" id="histPrivacy" onchange="togglePrivacy(this.checked)">
+            <span>🔒 기록 안 함</span>
+          </label>
+          <button onclick="toggleHistory()">&times;</button>
+        </div>
+      </div>
+      <div class="hist-search">
+        <input type="text" id="histSearchQ" placeholder="🔍 프롬프트/파일명/세션명 검색..." oninput="scheduleHistSearch()">
+        <select id="histSearchDays" onchange="fetchHistory()">
+          <option value="0">전체 기간</option>
+          <option value="1">오늘</option>
+          <option value="3">최근 3일</option>
+          <option value="7">최근 7일</option>
+        </select>
+        <select id="histSearchAgent" onchange="fetchHistory()">
+          <option value="">모든 에이전트</option>
+        </select>
+      </div>
+      <div class="hist-body">
+        <div class="hist-list" id="histList">
+          <div class="hist-empty">히스토리가 없습니다</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Help -->
+  <div class="help-overlay" id="helpOverlay" onclick="if(event.target===this)toggleHelp()">
+    <div class="help-modal">
+      <h2>Guide <button onclick="toggleHelp()">&times;</button></h2>
+
+      <div class="help-section">
+        <h3>Terminal</h3>
+        <div class="help-cmd"><code>claude-agents</code><span>서버 시작 + 브라우저 열기</span></div>
+        <div class="help-cmd"><code>claude-agents stop</code><span>서버 종료</span></div>
+        <div class="help-cmd"><code>claude-agents status</code><span>현재 상태 확인</span></div>
+        <div class="help-cmd"><code>claude-agents on</code><span>세션 시작 시 자동 실행 ON</span></div>
+        <div class="help-cmd"><code>claude-agents off</code><span>자동 실행 OFF</span></div>
+      </div>
+
+      <div class="help-section">
+        <h3>Session Tab</h3>
+        <div class="help-tip"><strong>클릭</strong> &mdash; 해당 세션 필터 (로그, 에이전트)</div>
+        <div class="help-tip"><strong>더블클릭</strong> &mdash; 세션 이름 변경</div>
+        <div class="help-tip"><strong>&times; 버튼</strong> &mdash; 종료된 세션 탭 제거</div>
+        <div class="help-tip">Claude Code 시작/종료 시 탭 자동 생성/제거</div>
+      </div>
+
+      <div class="help-section">
+        <h3>Workspace</h3>
+        <div class="help-tip">에이전트 캐릭터가 실시간 상태를 표시</div>
+        <div class="help-tip"><strong>idle</strong> = 숨쉬기 애니메이션, <strong>working</strong> = 바운스 + 발광, <strong>done</strong> = 초록 글로우</div>
+        <div class="help-tip">Agent 도구 호출 시 Master &harr; Agent 사이 flyDot 애니메이션</div>
+      </div>
+
+      <div class="help-section">
+        <h3>Left Panel</h3>
+        <div class="help-tip"><strong>Master 카드</strong> &mdash; CLAUDE.md 편집</div>
+        <div class="help-tip"><strong>Agent 카드</strong> &mdash; 클릭으로 활성/비활성, 연필 아이콘으로 설정 편집</div>
+        <div class="help-tip"><strong>+ New</strong> &mdash; 새 에이전트 정의 생성 (~/.claude/agents/)</div>
+      </div>
+
+      <div class="help-section">
+        <h3>알림</h3>
+        <div class="help-tip"><strong>&#128276; 버튼</strong> &mdash; 브라우저 알림 on/off 토글</div>
+        <div class="help-tip">탭이 비활성일 때 에이전트 완료, 응답 완료 시 알림</div>
+        <div class="help-tip">알림 클릭 시 대시보드 탭으로 포커스 이동</div>
+      </div>
+
+      <div class="help-section">
+        <h3>Hook</h3>
+        <div class="help-tip">SessionStart &rarr; 서버 시작 + 세션 등록</div>
+        <div class="help-tip">PreToolUse (Agent) &rarr; 에이전트 시작 이벤트</div>
+        <div class="help-tip">PostToolUse (Agent) &rarr; 에이전트 완료 이벤트</div>
+        <div class="help-tip">세션 종료 &rarr; 탭 &times; 버튼 또는 2시간 자동 만료</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <!-- 분리된 JS 모듈 (로드 순서: constants → state → utils → environment → creature → history → notifications → animations → 인라인 메인) -->
+  <script src="/js/constants.js"></script>
+  <script src="/js/state.js"></script>
+  <script src="/js/utils.js"></script>
+  <script src="/js/environment.js"></script>
+  <script src="/js/creature.js"></script>
+  <script src="/js/history.js"></script>
+  <script src="/js/notifications.js"></script>
+  <script src="/js/animations.js"></script>
+  <script>
+  // state-dependent helpers (아직 분리 안 됨 — 3단계에서 events.js 등으로 이동 예정)
+  function getAgentInfo(aid){return agents.find(function(a){return a.id===aid||a.name===aid})||null}
+  function getLiveInstances(){
+    var arr=Object.values(liveInstances);
+    if(currentSession) arr=arr.filter(function(i){return i.sessionPid===currentSession});
+    return arr;
+  }
+
+  function clearInstance(key){
+    var inst=liveInstances[key];var pid=inst?inst.sessionPid:'';
+    delete liveInstances[key];
+    if(pid&&sessions[pid]){
+      var anyWorking=Object.values(liveInstances).some(function(i){return i.sessionPid===pid&&i.st==='working'});
+      if(!anyWorking){sessions[pid]._masterSt='idle';sessions[pid]._masterTask=''}
+    }
+    renderAll();
+  }
+
+  function sessionColor(pid){var pids=Object.keys(sessions).sort();var idx=pids.indexOf(pid);return SESSION_COLORS[(idx<0?0:idx)%SESSION_COLORS.length]}
+
+  // === Theme ===
+  function applyTheme(t){document.documentElement.className='theme-'+t;currentTheme=t;localStorage.setItem('viz-theme',t);var btn=document.getElementById('themeBtn');btn.textContent=(t==='dark'?'🌙':'☀️');btn.dataset.tip=(t==='dark'?'Dark':'Light')}
+  function cycleTheme(){applyTheme(currentTheme==='dark'?'light':'dark');renderAll()}
+  applyTheme(currentTheme);
+
+  // === Session Tabs ===
+  var sessClickTimer=null;
+  function mergeSessionData(s, overrides) {
+    var prev = sessions[s.pid] || {};
+    return {
+      pid: s.pid,
+      name: s.name || prev.name || 'Session ' + s.pid,
+      cwd: s.cwd || prev.cwd || '',
+      sid: s.sid || prev.sid || '',
+      startTime: s.startTime || prev.startTime || '',
+      lastActivity: overrides.lastActivity || prev.lastActivity || '',
+      eventCount: overrides.eventCount != null ? overrides.eventCount : (prev.eventCount || 0),
+      agentCount: prev.agentCount || 0,
+      alive: true,
+      _masterSt: prev._masterSt || 'idle',
+      _masterTask: prev._masterTask || '',
+      _turnCount: prev._turnCount || 0,
+      _thinkStart: prev._thinkStart || null,
+      _lastDoneTime: prev._lastDoneTime || null,
+      _completed: false,
+    };
+  }
+  function registerSession(s){
+    if(!s||!s.pid) return;var isNew=!sessions[s.pid];
+    sessions[s.pid]=mergeSessionData(s, {
+      lastActivity: new Date().toISOString(),
+      eventCount: ((sessions[s.pid] || {}).eventCount || 0) + 1,
+    });
+    if(!sessions[s.pid].startTime) sessions[s.pid].startTime = new Date().toISOString();
+    if(isNew){var wasEmpty=!currentSession;if(wasEmpty)currentSession=s.pid;renderSessionTabs();updateHeaderStat();if(wasEmpty&&s.cwd)fetchProjectAgents(s.cwd)}return isNew;
+  }
+  function removeSession(pid){
+    if(sessions[pid]){
+      sessions[pid].alive=false;
+      Object.keys(liveInstances).forEach(function(k){if(liveInstances[k].sessionPid===pid)delete liveInstances[k]});
+      renderAll();
+    }
+  }
+  function switchSession(pid){
+    currentSession=pid;
+    if(sessions[pid])delete sessions[pid]._completed;
+    renderSessionTabs();renderLogs();renderActivity();renderWorkspace();
+    document.getElementById('logFilterLabel').textContent=!pid?'':(sessions[pid]?' ['+sessions[pid].name+']':'');
+    // 세션의 프로젝트 CLAUDE.md 로드
+    var cwd=(pid&&sessions[pid])?sessions[pid].cwd:'';
+    fetchMaster(cwd);
+    fetchProjectAgents(cwd);
+  }
+  var _tabsBuilt=false;
+  function renderSessionTabs(){
+    var box=document.getElementById('sessionTabs');
+    var pids=Object.keys(sessions);
+    pids.sort(function(a,b){return(sessions[a].startTime||'').localeCompare(sessions[b].startTime||'')});
+
+    // 탭 구조 변경 감지 (세션 추가/삭제/선택 변경 시에만 전체 재구축)
+    var structKey=currentSession+'|'+pids.map(function(p){return p+':'+(sessions[p].alive?'1':'0')+(sessions[p]._completed?'c':'')}).join(',');
+    if(_tabsBuilt===structKey){
+      // 구조 동일 → 기존 탭의 속성만 업데이트 (DOM 재구축 안 함)
+      pids.forEach(function(pid){
+        var tab=box.querySelector('[data-session="'+pid+'"]');if(!tab) return;
+        var s=sessions[pid];
+        var isStale=!s.alive;
+        var isInactive=s.alive&&(Date.now()-new Date(s.lastActivity||s.startTime).getTime())>600000;
+        var cls='sess-tab'+(currentSession===pid?' active':'')+(isStale?' stale':isInactive?' inactive':'')+(s._completed?' completed':'');
+        if(tab.className!==cls) tab.className=cls;
+        // 스피너
+        var hasWorking=Object.values(liveInstances).some(function(i){return i.sessionPid===pid&&i.st==='working'})||(s._masterSt==='thinking'||s._masterSt==='working');
+        var spinEl=tab.querySelector('.sess-spinner');
+        if(hasWorking&&!spinEl){var sp2=document.createElement('span');sp2.className='sess-spinner';tab.insertBefore(sp2,tab.querySelector('.sess-close'))}
+        if(!hasWorking&&spinEl) spinEl.remove();
+      });
+      return;
+    }
+
+    // 구조 변경 → 전체 재구축
+    _tabsBuilt=structKey;
+    box.innerHTML='';
+    if(pids.length===0){var h=document.createElement('span');h.className='empty-sessions';h.textContent='Claude Code \uC138\uC158 \uB300\uAE30 \uC911...';box.appendChild(h);return}
+    // 세션이 있는데 현재 선택이 없거나 삭제된 세션이면 첫 번째 세션 자동 선택
+    if(!currentSession||!sessions[currentSession]){currentSession=pids[0]}
+    var nameGroups={};pids.forEach(function(p){var n=sessions[p].name;if(!nameGroups[n])nameGroups[n]=[];nameGroups[n].push(p)});
+    pids.forEach(function(pid){
+      var s=sessions[pid];var sColor=sessionColor(pid);
+      var displayName=s.name;var group=nameGroups[s.name];
+      if(group.length>1){var nums=['\u2460','\u2461','\u2462','\u2463','\u2464','\u2465','\u2466','\u2467','\u2468','\u2469'];var idx=group.indexOf(pid);displayName=s.name+' '+(nums[idx]||'('+(idx+1)+')')}
+      var lastAct=new Date(s.lastActivity||s.startTime).getTime();
+      var isStale=!s.alive;
+      var isInactive=s.alive&&(Date.now()-lastAct)>600000;
+      var tab=document.createElement('button');tab.className='sess-tab'+(currentSession===pid?' active':'')+(isStale?' stale':isInactive?' inactive':'')+(s._completed?' completed':'');tab.dataset.session=pid;
+      (function(p){
+        tab.onclick=function(e){if(e.target.classList.contains('sess-close')||e.target.classList.contains('sess-rename'))return;if(sessClickTimer)return;sessClickTimer=setTimeout(function(){sessClickTimer=null;switchSession(p)},280)};
+        tab.ondblclick=function(e){e.preventDefault();if(sessClickTimer){clearTimeout(sessClickTimer);sessClickTimer=null}startRenameSession(p)};
+      })(pid);
+      var dot=document.createElement('span');dot.className='sess-dot';dot.style.background=s.alive?sColor:'var(--text-secondary)';dot.style.boxShadow=s.alive?'0 0 4px '+sColor:'none';dot.style.opacity=s.alive?'1':'.4';tab.appendChild(dot);
+      var ns=document.createElement('span');ns.className='sess-name-text';ns.textContent=displayName;tab.appendChild(ns);
+      var hasWorking=Object.values(liveInstances).some(function(i){return i.sessionPid===pid&&i.st==='working'})||(s._masterSt==='thinking'||s._masterSt==='working');
+      if(hasWorking){var sp2=document.createElement('span');sp2.className='sess-spinner';tab.appendChild(sp2)}
+      var cl=document.createElement('span');cl.className='sess-close';cl.textContent='\u00d7';cl.onclick=function(e){e.stopPropagation();delete sessions[pid];Object.keys(liveInstances).forEach(function(k){if(liveInstances[k].sessionPid===pid)delete liveInstances[k]});if(currentSession===pid){var remaining=Object.keys(sessions);currentSession=remaining.length>0?remaining[0]:null}_tabsBuilt='';renderAll()};tab.appendChild(cl)
+      box.appendChild(tab);
+    });
+  }
+
+  function startRenameSession(pid){
+    var s=sessions[pid];if(!s)return;var tabEl=document.querySelector('.sess-tab[data-session="'+pid+'"]');if(!tabEl)return;
+    var nameEl=tabEl.querySelector('.sess-name-text');if(!nameEl)return;
+    var input=document.createElement('input');input.className='sess-rename';input.value=s.name;
+    var committed=false;
+    function commitRename(){if(committed)return;committed=true;doRename(pid,input.value.trim())}
+    input.onclick=function(e){e.stopPropagation()};
+    input.onkeydown=function(e){if(e.key==='Enter'){e.preventDefault();commitRename()}if(e.key==='Escape'){committed=true;renderSessionTabs()}};
+    input.onblur=function(){commitRename()};
+    nameEl.replaceWith(input);input.focus();input.select();
+  }
+  function doRename(pid,n){
+    if(!n||!sessions[pid]||n===sessions[pid].name){_tabsBuilt='';renderSessionTabs();return}
+    fetch(API+'/api/sessions/'+pid,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:n})}).then(function(r){return r.json()}).then(function(res){if(res.ok){sessions[pid].name=n;toast(n)}_tabsBuilt='';renderSessionTabs()}).catch(function(){_tabsBuilt='';renderSessionTabs()});
+  }
+
+  function updateHeaderStat(){
+    var alive=Object.values(sessions).filter(function(s){return s.alive}).length;
+    var inst=Object.values(liveInstances).filter(function(i){return i.st==='working'}).length;
+    var el=document.getElementById('headerStat');
+    el.innerHTML='<strong>'+alive+'</strong> session'+(alive!==1?'s':'')+' &middot; <strong>'+inst+'</strong> active';
+  }
+
+  // === API ===
+  function fetchAgents(){
+    fetch(API+'/api/agents').then(function(r){return r.json()}).then(function(data){
+      agents=data.map(function(a,i){a.color=agColor(a.id,i);a.active=true;return a});setConn(true);renderAll();
+    }).catch(function(){setConn(false);document.getElementById('agentList').innerHTML='<div style="color:var(--negative);font-size:.6rem;font-family:monospace;padding:14px;text-align:center">\uC11C\uBC84 \uC5F0\uACB0 \uC2E4\uD328</div>'});
+  }
+  function fetchProjectAgents(cwd){
+    if(!cwd){projectAgents={hasRestriction:false,enabled:[]};renderAll();return}
+    fetch(API+'/api/project-agents?cwd='+encodeURIComponent(cwd)).then(function(r){return r.json()}).then(function(d){
+      projectAgents=d;_wsBuilt=false;renderAll();
+    }).catch(function(){projectAgents={hasRestriction:false,enabled:[]};renderAll()});
+  }
+  function saveProjectAgents(enabled){
+    var pid=currentSession;
+    var cwd=(pid&&sessions[pid])?sessions[pid].cwd:'';
+    if(!cwd){toast('프로젝트 경로 없음','err');return}
+    fetch(API+'/api/project-agents',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({cwd:cwd,enabled:enabled,hasRestriction:true})}).then(function(r){return r.json()}).then(function(r){
+      if(r.ok){projectAgents={hasRestriction:true,enabled:enabled};_wsBuilt=false;renderAll();fetchMaster(cwd);toast('에이전트 설정 저장')}
+      else toast('실패','err');
+    }).catch(function(){toast('연결 실패','err')});
+  }
+  function fetchMaster(cwd){
+    var url=API+'/api/master';
+    if(cwd) url+='?cwd='+encodeURIComponent(cwd);
+    fetch(url).then(function(r){return r.json()}).then(function(d){masterData=d;renderMasterCard()}).catch(function(){});
+  }
+  function fetchSessions(){
+    fetch(API+'/api/sessions').then(function(r){return r.json()}).then(function(d){
+      d.forEach(function(s){
+        sessions[s.pid] = mergeSessionData(s, {
+          lastActivity: s.lastActivity,
+          eventCount: s.eventCount || ((sessions[s.pid] || {}).eventCount || 0),
+        });
+      });
+      renderSessionTabs();updateHeaderStat();
+      var cwd=(currentSession&&sessions[currentSession])?sessions[currentSession].cwd:'';
+      if(cwd&&agents.length>0)fetchProjectAgents(cwd);
+    }).catch(function(){});
+  }
+
+  function renderMasterCard(){
+    var box=document.getElementById('masterCard');var card=document.createElement('div');card.className='master-card';card.onclick=function(){openMaster()};
+    var row=document.createElement('div');row.className='ag-row';row.appendChild(buildPix('master','#fbbf24','sm'));
+    var info=document.createElement('div');info.innerHTML='<div class="ag-name" style="color:#fbbf24">\u2605 Master</div><div class="ag-desc">CLAUDE.md \uC124\uC815</div>';
+    row.appendChild(info);card.appendChild(row);
+    var files=document.createElement('div');files.className='master-files';
+    var projLabel=masterData.projectPath?masterData.projectPath.replace(/^\/Users\/[^/]+/,'~'):'';
+    files.innerHTML='<div class="mf"><span class="dot" style="background:var(--positive)"></span>~/CLAUDE.md</div>'+(masterData.project?'<div class="mf"><span class="dot" style="background:var(--accent)"></span>'+esc(projLabel)+'</div>':'<div class="mf"><span class="dot" style="background:var(--text-secondary)"></span>\uD504\uB85C\uC81D\uD2B8 CLAUDE.md \uC5C6\uC74C</div>');
+    card.appendChild(files);box.innerHTML='';box.appendChild(card);
+  }
+  function setConn(ok){}
+  function saveAgentAPI(id,d,n){return fetch(n?API+'/api/agents':API+'/api/agents/'+id,{method:n?'POST':'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(d)}).then(function(r){return r.json()})}
+  function deleteAgentAPI(id){return fetch(API+'/api/agents/'+id,{method:'DELETE'}).then(function(r){return r.json()})}
+
+  // === Render ===
+  function renderList(){
+    var left=document.querySelector('.left');var scrollPos=left?left.scrollTop:0;
+    var box=document.getElementById('agentList');box.innerHTML='';
+    var hasCwd=currentSession&&sessions[currentSession]&&sessions[currentSession].cwd;
+    agents.forEach(function(ag){
+      var isEnabled=!projectAgents.hasRestriction||projectAgents.enabled.indexOf(ag.id)>=0;
+      var card=document.createElement('div');card.className='ag on'+(isEnabled?'':' disabled');
+      card.onclick=function(){openEdit(ag.id)};
+      // 어딘가에서 working 중이면 라이브 dot
+      var isLive=Object.values(liveInstances).some(function(inst){return inst.agentId===ag.id&&inst.st==='working'});
+      if(isLive){var dot=document.createElement('span');dot.className='ag-live';card.appendChild(dot)}
+      // 프로젝트별 토글 (Master idle일 때만)
+      if(hasCwd){
+        var csMst=currentSession&&sessions[currentSession]?sessions[currentSession]._masterSt||'idle':'idle';
+        var masterBusy=csMst==='thinking'||csMst==='working';
+        var isLocked=isLive||masterBusy;
+        var toggle=document.createElement('span');toggle.className='ag-toggle'+(isEnabled?' on':'')+(isLocked?' locked':'');
+        toggle.title=isLocked?'작업 중 — 변경 불가':(isEnabled?'이 프로젝트에서 활성':'이 프로젝트에서 비활성');
+        (function(agId,en){
+          toggle.onclick=function(e){
+            e.stopPropagation();
+            // 클릭 시점에 실시간 체크
+            var csMst2=currentSession&&sessions[currentSession]?sessions[currentSession]._masterSt||'idle':'idle';
+            var busy=csMst2==='thinking'||csMst2==='working';
+            var working=Object.values(liveInstances).some(function(i){return i.agentId===agId&&i.st==='working'});
+            if(busy||working){toast('작업 중에는 변경할 수 없습니다');return}
+            var newEnabled;
+            if(!projectAgents.hasRestriction){
+              newEnabled=agents.map(function(a){return a.id}).filter(function(id){return id!==agId});
+            } else if(en){
+              newEnabled=projectAgents.enabled.filter(function(id){return id!==agId});
+            } else {
+              newEnabled=projectAgents.enabled.concat([agId]);
+            }
+            if(newEnabled.length>=agents.length){
+              fetch(API+'/api/project-agents',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({cwd:(currentSession&&sessions[currentSession])?sessions[currentSession].cwd:'',enabled:[],hasRestriction:false})}).then(function(r){return r.json()}).then(function(r){
+                if(r.ok){projectAgents={hasRestriction:false,enabled:[]};_wsBuilt=false;renderAll();var cwdR=(currentSession&&sessions[currentSession])?sessions[currentSession].cwd:'';fetchMaster(cwdR);toast('에이전트 제한 해제')}
+              }).catch(function(){toast('연결 실패','err')});
+            } else {saveProjectAgents(newEnabled)}
+          };
+        })(ag.id,isEnabled);
+        card.appendChild(toggle);
+      }
+      var row=document.createElement('div');row.className='ag-row';row.appendChild(buildPix(ag.id,ag.color,'sm',ag.model));
+      var info=document.createElement('div');info.innerHTML='<div class="ag-name" style="color:'+esc(ag.color)+'">'+esc(ag.name)+'</div><div class="ag-desc">'+esc(ag.description)+'</div>';
+      row.appendChild(info);card.appendChild(row);
+      var meta=document.createElement('div');meta.className='ag-meta';meta.innerHTML='<span class="ag-tag model-'+esc(ag.model)+'">'+esc(ag.model)+'</span>';
+      (ag.tools||[]).forEach(function(t){meta.innerHTML+='<span class="ag-tag">'+esc(t)+'</span>'});
+      card.appendChild(meta);
+      box.appendChild(card);
+    });
+    if(left)left.scrollTop=scrollPos;
+  }
+
+  var _wsBuilt=false;
+  function renderWorkspace(){
+    var ws=document.getElementById('workspace');
+
+    // 항상 Master + 활성 에이전트만 표시
+    var nodes=[{wsId:'master',id:'master',name:'Master',color:'#fbbf24',model:''}];
+    agents.filter(function(a){
+      if(!a.active) return false;
+      if(projectAgents.hasRestriction&&projectAgents.enabled.indexOf(a.id)<0) return false;
+      return true;
+    }).forEach(function(ag){
+      nodes.push({wsId:ag.id,id:ag.id,name:ag.name,color:ag.color,model:ag.model});
+    });
+
+    // 정의되지 않은 에이전트(Explore 등)도 활동 중이면 동적 추가
+    var instances=!currentSession?Object.values(liveInstances):getLiveInstances();
+    var definedIds=nodes.map(function(n){return n.id});
+    var knownAgentIds=agents.map(function(a){return a.id});
+    instances.forEach(function(inst){
+      // 정의된 에이전트는 토글로 관리하므로 동적 추가 안 함
+      if(inst.agentId&&knownAgentIds.indexOf(inst.agentId)>=0) return;
+      if(inst.agentId&&definedIds.indexOf(inst.agentId)===-1){
+        if(!nodes.find(function(n){return n.id===inst.agentId})){
+          nodes.push({wsId:inst.agentId,id:inst.agentId,name:inst.agentId,color:inst.color||agColor(inst.agentId,nodes.length),model:'',_dynamic:true});
+          definedIds.push(inst.agentId);
+        }
+      }
+    });
+
+    // 라이브 인스턴스와 매칭 → 상태 결정
+    nodes.forEach(function(nd){
+      if(nd.id==='master'){
+        var cs=currentSession&&sessions[currentSession]?sessions[currentSession]:null;
+        var anyWorking=instances.some(function(i){return i.st==='working'});
+        var sessMst=cs?cs._masterSt||'idle':'idle';
+        nd._st=anyWorking?'working':sessMst;
+        nd._task=cs?cs._masterTask||'':'';
+        return;
+      }
+      // 이 에이전트의 working 인스턴스 찾기
+      var match=instances.find(function(inst){return inst.agentId===nd.id&&inst.st==='working'});
+      if(!match) match=instances.find(function(inst){return inst.agentId===nd.id});
+      if(match){
+        // done 후 10초 지나면 Workspace에서 idle 복귀 (Activity는 done 유지)
+        if(match.st==='done'&&match.doneTime&&(Date.now()-match.doneTime)>5000){
+          nd._st='idle';nd._task='';nd.sessionName='';
+        } else {
+          nd._st=match.st;nd._task=match.task;nd.sessionName=match.sessionName;
+        }
+      } else {
+        nd._st='idle';nd._task='';nd.sessionName='';
+      }
+    });
+
+    // DOM 구조는 에이전트 추가/삭제 시에만 재구축
+    var structKey=nodes.map(function(n){return n.wsId}).join(',');
+    if(_wsBuilt!==structKey){
+      _wsBuilt=structKey;
+      // 기존 요소 유지, 새 요소만 추가, 불필요한 요소만 제거 (깜빡임 방지)
+      var positions=getPositions(nodes.length);
+      var existingIds={};
+      ws.querySelectorAll('.ws-agent').forEach(function(el){existingIds[el.id]=true});
+      // 집 추가 (없으면)
+      if(!ws.querySelector('#ws-house')) ws.appendChild(buildHouse());
+      // 삭제된 노드 제거
+      ws.querySelectorAll('.ws-agent').forEach(function(el){
+        var wid=el.id.replace('ws-','');
+        if(!nodes.find(function(n){return n.wsId===wid})) el.remove();
+      });
+      // 새 노드 추가 (기존 노드는 건드리지 않음)
+      nodes.forEach(function(nd,i){
+        if(existingIds['ws-'+nd.wsId]) return;
+        var el=document.createElement('div');el.className='ws-agent '+(nd._st||'idle');el.id='ws-'+nd.wsId;el.dataset.st=nd._st||'idle';
+        var savedPos=creatureLife[nd.wsId];
+        el.style.left=(savedPos?savedPos.x:positions[i].x)+'%';el.style.top=(savedPos?savedPos.y:positions[i].y)+'%';el.style.transform='translate(-50%,-50%)';
+        el.style.setProperty('--rnd-delay',(Math.random()*3).toFixed(2)+'s');
+        el.style.setProperty('--rnd-dur',(0.8+Math.random()*0.6).toFixed(2));
+        var pixWrap=document.createElement('div');pixWrap.style.position='relative';
+        pixWrap.appendChild(buildPix(nd.id,nd.color,'lg',nd.model));
+        // 악세서리
+        var acc=AGENT_ACCESSORIES[nd.id];
+        if(acc){var accEl=document.createElement('span');accEl.className='ws-accessory';accEl.textContent=acc;pixWrap.appendChild(accEl)}
+        el.appendChild(pixWrap);
+        var lbl=document.createElement('div');lbl.className='ws-label';
+        if(nd.id==='master') lbl.innerHTML='<span style="color:#c084fc">Master</span><span class="ws-badge" style="background:rgba(251,191,36,.15);color:#fbbf24">SESSION</span>';
+        else lbl.innerHTML=esc(nd.name)+'<span class="ws-badge model-'+esc(nd.model||'sonnet')+'">'+esc((nd.model||'').toUpperCase())+'</span>';
+        el.appendChild(lbl);
+        var bub=document.createElement('div');bub.className='ws-bubble';bub.textContent=nd._task||'';if(!nd._task)bub.style.display='none';el.appendChild(bub);
+        ws.appendChild(el);
+      });
+      startAmbient(ws);
+    } else {
+      // 상태만 업데이트 (위치 변경 없음)
+      nodes.forEach(function(nd){
+        var el=document.getElementById('ws-'+nd.wsId);if(!el) return;
+        var prevSt=el.dataset.st||'idle';
+        el.className='ws-agent '+(nd._st||'idle');
+        el.dataset.st=nd._st||'idle';
+        // idle → working 전환 시 현재 위치 그대로 (그 자리에서 일 시작)
+        var bub=el.querySelector('.ws-bubble');
+        if(bub){bub.textContent=nd._task||'';bub.style.display=nd._task?'':'none'}
+      });
+    }
+    // 집 배지 업데이트 (비활성 에이전트 수)
+    var house=ws.querySelector('#ws-house');
+    if(house){
+      var disabledCount=projectAgents.hasRestriction?agents.filter(function(a){return a.active&&projectAgents.enabled.indexOf(a.id)<0}).length:0;
+      var badge=house.querySelector('.ws-house-badge');
+      if(disabledCount>0){
+        if(!badge){badge=document.createElement('div');badge.className='ws-house-badge';house.appendChild(badge)}
+        badge.textContent='🏠 '+disabledCount;
+      } else {if(badge)badge.remove()}
+    }
+    // 상태별 이펙트: 아우라 (working), 이모션 (done)
+    nodes.forEach(function(nd){
+      var el=document.getElementById('ws-'+nd.wsId);if(!el)return;
+      var st=nd._st||'idle';
+      // 아우라 (working)
+      var aura=el.querySelector('.ws-aura');
+      if(st==='working'){
+        if(!aura){
+          aura=document.createElement('div');aura.className='ws-aura';
+          var MODEL_AURA={opus:'#fbbf24',sonnet:'#00ffc8',haiku:'#f472b6'};
+          var ac=MODEL_AURA[nd.model]||nd.color;
+          for(var p=0;p<6;p++){var dot=document.createElement('i');dot.style.background=ac;dot.style.setProperty('--ax',(Math.random()*30-15)+'px');dot.style.setProperty('--ay',(Math.random()*-25-5)+'px');dot.style.left=(20+Math.random()*60)+'%';dot.style.top=(20+Math.random()*60)+'%';dot.style.animationDelay=(p*0.33)+'s';dot.style.animationDuration=(1.5+Math.random())+'s';aura.appendChild(dot)}
+          el.appendChild(aura);
+        }
+      } else {if(aura)aura.remove()}
+      // 이모션: working/done (idle은 creature 시스템에서 제어)
+      if(st!=='idle'){
+        var zzz=el.querySelector('.ws-zzz');if(zzz)zzz.remove();
+        var pix=el.querySelector('.pix-lg');if(!pix)return;
+        var eyes=pix.querySelectorAll('i[data-eye]');
+        var normalEye=currentTheme==='dark'?'#080810':'#1a1a1a';
+        eyes.forEach(function(eye){
+          if(st==='done'){eye.style.background='#10b981';eye.style.borderRadius='50%';eye.style.transform='scaleY(.4)'}
+          else{eye.style.background=normalEye;eye.style.borderRadius='0';eye.style.transform=''}
+        });
+      }
+    });
+
+    // 상태 텍스트
+    var stEl=ws.querySelector('.ws-status');
+    var working=instances.filter(function(i){return i.st==='working'}).length;
+    var statusText='';
+    if(!currentSession){var sc=Object.keys(sessions).length;statusText=sc+' session'+(sc!==1?'s':'')+' \u00b7 '+agents.length+' agents'}
+    else if(working>0){statusText=working+' working'}
+    if(statusText){
+      if(!stEl){stEl=document.createElement('div');stEl.className='ws-status';ws.appendChild(stEl)}
+      stEl.textContent=statusText;
+    } else if(stEl){stEl.remove()}
+
+    // 연결선 제거됨 — 방방 뛰기 + 말풍선 + 액티비티 + 타임라인으로 충분
+  }
+
+  var _ambientRunning=false;
+  function startAmbient(ws){
+    if(_ambientRunning) return;_ambientRunning=true;
+    var colors=['#00ffc8','#a78bfa','#fbbf24','#00d4ff','#f472b6','#84cc16'];
+    setInterval(function(){
+      if(!document.getElementById('workspace')) return;
+      var p=document.createElement('div');p.className='ambient';
+      p.style.background=colors[Math.floor(Math.random()*colors.length)];
+      p.style.left=Math.random()*100+'%';
+      p.style.top=(Math.random()*100)+'%';
+      p.style.setProperty('--dx',(Math.random()*40-20)+'px');
+      p.style.animationDuration=(4+Math.random()*5)+'s';
+      var size=2+Math.random()*3;
+      p.style.width=size+'px';p.style.height=size+'px';
+      ws.appendChild(p);
+      setTimeout(function(){p.remove()},9000);
+    },500);
+  }
+
+  function getPositions(n){
+    if(n===0) return [];
+    if(n===1) return [{x:50,y:68}];
+
+    var pos=[{x:50,y:62}];
+    var rest=n-1;
+    // 간격: 에이전트 수에 따라 조절 (최소 14%, 최대 22%)
+    var gap=Math.max(14,Math.min(22,80/rest));
+
+    if(rest<=4){
+      var startX=50-((rest-1)*gap)/2;
+      for(var i=0;i<rest;i++) pos.push({x:startX+i*gap,y:74});
+    } else if(rest<=8){
+      var row1=Math.ceil(rest/2);
+      var row2=rest-row1;
+      var startX1=50-((row1-1)*gap)/2;
+      for(var i=0;i<row1;i++) pos.push({x:startX1+i*gap,y:45});
+      var startX2=50-((row2-1)*gap)/2;
+      for(var i=0;i<row2;i++) pos.push({x:startX2+i*gap,y:78});
+    } else {
+      // 3줄
+      var perRow=Math.ceil(rest/3);
+      var rows=[[],[],[]];
+      for(var i=0;i<rest;i++) rows[Math.floor(i/perRow)].push(i);
+      var yPositions=[35,58,81];
+      rows.forEach(function(row,ri){
+        var g=Math.max(12,80/row.length);
+        var sx=50-((row.length-1)*g)/2;
+        row.forEach(function(_,ci){pos.push({x:sx+ci*g,y:yPositions[ri]})});
+      });
+    }
+    return pos;
+  }
+
+  function renderActivity(){
+    var box=document.getElementById('activityList');box.innerHTML='';
+    var instances=getLiveInstances();
+    var countEl=document.getElementById('actCount');
+    var working=instances.filter(function(i){return i.st==='working'}).length;
+    countEl.textContent=working>0?working+' working':'';
+
+    if(!currentSession&&Object.keys(sessions).length===0){
+      box.innerHTML='<div class="act-empty">\uC138\uC158 \uB300\uAE30 \uC911...</div>';return;
+    }
+    // Master 항상 표시
+    var curS=currentSession&&sessions[currentSession]?sessions[currentSession]:null;
+    var mst=curS?curS._masterSt||'idle':'idle';
+    var mThinkStart=curS?curS._thinkStart:null;
+    var mLabels={thinking:'생각 중',done:'완료',working:'조율 중',idle:'대기'};
+    var mRow=document.createElement('div');mRow.className='act-row';
+    mRow.appendChild(buildPix('master','#fbbf24','sm'));
+    mRow.innerHTML+='<span class="act-name" style="color:#fbbf24">Master</span>';
+    var mProg=mst==='done'?100:mst==='thinking'?Math.min(90,10+((Date.now()-(mThinkStart||Date.now()))/1000)*5):mst==='working'?50:0;
+    mRow.innerHTML+='<div class="act-bar"><div class="act-bar-fill '+mst+'" style="width:'+mProg+'%"></div></div>';
+    var mTaskText=curS?curS._masterTask||'':'';
+    mRow.innerHTML+='<span class="act-task">'+esc(mTaskText)+'</span>';
+    mRow.innerHTML+='<span class="act-status '+mst+'">'+(mLabels[mst]||mst)+'</span>';
+    box.appendChild(mRow);
+
+    if(instances.length===0&&mst==='idle'){return;}
+    instances.forEach(function(inst){
+      var ai=getAgentInfo(inst.agentId);var name=ai?ai.name:inst.agentId;
+      var row=document.createElement('div');row.className='act-row';
+      row.appendChild(buildPix(inst.agentId,inst.color,'sm'));
+      row.innerHTML+='<span class="act-name" style="color:'+esc(inst.color)+'">'+esc(name)+'</span>';
+      row.innerHTML+='<div class="act-bar"><div class="act-bar-fill '+inst.st+'" style="width:'+(inst.prog||0)+'%"></div></div>';
+      row.innerHTML+='<span class="act-task">'+esc(inst.task||'-')+'</span>';
+      var labels={idle:'\uB300\uAE30',working:'\uC791\uC5C5 \uC911',done:'\uC644\uB8CC'};
+      row.innerHTML+='<span class="act-status '+inst.st+'">'+(labels[inst.st]||inst.st)+'</span>';
+      if(!currentSession&&inst.sessionName) row.innerHTML+='<span class="act-session">'+esc(inst.sessionName)+'</span>';
+      // 리셋 버튼 (done)
+      if(inst.st==='done'){
+        var rb=document.createElement('span');rb.className='act-reset';rb.textContent='\u00d7';rb.title='\uC81C\uAC70';
+        (function(k){rb.onclick=function(e){e.stopPropagation();clearInstance(k)}})(inst.key);
+        row.appendChild(rb);
+      }
+      box.appendChild(row);
+    });
+    updateHeaderStat();
+  }
+
+  // === Timeline ===
+  var _tlOpen=false;
+  function toggleTimeline(){_tlOpen=!_tlOpen;document.getElementById('timelineBody').style.display=_tlOpen?'':'none';document.getElementById('tlToggle').textContent=_tlOpen?'\u25BC':'\u25B6'}
+  function renderTimeline(){
+    var box=document.getElementById('timelineBody');if(!box)return;box.innerHTML='';
+    var instances=getLiveInstances();
+    // 타임라인은 에이전트 활동만 표시 (Master는 액티비티 패널에서 확인)
+    if(instances.length===0){box.innerHTML='<div class="tl-empty">\uC5D0\uC774\uC804\uD2B8 \uD65C\uB3D9 \uC5C6\uC74C</div>';return}
+    // 시간 범위 계산
+    var minStart=Infinity,maxEnd=0,now=Date.now();
+    instances.forEach(function(inst){
+      if(inst.startTime<minStart)minStart=inst.startTime;
+      var end=inst.doneTime||now;
+      if(end>maxEnd)maxEnd=end;
+    });
+    var totalMs=Math.max(maxEnd-minStart,1000);
+    // 각 에이전트 바 렌더링
+    instances.forEach(function(inst){
+      var ai=getAgentInfo(inst.agentId);var name=ai?ai.name:inst.agentId;
+      var row=document.createElement('div');row.className='tl-row';
+      var lbl=document.createElement('span');lbl.className='tl-label';lbl.style.color=inst.color;lbl.textContent=name;
+      var track=document.createElement('div');track.className='tl-track';
+      var bar=document.createElement('div');bar.className='tl-bar'+(inst.st==='working'?' working':'');
+      var startPct=((inst.startTime-minStart)/totalMs)*100;
+      var endTime=inst.doneTime||now;
+      var widthPct=((endTime-inst.startTime)/totalMs)*100;
+      bar.style.left=startPct+'%';bar.style.width=Math.max(widthPct,1)+'%';bar.style.background=inst.color;
+      var sec=Math.round((endTime-inst.startTime)/1000);
+      bar.title=name+' '+sec+'s';
+      track.appendChild(bar);
+      var timeLabel=document.createElement('span');timeLabel.className='tl-bar-label';timeLabel.textContent=sec+'s';
+      row.appendChild(lbl);row.appendChild(track);row.appendChild(timeLabel);box.appendChild(row);
+    });
+    // 시간 눈금
+    var scaleRow=document.createElement('div');scaleRow.className='tl-row';scaleRow.style.height='auto';
+    var scaleLabel=document.createElement('span');scaleLabel.className='tl-label';scaleLabel.textContent='';
+    var scale=document.createElement('div');scale.className='tl-scale';
+    var scalePad=document.createElement('span');scalePad.className='tl-bar-label';scalePad.textContent='';
+    var totalSec=Math.round(totalMs/1000);
+    for(var i=0;i<=4;i++){var s=document.createElement('span');s.textContent=Math.round(totalSec*i/4)+'s';scale.appendChild(s)}
+    scaleRow.appendChild(scaleLabel);scaleRow.appendChild(scale);scaleRow.appendChild(scalePad);
+    box.appendChild(scaleRow);
+  }
+
+  // === Logs ===
+  function addLog(ag,msg,cls,sp,sn){
+    logEntries.unshift({sessionPid:sp||'',sessionName:sn||'',agName:ag?ag.name:'System',agColor:ag?ag.color:'var(--accent)',msg:msg,cls:cls||'',time:new Date().toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit',second:'2-digit'})});
+    if(logEntries.length>MAX_LOGS)logEntries.length=MAX_LOGS;renderLogs();
+  }
+  function renderLogs(){
+    var box=document.getElementById('logBox');box.innerHTML='';
+    var filtered=!currentSession?logEntries:logEntries.filter(function(l){return!l.sessionPid||l.sessionPid===currentSession});
+    filtered.slice(0,50).forEach(function(l){
+      var d=document.createElement('div');d.className='log'+(l.cls?' '+l.cls:'');
+      var sl='';if(!currentSession&&l.sessionPid&&l.sessionName) sl='<span class="ls">['+esc(l.sessionName)+']</span>';
+      d.innerHTML='<span class="lt">'+l.time+'</span>'+sl+'<span class="la" style="color:'+esc(l.agColor)+'">['+esc(l.agName)+']</span><span class="lm">'+esc(l.msg)+'</span>';
+      box.appendChild(d);
+    });
+  }
+  function fmtTime(s){var m=Math.floor(s/60);var sec=s%60;return(m<10?'0':'')+m+':'+(sec<10?'0':'')+sec}
+
+  var _renderTimer=null;
+  function renderAll(){
+    if(_renderTimer)clearTimeout(_renderTimer);
+    _renderTimer=setTimeout(function(){_renderTimer=null;try{renderList();renderWorkspace();renderActivity();renderTimeline();renderLogs();updateHeaderStat();renderSessionTabs()}catch(e){console.error('[agent-viz] renderAll error:',e)}},50);
+  }
+
+  // === Modal ===
+  function openEdit(id){
+    var ag=agents.find(function(a){return a.id===id});if(!ag)return;editingId=id;    document.getElementById('modalTitle').textContent=ag.name;document.getElementById('fName').value=ag.name;document.getElementById('fName').disabled=true;
+    document.getElementById('fDesc').value=ag.description;document.getElementById('fModel').value=ag.model;document.getElementById('fBody').value=ag.body||'';
+    document.getElementById('btnDel').style.display='';renderToolsGrid(ag.tools||[]);
+    document.getElementById('agentFields').style.display='';document.getElementById('masterFields').style.display='none';    document.getElementById('btnSave').onclick=saveAgent;document.getElementById('btnDel').onclick=deleteAgent;
+    document.getElementById('overlay').classList.add('show');
+  }
+  function openNew(){
+    editingId=null;document.getElementById('modalTitle').textContent='\uC0C8 \uC5D0\uC774\uC804\uD2B8';
+    document.getElementById('fName').value='';document.getElementById('fName').disabled=false;
+    document.getElementById('fDesc').value='';document.getElementById('fModel').value='sonnet';document.getElementById('fBody').value='';
+    document.getElementById('btnDel').style.display='none';renderToolsGrid(['Read','Glob','Grep']);
+    document.getElementById('agentFields').style.display='';document.getElementById('masterFields').style.display='none';    document.getElementById('btnSave').onclick=saveAgent;document.getElementById('btnDel').onclick=deleteAgent;
+    document.getElementById('overlay').classList.add('show');
+  }
+  function openMaster(){
+    editingId='master';masterTab='global';document.getElementById('modalTitle').textContent='\u2605 Master';
+    document.getElementById('agentFields').style.display='none';document.getElementById('masterFields').style.display='';    document.getElementById('btnSave').onclick=saveAgent;
+    document.getElementById('btnDel').style.display='none';document.getElementById('fMaster').value=masterData.global||'';
+    document.getElementById('masterFileLabel').textContent=masterData.globalPath||'~/CLAUDE.md';updateMasterTabs();
+    document.getElementById('overlay').classList.add('show');
+  }
+  function switchMasterTab(t){masterTab=t;document.getElementById('fMaster').value=t==='global'?(masterData.global||''):(masterData.project||'');document.getElementById('masterFileLabel').textContent=t==='global'?(masterData.globalPath||'~/CLAUDE.md'):(masterData.projectPath||'project/CLAUDE.md');updateMasterTabs()}
+  function updateMasterTabs(){var bs=document.querySelectorAll('#masterTabs button');bs.forEach(function(b,i){b.className=(i===0&&masterTab==='global')||(i===1&&masterTab==='project')?'active':''})}
+  function closeModal(){document.getElementById('overlay').classList.remove('show');document.getElementById('agentFields').style.display='';document.getElementById('masterFields').style.display='none'}
+  var TOOL_TIPS={Read:'\uD30C\uC77C \uC77D\uAE30',Write:'\uC0C8 \uD30C\uC77C \uC0DD\uC131',Edit:'\uAE30\uC874 \uD30C\uC77C \uC218\uC815',Glob:'\uD30C\uC77C \uAC80\uC0C9 (\uD328\uD134)',Grep:'\uB0B4\uC6A9 \uAC80\uC0C9',Bash:'\uD130\uBBF8\uB110 \uBA85\uB839 \uC2E4\uD589',Agent:'\uB2E4\uB978 \uC5D0\uC774\uC804\uD2B8 \uD638\uCD9C',WebFetch:'URL \uB0B4\uC6A9 \uAC00\uC838\uC624\uAE30',WebSearch:'\uC6F9 \uAC80\uC0C9',NotebookEdit:'\uB178\uD2B8\uBD81 \uD3B8\uC9D1'};
+  function renderToolsGrid(sel){var g=document.getElementById('toolsGrid');g.innerHTML='';ALL_TOOLS.forEach(function(t){var c=document.createElement('span');c.className='tool-chip'+(sel.indexOf(t)>=0?' sel':'');c.textContent=t;c.title=TOOL_TIPS[t]||t;c.onclick=function(){c.classList.toggle('sel')};g.appendChild(c)})}
+  function getSelectedTools(){var cs=document.querySelectorAll('#toolsGrid .tool-chip.sel');var t=[];cs.forEach(function(c){t.push(c.textContent)});return t}
+  function saveAgent(){
+    if(editingId==='master'){var ct=document.getElementById('fMaster').value;var saveCwd=masterData.cwd||'';fetch(API+'/api/master/'+masterTab,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({content:ct,cwd:saveCwd})}).then(function(r){return r.json()}).then(function(r){if(r.ok){toast(masterTab==='global'?'~/CLAUDE.md \uC800\uC7A5':(r.path||'\uD504\uB85C\uC81D\uD2B8')+' \uC800\uC7A5');if(masterTab==='global')masterData.global=ct;else masterData.project=ct}else toast('\uC2E4\uD328','err')}).catch(function(){toast('\uC5F0\uACB0 \uC2E4\uD328','err')});return}
+    var name=document.getElementById('fName').value.trim();if(!name){toast('\uC774\uB984 \uD544\uC694','err');return}
+    var d={id:name.toLowerCase().replace(/[^a-z0-9-]/g,'-'),name:name,description:document.getElementById('fDesc').value.trim(),model:document.getElementById('fModel').value,tools:getSelectedTools(),body:document.getElementById('fBody').value};
+    var isNew=editingId===null;var id=isNew?d.id:editingId;
+    saveAgentAPI(id,d,isNew).then(function(r){if(r.ok){toast(id+'.md \uC800\uC7A5');closeModal();fetchAgents()}else toast('\uC2E4\uD328','err')}).catch(function(){toast('\uC5F0\uACB0 \uC2E4\uD328','err')});
+  }
+  var delConfirmTimer=null;
+  function deleteAgent(){
+    if(!editingId) return;
+    var btn=document.getElementById('btnDel');
+    if(btn.dataset.confirm==='1'){
+      clearTimeout(delConfirmTimer);
+      btn.dataset.confirm='';btn.textContent='\uC0AD\uC81C';btn.style.background='';btn.style.color='';
+      deleteAgentAPI(editingId).then(function(r){if(r.ok){toast(editingId+' \uC0AD\uC81C');closeModal();fetchAgents()}}).catch(function(){toast('\uC2E4\uD328','err')});
+    } else {
+      btn.dataset.confirm='1';btn.textContent='\uC815\uB9D0 \uC0AD\uC81C?';btn.style.background='var(--negative)';btn.style.color='#fff';
+      delConfirmTimer=setTimeout(function(){btn.dataset.confirm='';btn.textContent='\uC0AD\uC81C';btn.style.background='';btn.style.color=''},3000);
+    }
+  }
+  // === MCP ===
+  var mcpServers=[];
+  function fetchMcpServers(){
+    fetch(API+'/api/mcp').then(function(r){return r.json()}).then(function(data){
+      mcpServers=data;renderMcpList();
+    }).catch(function(){});
+  }
+  function renderMcpList(){
+    var box=document.getElementById('mcpList');box.innerHTML='';
+    if(mcpServers.length===0){box.innerHTML='<div class="mcp-empty">MCP 서버 없음</div>';return}
+    // MCP 서버명에서 자동 색상 생성
+    function mcpColor(name){var h=0;for(var i=0;i<name.length;i++)h=name.charCodeAt(i)+((h<<5)-h);return 'hsl('+(Math.abs(h)%360)+',60%,55%)'}
+    mcpServers.forEach(function(mcp){
+      var el=document.createElement('div');el.className='mcp-item';
+      var color=mcpColor(mcp.id);
+      el.innerHTML='<span class="mcp-dot" style="background:'+esc(color)+';box-shadow:0 0 4px '+esc(color)+'"></span><div><div class="mcp-name">'+esc(mcp.name)+'</div><div class="mcp-type">'+esc(mcp.type)+'</div></div>';
+      box.appendChild(el);
+    });
+  }
+
+  // === Hooks ===
+  var hooksData=[];
+  function fetchHooks(){
+    fetch(API+'/api/hooks').then(function(r){return r.json()}).then(function(data){
+      hooksData=data;renderHooksList();
+    }).catch(function(){});
+  }
+  function renderHooksList(){
+    var box=document.getElementById('hooksList');box.innerHTML='';
+    if(hooksData.length===0){box.innerHTML='<div class="mcp-empty">Hook 없음</div>';return}
+    var EVENT_COLORS={SessionStart:'#10b981',SessionEnd:'#f43f5e',UserPromptSubmit:'#fbbf24',Stop:'#fb923c',PreToolUse:'#00d4ff',PostToolUse:'#a78bfa'};
+    // 이벤트별 그룹핑
+    var groups={};
+    hooksData.forEach(function(h){
+      if(!groups[h.event]) groups[h.event]=[];
+      groups[h.event].push(h);
+    });
+    Object.keys(groups).forEach(function(evt){
+      var g=document.createElement('div');g.className='hook-group';
+      var color=EVENT_COLORS[evt]||'var(--accent)';
+      var header='<div class="hook-event"><span class="hook-event-dot" style="background:'+color+'"></span>'+esc(evt)+' <span style="font-size:.4rem;color:var(--text-secondary);font-weight:400">('+groups[evt].length+')</span></div>';
+      g.innerHTML=header;
+      groups[evt].forEach(function(h){
+        var cmd=h.command||'';
+        // 경로 축약
+        var shortCmd=cmd.replace(/\/Users\/[^/]+/g,'~').replace(/\/\.claude\/agent-viz\//,'');
+        var line=document.createElement('div');line.className='hook-handler';line.textContent=shortCmd;line.title=cmd;
+        g.appendChild(line);
+        if(h.matcher){
+          var m=document.createElement('div');m.className='hook-matcher';m.textContent='matcher: '+h.matcher;
+          g.appendChild(m);
+        }
+      });
+      box.appendChild(g);
+    });
+  }
+
+  // === Daily Stats ===
+  var dailyStatsData={prompts:0,totalAgents:0,totalTools:0,agents:{},tools:{}};
+  function fetchDailyStats(){
+    fetch(API+'/api/stats').then(function(r){return r.json()}).then(function(data){
+      dailyStatsData=data;renderDailyStat();
+    }).catch(function(){});
+  }
+  function renderDailyStat(){
+    var el=document.getElementById('dailyStat');if(!el)return;
+    var d=dailyStatsData;
+    var summary='📊 질문 <strong>'+d.prompts+'</strong> · 에이전트 <strong>'+d.totalAgents+'</strong> · 도구 <strong>'+d.totalTools+'</strong>';
+
+    var dd='<div class="daily-dropdown"><div class="daily-title">📊 오늘</div>';
+
+    dd+='<div class="daily-section">질문 '+d.prompts+'회</div>';
+
+    // 오늘 에이전트
+    var agentKeys=Object.keys(d.agents||{}).sort(function(a,b){return d.agents[b]-d.agents[a]});
+    dd+='<div class="daily-section">에이전트 '+d.totalAgents+'회</div>';
+    if(agentKeys.length===0){dd+='<div class="daily-row"><span>없음</span><span>-</span></div>'}
+    agentKeys.forEach(function(k,i){dd+='<div class="daily-row sub'+(i===agentKeys.length-1?' last':'')+'"><span>'+k+'</span><span>'+d.agents[k]+'</span></div>'});
+
+    // 오늘 도구
+    var toolKeys=Object.keys(d.tools||{}).sort(function(a,b){return d.tools[b]-d.tools[a]});
+    dd+='<div class="daily-section">도구 '+d.totalTools+'회</div>';
+    var showTools=toolKeys.slice(0,8);
+    showTools.forEach(function(k,i){dd+='<div class="daily-row sub'+(i===showTools.length-1?' last':'')+'"><span>'+k+'</span><span>'+d.tools[k]+'</span></div>'});
+    if(toolKeys.length>8){dd+='<div class="daily-row sub last"><span>외 '+(toolKeys.length-8)+'개</span><span></span></div>'}
+
+    // 주간 통계
+    var w=d.weekly||{};
+    var wAgents=0;Object.keys(w.agents||{}).forEach(function(k){wAgents+=w.agents[k]});
+    var wTools=0;Object.keys(w.tools||{}).forEach(function(k){wTools+=w.tools[k]});
+    dd+='<div class="daily-title" style="margin-top:10px;border-top:1px solid var(--border);padding-top:8px">📅 주간 (7일)</div>';
+    dd+='<div class="daily-row"><span>질문</span><span>'+(w.prompts||0)+'</span></div>';
+    dd+='<div class="daily-row"><span>에이전트</span><span>'+wAgents+'</span></div>';
+    dd+='<div class="daily-row"><span>도구</span><span>'+wTools+'</span></div>';
+
+    // 전체 통계
+    var t=d.total||{};
+    var tAgents=0;Object.keys(t.agents||{}).forEach(function(k){tAgents+=t.agents[k]});
+    var tTools=0;Object.keys(t.tools||{}).forEach(function(k){tTools+=t.tools[k]});
+    dd+='<div class="daily-title" style="margin-top:10px;border-top:1px solid var(--border);padding-top:8px">🏆 전체'+(t.since?' ('+t.since+'~)':'')+'</div>';
+    dd+='<div class="daily-row"><span>질문</span><span>'+(t.prompts||0)+'</span></div>';
+    dd+='<div class="daily-row"><span>에이전트</span><span>'+tAgents+'</span></div>';
+    dd+='<div class="daily-row"><span>도구</span><span>'+tTools+'</span></div>';
+
+    dd+='</div>';
+    el.innerHTML=summary+dd;
+  }
+  // SSE 이벤트 수신 시 실시간 업데이트
+  function updateDailyStatFromEvent(ev){
+    if(ev.event==='thinking_start') dailyStatsData.prompts=(dailyStatsData.prompts||0)+1;
+    if(ev.event==='agent_done'&&ev.agent_type){
+      dailyStatsData.agents[ev.agent_type]=(dailyStatsData.agents[ev.agent_type]||0)+1;
+      dailyStatsData.totalAgents=(dailyStatsData.totalAgents||0)+1;
+    }
+    if(ev.event==='tool_use'&&ev.tool_name){
+      dailyStatsData.tools[ev.tool_name]=(dailyStatsData.tools[ev.tool_name]||0)+1;
+      dailyStatsData.totalTools=(dailyStatsData.totalTools||0)+1;
+    }
+    renderDailyStat();
+  }
+
+  function toggleHelp(){document.getElementById('helpOverlay').classList.toggle('show')}
+
+
+  var restartConfirmTimer=null;
+  function restartServer(){
+    var btn=document.querySelector('.restart-btn');
+    if(btn.classList.contains('confirm')){
+      clearTimeout(restartConfirmTimer);
+      btn.classList.remove('confirm');btn.innerHTML='&#8635;';
+      toast('\uC7AC\uC2DC\uC791 \uC911...');
+      fetch(API+'/api/restart',{method:'POST'}).then(function(){
+        // 서버 종료 후 재시작 대기 → 연결 확인 후 reload
+        var attempts=0;
+        var check=setInterval(function(){
+          attempts++;
+          fetch(API+'/api/sessions').then(function(){clearInterval(check);location.reload()}).catch(function(){});
+          if(attempts>15){clearInterval(check);toast('\uC7AC\uC2DC\uC791 \uC2E4\uD328','err')}
+        },1000);
+      }).catch(function(){toast('\uC2E4\uD328','err')});
+    } else {
+      btn.classList.add('confirm');btn.textContent='\uC7AC\uC2DC\uC791?';
+      restartConfirmTimer=setTimeout(function(){btn.classList.remove('confirm');btn.innerHTML='&#8635;'},3000);
+    }
+  }
+
+  var stopConfirmTimer=null;
+  function shutdownServer(){
+    var btn=document.querySelector('.stop-btn');
+    if(btn.classList.contains('confirm')){
+      clearTimeout(stopConfirmTimer);
+      btn.classList.remove('confirm');btn.innerHTML='&#9632;';
+      fetch(API+'/api/shutdown',{method:'POST'}).then(function(){toast('\uC11C\uBC84 \uC885\uB8CC\uB428');setConn(false)}).catch(function(){toast('\uC774\uBBF8 \uC885\uB8CC\uB428','err')});
+    } else {
+      btn.classList.add('confirm');btn.textContent='\uC885\uB8CC?';
+      stopConfirmTimer=setTimeout(function(){btn.classList.remove('confirm');btn.innerHTML='&#9632;'},3000);
+    }
+  }
+  function toast(m,t){var el=document.getElementById('toast');el.textContent=m;el.style.background=t==='err'?'var(--negative)':'var(--positive)';el.classList.add('show');setTimeout(function(){el.classList.remove('show')},1800)}
+
+
+
+  // === SSE ===
+  var evtSource=null;
+  function connectSSE(){
+    if(evtSource){try{evtSource.close()}catch(e){}}
+    evtSource=new EventSource(API+'/api/stream');
+    evtSource.onmessage=function(e){try{handleLiveEvent(JSON.parse(e.data))}catch(ex){console.error('[agent-viz] SSE event error:',ex,'data:',e.data)}};
+    var _lastSyncTime=0;
+    evtSource.onopen=function(){setConn(true);
+      // 재연결 시 서버에 없는 세션 정리 (5초 디바운스)
+      var now=Date.now();if(now-_lastSyncTime<5000)return;_lastSyncTime=now;
+      fetch(API+'/api/sessions').then(function(r){return r.json()}).then(function(serverSessions){
+        var serverPids={};serverSessions.forEach(function(s){serverPids[s.pid]=true});
+        var removed=false;
+        Object.keys(sessions).forEach(function(pid){if(!serverPids[pid]){delete sessions[pid];Object.keys(liveInstances).forEach(function(k){if(liveInstances[k].sessionPid===pid)delete liveInstances[k]});removed=true}});
+        if(removed){if(currentSession&&!sessions[currentSession]){var remaining=Object.keys(sessions);currentSession=remaining.length>0?remaining[0]:null}_tabsBuilt='';renderAll()}
+      }).catch(function(){})
+    };
+    evtSource.onerror=function(){setConn(false)};
+  }
+
+  function handleLiveEvent(data){
+    var evt=data.event;var sp=data.session_pid||'';var sn=data.session_name||'';
+    if(evt==='connected')return;
+    updateDailyStatFromEvent(data);
+    if(evt==='session_registered'){if(data.session)registerSession(data.session);addLog(null,'\uC138\uC158: '+(data.session?data.session.name:''),'ok',data.session?data.session.pid:'',data.session?data.session.name:'');return}
+    if(evt==='session_renamed'){
+      if(sessions[sp]){
+        sessions[sp].name=data.session_name||sn;
+        _tabsBuilt=''; // 캐시 무효화 → 탭 DOM 재구성
+        renderSessionTabs();
+        // 로그 필터 라벨도 갱신
+        if(currentSession===sp){
+          var lblEl=document.getElementById('logFilterLabel');
+          if(lblEl)lblEl.textContent=' ['+sessions[sp].name+']';
+        }
+      }
+      return;
+    }
+    if(evt==='session_stopped'){
+      var stoppedPid=data.session_pid;
+      if(sessions[stoppedPid]){sessions[stoppedPid].alive=false;renderAll()}
+      addLog(null,'\uC138\uC158 \uC885\uB8CC: '+(data.session_name||stoppedPid),'err',stoppedPid,data.session_name);
+      // 탭에 closing 애니메이션 (10초 카운트다운 바)
+      var closingTab=document.querySelector('.sess-tab[data-session="'+stoppedPid+'"]');
+      if(closingTab){closingTab.classList.add('closing');var spinEl=closingTab.querySelector('.sess-spinner');if(spinEl)spinEl.remove()}
+      // 히스토리 패널 열려있으면 갱신 (서버 저장 완료 대기 후)
+      setTimeout(function(){if(document.getElementById('histOverlay').classList.contains('show'))fetchHistory()},1000);
+      // 10초 후 자동 제거
+      if(stoppedPid)(function(pid){setTimeout(function(){
+        if(sessions[pid]&&sessions[pid].alive===false&&currentSession!==pid){
+          delete sessions[pid];
+          Object.keys(liveInstances).forEach(function(k){if(liveInstances[k].sessionPid===pid)delete liveInstances[k]});
+          renderAll();
+          addLog(null,'\uC138\uC158 \uD0ED \uC81C\uAC70: '+(data.session_name||pid),'',pid,data.session_name||'');
+        }
+      },10000)})(stoppedPid);
+      return;
+    }
+    if(evt==='session_removed'){removeSession(data.session_pid);addLog(null,'\uC138\uC158 \uC81C\uAC70: '+(data.session_name||data.session_pid),'err',data.session_pid,data.session_name);
+      setTimeout(function(){if(document.getElementById('histOverlay').classList.contains('show'))fetchHistory()},1000);return}
+    if(evt==='server_shutdown'){
+      // 모든 세션을 종료 상태로
+      Object.keys(sessions).forEach(function(pid){sessions[pid].alive=false});
+      renderAll();
+      return;
+    }
+    // session_start 이외 이벤트에서는 기존 세션 업데이트만 (새 세션 생성 안 함)
+    if(sp&&sessions[sp]){sessions[sp].lastActivity=new Date().toISOString()}
+
+    if(evt==='thinking_start'){
+      // 세션이 없으면 자동 생성 (서버 재시작 복구/경합 대비)
+      if(sp&&!sessions[sp]){
+        registerSession({pid:sp,name:sn||'Session '+sp,cwd:data.session_cwd||''});
+      }
+      if(sp&&sessions[sp]){
+        sessions[sp]._turnCount=(sessions[sp]._turnCount||0)+1;
+        sessions[sp]._masterSt='thinking';sessions[sp]._masterTask='생각 중...';
+        sessions[sp]._thinkStart=Date.now();
+        delete sessions[sp]._completed;
+      }
+      var tc=sp&&sessions[sp]?sessions[sp]._turnCount:0;
+      Object.keys(liveInstances).forEach(function(k){if(liveInstances[k].sessionPid===sp&&liveInstances[k].st!=='working')delete liveInstances[k]});
+      addLog({name:'Master',color:'#fbbf24'},'── Q'+tc+(sn?' ['+sn+']':'')+' ──','',sp,sn);
+      if(!_tlOpen){_tlOpen=true;document.getElementById('timelineBody').style.display='';document.getElementById('tlToggle').textContent='\u25BC'}
+      renderAll();return;
+    }
+    if(evt==='thinking_end'){
+      var s=sp&&sessions[sp]?sessions[sp]:null;
+      if(!s){addLog(null,'thinking_end (세션 없음)','',sp,sn);renderAll();return}
+      if(!s._thinkStart){renderAll();return}
+      var anyWorking=Object.values(liveInstances).some(function(i){return i.sessionPid===sp&&i.st==='working'});
+      var sec=Math.round((Date.now()-s._thinkStart)/1000);
+      var tc=s._turnCount||0;
+      s._thinkStart=null;
+      if(!anyWorking){
+        var doneMsg='Q'+tc+' 완료'+(sec>0?' ('+sec+'s)':'');
+        addLog({name:'Master',color:'#fbbf24'},'── '+doneMsg+' ──','ok',sp,sn);
+        sendNotif('Q'+tc+' 응답 완료',(sn?'['+sn+'] ':'')+(sec>0?sec+'초 소요':''));
+        if(s){s._masterSt='done';s._masterTask=doneMsg;if(currentSession!==sp){s._completed=true;
+          // 10초 후 fade-out
+          (function(pid){setTimeout(function(){
+            if(sessions[pid]&&sessions[pid]._completed){
+              var t=document.querySelector('.sess-tab[data-session="'+pid+'"]');
+              if(t){t.classList.add('faded');setTimeout(function(){delete sessions[pid]._completed;t.classList.remove('completed','faded');_tabsBuilt=''},800)}
+              else delete sessions[pid]._completed;
+            }
+          },5000)})(sp)
+        }}
+        renderAll();
+        return;
+      }
+      // ESC 중단: 에이전트 working 중이지만 thinking_end → working 에이전트 강제 정리
+      Object.keys(liveInstances).forEach(function(k){
+        if(liveInstances[k].sessionPid===sp&&liveInstances[k].st==='working'){
+          liveInstances[k].st='done';liveInstances[k].task='중단됨';liveInstances[k].prog=100;
+        }
+      });
+      var doneMsg='Q'+tc+' 완료'+(sec>0?' ('+sec+'s)':'');
+      addLog({name:'Master',color:'#fbbf24'},'── '+doneMsg+' (중단) ──','ok',sp,sn);
+      if(s){s._masterSt='done';s._masterTask=doneMsg}
+      renderAll();return;
+    }
+    if(evt==='tool_use'){
+      var tn=data.tool_name||'';if(!tn||tn==='Agent') return;
+      var agType=data.agent_type||'';
+      if(agType){
+        // agent_type 있음 → 에이전트의 도구 사용
+        var key=instKey(sp,agType);
+        var inst=liveInstances[key];
+        if(!inst){
+          // 넘버링된 인스턴스 찾기
+          var candidates=Object.keys(liveInstances).filter(function(k){return k.indexOf(key)===0&&liveInstances[k].st==='working'});
+          if(candidates.length>0) inst=liveInstances[candidates[candidates.length-1]];
+        }
+        if(inst&&inst.st==='working'){inst.task=inst.desc+' — '+tn;renderAll()}
+      } else if(sp&&sessions[sp]&&sessions[sp]._masterSt==='thinking'){
+        sessions[sp]._masterTask=tn;renderAll();
+      }
+      return;
+    }
+
+    if(evt==='agent_start'){
+      // 에이전트 카운터 증가
+      if(sp&&sessions[sp]){sessions[sp].agentCount=(sessions[sp].agentCount||0)+1;renderSessionTabs()}
+      // 새 라운드 감지: master가 idle이고 마지막 done 후 5초 이상 경과 → 이전 done 정리
+      var ss=sp&&sessions[sp]?sessions[sp]:null;
+      if(ss&&ss._masterSt!=='working'){var sinceDone=ss._lastDoneTime?Date.now()-ss._lastDoneTime:Infinity;if(sinceDone>5000){Object.keys(liveInstances).forEach(function(k){if(liveInstances[k].sessionPid===sp&&liveInstances[k].st!=='working')delete liveInstances[k]})}}
+      var at=data.agent_type||'';var desc=data.agent_description||data.agent_prompt||'';
+      var ai=getAgentInfo(at);var color=ai?ai.color:agColor(at,Object.keys(liveInstances).length);var name=ai?ai.name:at;
+      var baseKey=instKey(sp,at);
+      var key=baseKey;
+      // 같은 타입이 이미 working이면 넘버링
+      var dup=1;
+      while(liveInstances[key]&&liveInstances[key].st==='working'){key=baseKey+'_'+dup;dup++}
+      var taskDesc=desc||name;
+      liveInstances[key]={key:key,agentId:at,sessionPid:sp,sessionName:sn,st:'working',task:taskDesc,desc:taskDesc,prog:10,startTime:Date.now(),color:color};
+      addLog({name:name,color:color},(sn?'['+sn+'] ':'')+name+' \uC2DC\uC791 \u2014 '+taskDesc,'',sp,sn);
+      if(sp&&sessions[sp]){sessions[sp]._masterSt='working';sessions[sp]._masterTask=(sn?'['+sn+'] ':'')+'\uC870\uC728 \uC911...'}
+      // 타임라인 자동 펼침
+      if(!_tlOpen){_tlOpen=true;document.getElementById('timelineBody').style.display='';document.getElementById('tlToggle').textContent='\u25BC'}
+      renderAll();setTimeout(function(){sparks('inst-'+key,color);flyDot('master','inst-'+key)},50);
+      // progress animation
+      var progKey=key;(function(k){var t0=Date.now();var iv=setInterval(function(){var inst=liveInstances[k];if(!inst||inst.st!=='working'){clearInterval(iv);return}var el=(Date.now()-t0)/1000;inst.prog=Math.min(90,10+el*3);renderActivity()},500)})(progKey);
+    }
+    else if(evt==='agent_done'){
+      var at=data.agent_type||'';var baseKey=instKey(sp,at);
+      // working 인스턴스 중 가장 오래된 것 먼저 완료 (FIFO)
+      var key=baseKey;
+      if(!liveInstances[key]||liveInstances[key].st!=='working'){
+        var candidates=Object.keys(liveInstances).filter(function(k){return k.indexOf(baseKey)===0&&liveInstances[k].st==='working'});
+        if(candidates.length>0) key=candidates.sort(function(a,b){return liveInstances[a].startTime-liveInstances[b].startTime})[0];
+      }
+      var inst=liveInstances[key];
+      if(inst){
+        var sec=Math.round((Date.now()-inst.startTime)/1000);inst.st='done';inst.doneTime=Date.now();inst.task=inst.desc+' \u2014 \uC644\uB8CC ('+sec+'s)';inst.prog=100;
+        var ai=getAgentInfo(at);var doneAgentName=ai?ai.name:at;
+        addLog({name:doneAgentName,color:inst.color},(sn?'['+sn+'] ':'')+inst.desc+' \uC644\uB8CC ('+sec+'s)','ok',sp,sn);
+        renderAll();setTimeout(function(){sparks('inst-'+key,inst.color);flyDot('inst-'+key,'master')},50);
+        if(!Object.values(liveInstances).some(function(i){return i.sessionPid===sp&&i.st==='working'})){
+          // 아직 응답 작성 중이면 thinking으로 복귀, 아니면 idle
+          var sd=sp&&sessions[sp]?sessions[sp]:null;
+          if(sd&&sd._thinkStart){sd._masterSt='thinking';sd._masterTask='생각 중...'}
+          else if(sd){sd._masterSt='idle';sd._masterTask=''}
+          if(sd)sd._lastDoneTime=Date.now();
+          renderAll();celebrate();
+          sendNotif('모든 에이전트 완료',doneAgentName+' 완료 ('+sec+'s) — 모든 작업이 끝났습니다');
+        } else {
+          sendNotif(doneAgentName+' 완료 ('+sec+'s)',inst.desc);
+        }
+      } else {addLog({name:at,color:'var(--accent)'},at+' \uC644\uB8CC','ok',sp,sn);renderAll()}
+    }
+    else{addLog(null,evt+' '+(data.tool_name||''),'',sp,sn)}
+  }
+
+  // === Logo ===
+  (function(){var el=document.getElementById('logo');var c=['#00ffc8','#a78bfa','#fbbf24','#00d4ff','#f472b6','#10b981','#fb923c'];var p=[1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1];for(var i=0;i<25;i++){var s=document.createElement('i');s.style.background=p[i]?c[i%c.length]:'transparent';s.style.borderRadius='1px';el.appendChild(s)}})();
+
+
+
+
+  // === Init ===
+  initEnvironment(); // environment.js
+  initCreatureSystem(); // creature.js
+  initNotifBtn(); // notifications.js
+  fetchMaster();fetchSessions();fetchMcpServers();fetchHooks();fetchDailyStats();
+  // inactive 상태 주기적 갱신 (60초마다 세션 탭 re-render)
+  setInterval(function(){if(Object.keys(sessions).length>0)renderSessionTabs()},60000);
+  // fetchAgents 완료 후 SSE 연결 (에이전트 목록 없이 이벤트 수신 시 캐릭터 누락 방지)
+  fetch(API+'/api/agents').then(function(r){return r.json()}).then(function(data){
+    agents=data.map(function(a,i){a.color=agColor(a.id,i);a.active=true;return a});setConn(true);_wsBuilt=false;renderAll();
+    var cwd=(currentSession&&sessions[currentSession])?sessions[currentSession].cwd:'';
+    if(cwd) fetchProjectAgents(cwd);
+  }).catch(function(){setConn(false)}).finally(function(){connectSSE()});
+
+  // === Page Visibility: 탭 비활성 시 애니메이션 일시정지 ===
+  document.addEventListener('visibilitychange',function(){
+    var ws=document.getElementById('workspace');
+    if(document.hidden){
+      // 탭 비활성: 모든 파티클/애니메이션 정지
+      if(_weatherInterval){clearInterval(_weatherInterval);_weatherInterval=null}
+      if(_sparkleInterval){clearInterval(_sparkleInterval);_sparkleInterval=null}
+      if(_envInterval){clearInterval(_envInterval);_envInterval=null}
+      if(_blinkInterval){clearInterval(_blinkInterval);_blinkInterval=null}
+      if(_walkInterval){clearInterval(_walkInterval);_walkInterval=null}
+      if(_seasonInterval){clearInterval(_seasonInterval);_seasonInterval=null}
+      if(ws&&ws._cloudInterval){clearInterval(ws._cloudInterval);ws._cloudInterval=null}
+      if(ws)ws.querySelectorAll('.weather-particle,.sparkle-fall').forEach(function(p){p.remove()});
+    } else {
+      // 탭 활성: 재개
+      _blinkInterval=setInterval(blinkEyes,1500);
+      if(_envEnabled){
+        startWeather();startSparkles();
+        if(ws)ws._cloudInterval=null;
+        _envInterval=setInterval(updateEnvironment,8000);
+      }
+      if(_envEnabled){
+        _seasonInterval=setInterval(seasonCycleCheck,3000);
+        updateEnvironment();
+      }
+      _walkInterval=setInterval(function(){document.querySelectorAll('.ws-agent.working .pix-lg,.ws-agent.idle .pix-lg').forEach(function(pix){var agent=pix.parentElement.parentElement||pix.parentElement;var id=agent.id?agent.id.replace('ws-',''):'';var c=creatureLife[id];if(agent.classList.contains('working')){if(Math.random()>.6)return;walkLegs(pix)}else if(c&&c.beh==='roam'){if(Math.random()>.5)return;walkLegs(pix)}})},350);
+      renderAll();
+    }
+  });
+  </script>
+</body>
+</html>

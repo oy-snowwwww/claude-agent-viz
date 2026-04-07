@@ -292,7 +292,11 @@ CLAUDE.md
 
 ```
 ~/.claude/agent-viz/
-├── index.html          # 단일 파일 SPA (UI 전체)
+├── public/             # 클라이언트 정적 파일 (브라우저에 서빙)
+│   ├── index.html      # UI 마크업
+│   ├── css/
+│   │   └── styles.css  # 전체 스타일
+│   └── js/             # JS 모듈 (분리 예정)
 ├── server.js           # Node.js HTTP 서버
 ├── hook-handler.sh     # Claude Code 훅 → 서버 이벤트 브릿지
 ├── start.sh            # 서버 시작/종료/상태 CLI
@@ -390,9 +394,9 @@ model: sonnet
 ## 기술 스택
 
 - **의존성 없음** — npm 패키지, 외부 CDN 없이 Node.js 내장 모듈만 사용
-- **단일 HTML 파일** — CSS + JavaScript 인라인, 배포가 파일 하나로 완결
+- **정적 파일 서빙** — `public/` 하위에 클라이언트 자산 (HTML/CSS/JS) 분리, 서버가 직접 서빙
 - **SSE (Server-Sent Events)** — 실시간 이벤트 스트리밍
-- **Vanilla JavaScript** — 프레임워크 없는 순수 JS
+- **Vanilla JavaScript** — 프레임워크 없는 순수 JS, 빌드 시스템 없음
 
 ## 라이선스
 
