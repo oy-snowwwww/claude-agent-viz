@@ -162,6 +162,55 @@ function readHooks() {
 var HISTORY_DIR = path.join(__dirname, 'history');
 if (!fs.existsSync(HISTORY_DIR)) fs.mkdirSync(HISTORY_DIR, { recursive: true });
 
+// 히스토리 용량 방어 상수
+var HISTORY_MAX_PROMPT_LEN = 500;       // 프롬프트 최대 길이
+var HISTORY_MAX_SUMMARY_LEN = 300;      // 응답 요약 최대 길이
+var HISTORY_MAX_QUESTIONS_PER_SESSION = 100;  // 세션당 최대 질문 수
+var HISTORY_DIR_MAX_BYTES = 10 * 1024 * 1024; // history/ 디렉토리 최대 10MB
+
+// Privacy: 프롬프트 기록 여부 (파일 존재로 제어)
+var PRIVACY_FILE = path.join(__dirname, 'privacy');
+function isPrivacyOn() { return fs.existsSync(PRIVACY_FILE); }
+
+// 민감정보 마스킹 (API 키/토큰 패턴)
+function maskSecrets(s) {
+  if (!s) return s;
+  return String(s)
+    // OpenAI / Anthropic / 일반 sk- 계열 (sk-proj-, sk-ant- 등 모두 매칭)
+    .replace(/sk-[a-zA-Z0-9_\-]{20,}/g, '[REDACTED_KEY]')
+    // GitHub tokens
+    .replace(/ghp_[a-zA-Z0-9]{20,}/g, '[REDACTED_GH]')
+    .replace(/ghs_[a-zA-Z0-9]{20,}/g, '[REDACTED_GH]')
+    .replace(/gho_[a-zA-Z0-9]{20,}/g, '[REDACTED_GH]')
+    .replace(/ghu_[a-zA-Z0-9]{20,}/g, '[REDACTED_GH]')
+    .replace(/github_pat_[a-zA-Z0-9_]{22,}/g, '[REDACTED_GH]')
+    // Slack
+    .replace(/xox[baprs]-[a-zA-Z0-9-]{20,}/g, '[REDACTED_SLACK]')
+    // AWS Access Key
+    .replace(/AKIA[0-9A-Z]{16}/g, '[REDACTED_AWS]')
+    // JWT (3 segment base64url, 첫 segment는 일반적으로 eyJ로 시작)
+    .replace(/eyJ[A-Za-z0-9_\-]{10,}\.[A-Za-z0-9_\-]{10,}\.[A-Za-z0-9_\-]{10,}/g, '[REDACTED_JWT]')
+    // Bearer 토큰 헤더
+    .replace(/Bearer\s+[A-Za-z0-9._\-]{20,}/gi, 'Bearer [REDACTED]');
+}
+
+// CSRF 방어: Origin 헤더가 있으면 host와 일치해야 함
+// (curl 등 server-to-server 요청은 Origin 없음 → 허용)
+function isAllowedOrigin(req) {
+  var origin = req.headers.origin || '';
+  var host = req.headers.host || '';
+  if (!origin) return true;
+  try {
+    var u = new URL(origin);
+    return u.host === host;
+  } catch(e) { return false; }
+}
+function truncate(s, max) {
+  if (!s) return '';
+  var cleaned = String(s).replace(/\s+/g, ' ').trim();
+  return cleaned.length > max ? cleaned.slice(0, max) + '…' : cleaned;
+}
+
 // 세션별 요약 트래커 (메모리) — 세션 종료 시 요약 파일로 저장
 var sessionTrackers = {}; // pid -> tracker
 
@@ -174,6 +223,8 @@ function getTracker(pid) {
       agents: {},       // type -> { count, totalSec, startTime }
       tools: {},        // name -> count
       files: {},        // path -> { read: n, edit: n }
+      turns: [],        // [{ q, prompt, startTime, endTime, tools: {} }]
+      transcriptPath: null,
     };
   }
   return sessionTrackers[pid];
@@ -186,16 +237,61 @@ function recordSessionEvent(pid, parsed) {
   if (parsed.event === 'thinking_start') {
     t.questions++;
     t.thinkStart = Date.now();
+    // transcript_path는 매 질문마다 갱신 (/clear 후 새 transcript 시작 대응)
+    if (parsed.transcript_path) t.transcriptPath = parsed.transcript_path;
+    // /rename 명령 자동 감지 → 세션 이름 동기화 (transcript의 rename이 hook session.name보다 우선)
+    if (parsed.transcript_path && sessions[pid]) {
+      var renamed = extractLatestRenameFromTranscript(parsed.transcript_path);
+      if (renamed && renamed !== sessions[pid].name) {
+        var oldName = sessions[pid].name;
+        sessions[pid].name = renamed;
+        sessions[pid]._renamedFromTranscript = true;
+        console.log('  [SESSION~] /rename detected:', oldName, '→', renamed);
+        broadcastEvent({ event: 'session_renamed', session_pid: pid, session_name: renamed });
+      }
+    }
+    // turn 기록 (프롬프트 포함, privacy 모드면 생략)
+    if (t.turns.length < HISTORY_MAX_QUESTIONS_PER_SESSION) {
+      var promptText = isPrivacyOn() ? '' : truncate(maskSecrets(parsed.prompt || ''), HISTORY_MAX_PROMPT_LEN);
+      t.turns.push({
+        q: t.questions,
+        prompt: promptText,
+        startTime: Date.now(),
+        endTime: null,
+        sec: 0,
+        tools: {},
+        agents: {},
+      });
+    } else {
+      // 100개 cap 도달 — turns에 추가 안 함, truncated 플래그
+      t.truncated = true;
+    }
   }
+  // truncated 상태에서는 마지막(99번째) turn에 후속 이벤트가 잘못 합산되지 않도록 차단
+  // 세션 전체 통계(t.tools, t.agents, t.responseTimes)는 계속 누적
+  var canUpdateTurn = !t.truncated;
+
   if (parsed.event === 'thinking_end' && t.thinkStart) {
-    t.responseTimes.push(Math.round((Date.now() - t.thinkStart) / 1000));
+    var sec = Math.round((Date.now() - t.thinkStart) / 1000);
+    t.responseTimes.push(sec);
     t.thinkStart = null;
+    if (canUpdateTurn) {
+      var curTurn = t.turns[t.turns.length - 1];
+      if (curTurn && !curTurn.endTime) {
+        curTurn.endTime = Date.now();
+        curTurn.sec = sec;
+      }
+    }
   }
   if (parsed.event === 'agent_start' && parsed.agent_type) {
     var aKey = parsed.agent_type;
     if (!t.agents[aKey]) t.agents[aKey] = { count: 0, totalSec: 0, starts: [] };
     t.agents[aKey].count++;
     t.agents[aKey].starts.push(Date.now());
+    if (canUpdateTurn) {
+      var curT = t.turns[t.turns.length - 1];
+      if (curT && !curT.endTime) curT.agents[aKey] = (curT.agents[aKey] || 0) + 1;
+    }
   }
   if (parsed.event === 'agent_done' && parsed.agent_type) {
     var aKey = parsed.agent_type;
@@ -206,6 +302,11 @@ function recordSessionEvent(pid, parsed) {
   }
   if (parsed.event === 'tool_use' && parsed.tool_name) {
     t.tools[parsed.tool_name] = (t.tools[parsed.tool_name] || 0) + 1;
+    // 현재 turn에도 기록 (thinking_end 이전 + 100개 cap 미달일 때만)
+    if (canUpdateTurn) {
+      var curT2 = t.turns[t.turns.length - 1];
+      if (curT2 && !curT2.endTime) curT2.tools[parsed.tool_name] = (curT2.tools[parsed.tool_name] || 0) + 1;
+    }
     // 파일 경로 추출
     var input = parsed.tool_input || {};
     var fp = input.file_path || input.path || '';
@@ -217,6 +318,163 @@ function recordSessionEvent(pid, parsed) {
       }
     }
   }
+}
+
+// transcript path 화이트리스트 검증 (Path Traversal 방어)
+// ~/.claude/projects/ 하위 + .jsonl 확장자만 허용
+var TRANSCRIPT_BASE = path.resolve(process.env.HOME || '', '.claude', 'projects');
+var TRANSCRIPT_MAX_BYTES = 50 * 1024 * 1024; // 50MB
+function isValidTranscriptPath(p) {
+  if (!p || typeof p !== 'string') return false;
+  try {
+    var resolved = path.resolve(p);
+    if (!resolved.startsWith(TRANSCRIPT_BASE + path.sep)) return false;
+    if (!resolved.endsWith('.jsonl')) return false;
+    return true;
+  } catch(e) { return false; }
+}
+
+// 시스템 메시지/캐비엇 식별 (실제 사용자 질문이 아님)
+function isNoiseUserText(text) {
+  if (!text) return true;
+  var trimmed = text.trim();
+  if (/^<(command-name|command-message|command-args|system-reminder|local-command-(stdout|stderr|caveat)|tool_use_error|user_input|bash-stdout|bash-stderr)/.test(trimmed)) return true;
+  if (/^\[Request interrupted/.test(trimmed)) return true;
+  return false;
+}
+
+// JSONL transcript에서 가장 최근 /rename 명령의 인자(새 이름)를 추출
+// Claude Code의 /rename은 system + local_command 메시지에 <command-name>/rename</command-name> + <command-args>NAME</command-args> 형식
+function extractLatestRenameFromTranscript(transcriptPath) {
+  if (!isValidTranscriptPath(transcriptPath)) return null;
+  if (!fs.existsSync(transcriptPath)) return null;
+  try {
+    var stat = fs.statSync(transcriptPath);
+    if (stat.size > TRANSCRIPT_MAX_BYTES) return null;
+    var fileContent = fs.readFileSync(transcriptPath, 'utf8');
+    var lines = fileContent.split('\n').filter(function(l) { return l.trim(); });
+    var latest = null;
+    // 끝에서 거꾸로 스캔 (최신 rename 우선)
+    for (var i = lines.length - 1; i >= 0; i--) {
+      var d;
+      try { d = JSON.parse(lines[i]); } catch(e) { continue; }
+      if (d.type !== 'system' || d.subtype !== 'local_command') continue;
+      var content = d.content || '';
+      if (content.indexOf('<command-name>/rename</command-name>') === -1) continue;
+      var m = content.match(/<command-args>([\s\S]*?)<\/command-args>/);
+      if (m && m[1]) {
+        latest = m[1].trim();
+        break;
+      }
+    }
+    return latest;
+  } catch(e) { return null; }
+}
+
+// JSONL transcript 파싱하여 (userText, summary) 쌍 배열 반환
+// 매번 갱신될 수 있는 path를 받아 안전하게 읽고, 손상된 라인은 건너뛴다
+function parseTranscriptTurns(transcriptPath) {
+  if (!isValidTranscriptPath(transcriptPath)) return [];
+  if (!fs.existsSync(transcriptPath)) return [];
+  try {
+    var stat = fs.statSync(transcriptPath);
+    if (stat.size > TRANSCRIPT_MAX_BYTES) {
+      console.log('  [HISTORY] transcript too large, skipped:', transcriptPath, '(' + stat.size + 'B)');
+      return [];
+    }
+    var fileContent = fs.readFileSync(transcriptPath, 'utf8');
+    var lines = fileContent.split('\n').filter(function(l) { return l.trim(); });
+    var turns = []; // [{ userText, lastAssistantText }]
+    var currentTurn = null;
+
+    for (var i = 0; i < lines.length; i++) {
+      var d;
+      try { d = JSON.parse(lines[i]); } catch(e) { continue; }
+      var type = d.type;
+      if (type === 'user') {
+        var msg = d.message || {};
+        var msgContent = msg.content;
+        // tool_result만 들어있는 user 메시지는 도구 응답이지 사용자 입력이 아님
+        if (Array.isArray(msgContent)) {
+          var allToolResult = msgContent.length > 0 && msgContent.every(function(c) { return c && c.type === 'tool_result'; });
+          if (allToolResult) continue;
+        }
+        var text = '';
+        if (typeof msgContent === 'string') text = msgContent;
+        else if (Array.isArray(msgContent)) {
+          var txt = msgContent.find(function(c) { return c && c.type === 'text'; });
+          if (txt) text = txt.text || '';
+        }
+        if (text && !isNoiseUserText(text)) {
+          if (currentTurn) turns.push(currentTurn);
+          currentTurn = { userText: text, lastAssistantText: '' };
+        }
+      } else if (type === 'assistant' && currentTurn) {
+        var amsg = d.message || {};
+        var acontent = amsg.content;
+        if (Array.isArray(acontent)) {
+          var atxt = acontent.filter(function(c) { return c && c.type === 'text' && c.text; }).map(function(c) { return c.text; }).join('\n');
+          if (atxt) currentTurn.lastAssistantText = atxt; // 마지막 assistant text로 덮어씀
+        }
+      }
+    }
+    if (currentTurn) turns.push(currentTurn);
+    return turns;
+  } catch(e) {
+    console.log('  [HISTORY] transcript parse error:', e.message);
+    return [];
+  }
+}
+
+// 트래커의 turns 배열과 transcript의 (userText, summary) 쌍을 매칭
+// 매칭 전략:
+//   - tracker prompt는 truncate(500자, 끝에 …)로 저장됨
+//   - 매칭 키는 trailing … 제거 + whitespace 정규화
+//   - 1단계: 정확 일치 (truncate되지 않은 prompt)
+//   - 2단계: transcript의 user text가 prompt(truncate된)로 시작하는지 (prompt가 truncate된 케이스)
+//   - 짧은 prompt(5자 미만) → 매칭 포기 (오답 방지)
+function buildTurnSummaries(trackerTurns, transcriptTurns) {
+  function normFull(s) {
+    return String(s || '').replace(/\s+/g, ' ').trim();
+  }
+  function stripEllipsis(s) {
+    return s.replace(/…$/, '').trim();
+  }
+  // transcript turn -> summary (firstPara + mask + truncate) 미리 계산
+  var precomputed = transcriptTurns.map(function(tt) {
+    var firstPara = (tt.lastAssistantText || '').split(/\n\n+/)[0] || '';
+    return {
+      full: normFull(tt.userText),
+      summary: truncate(maskSecrets(firstPara), HISTORY_MAX_SUMMARY_LEN),
+    };
+  });
+  // 사용 여부 추적 (한 transcript turn이 여러 tracker turn에 매칭되지 않도록)
+  var used = new Array(precomputed.length).fill(false);
+
+  function findMatch(turnPrompt) {
+    if (!turnPrompt) return -1;
+    var key = stripEllipsis(normFull(turnPrompt));
+    if (key.length < 5) return -1; // 너무 짧으면 오매칭 위험 → 포기
+    // 1단계: 정확 일치
+    for (var i = 0; i < precomputed.length; i++) {
+      if (used[i]) continue;
+      if (precomputed[i].full === key) return i;
+    }
+    // 2단계: transcript가 key로 시작 (tracker prompt가 truncate된 경우만 허용 — 역방향 X)
+    for (var j = 0; j < precomputed.length; j++) {
+      if (used[j]) continue;
+      // tracker prompt(key)가 transcript full보다 짧을 때만 prefix 매칭 허용
+      if (key.length < precomputed[j].full.length && precomputed[j].full.startsWith(key)) return j;
+    }
+    return -1;
+  }
+
+  return trackerTurns.map(function(turn) {
+    var pos = findMatch(turn.prompt);
+    if (pos < 0) return '';
+    used[pos] = true;
+    return precomputed[pos].summary;
+  });
 }
 
 function saveSessionHistory(pid) {
@@ -243,6 +501,20 @@ function saveSessionHistory(pid) {
   var fileSummary = {};
   fileKeys.forEach(function(k) { fileSummary[k] = t.files[k]; });
 
+  // 응답 요약 추출 (JSONL transcript 파싱) — text 매칭으로 인덱스 무관
+  var transcriptTurns = parseTranscriptTurns(t.transcriptPath);
+  var summaries = buildTurnSummaries(t.turns, transcriptTurns);
+  var turnsOut = t.turns.map(function(turn, idx) {
+    return {
+      q: turn.q,
+      prompt: turn.prompt,
+      summary: summaries[idx] || '',
+      sec: turn.sec,
+      tools: turn.tools,
+      agents: turn.agents,
+    };
+  });
+
   var record = {
     name: sess.name || pid,
     cwd: sess.cwd || '',
@@ -254,6 +526,8 @@ function saveSessionHistory(pid) {
     agents: agentSummary,
     tools: t.tools,
     files: fileSummary,
+    turns: turnsOut,
+    truncated: t.truncated === true || t.questions > turnsOut.length,
   };
 
   // 파일명: YYYY-MM-DD_HHmmss_sessionName.json
@@ -272,22 +546,70 @@ function saveSessionHistory(pid) {
   delete sessionTrackers[pid];
 }
 
+// Privacy 토글 ON 시 디스크에 저장된 history 파일의 prompt/summary를 일괄 비움
+// (사용자 신뢰: "기록 안 함"의 약속이 디스크까지 미치도록)
+function scrubHistoryPrompts() {
+  var scrubbed = 0;
+  try {
+    var files = fs.readdirSync(HISTORY_DIR).filter(function(f) { return f.endsWith('.json'); });
+    files.forEach(function(f) {
+      var fpath = path.join(HISTORY_DIR, f);
+      try {
+        var rec = JSON.parse(fs.readFileSync(fpath, 'utf8'));
+        var changed = false;
+        if (rec.turns && Array.isArray(rec.turns)) {
+          rec.turns.forEach(function(turn) {
+            if (turn.prompt) { turn.prompt = ''; changed = true; }
+            if (turn.summary) { turn.summary = ''; changed = true; }
+          });
+        }
+        if (changed) {
+          fs.writeFileSync(fpath, JSON.stringify(rec), 'utf8');
+          scrubbed++;
+        }
+      } catch(e) { /* skip corrupt */ }
+    });
+    if (scrubbed > 0) console.log('  [HISTORY] privacy scrubbed', scrubbed, 'file(s)');
+  } catch(e) { console.log('  [HISTORY] scrub error:', e.message); }
+  return scrubbed;
+}
+
 function cleanHistory() {
-  // 7일 이상 된 히스토리 파일 삭제
+  // 1) 7일 이상 된 히스토리 파일 삭제
   var MAX_AGE = 7 * 24 * 60 * 60 * 1000;
   try {
-    var files = fs.readdirSync(HISTORY_DIR);
-    files.filter(function(f) { return f.endsWith('.json'); }).forEach(function(f) {
+    var allFiles = fs.readdirSync(HISTORY_DIR).filter(function(f) { return f.endsWith('.json'); });
+    allFiles.forEach(function(f) {
       var fpath = path.join(HISTORY_DIR, f);
       var stat = fs.statSync(fpath);
       if (Date.now() - stat.mtimeMs > MAX_AGE) {
         fs.unlinkSync(fpath);
-        console.log('  [HISTORY] cleaned:', f);
+        console.log('  [HISTORY] cleaned (age):', f);
       }
     });
+    // 2) 디렉토리 전체 크기가 상한 초과 시 오래된 것부터 추가 삭제
+    var remaining = fs.readdirSync(HISTORY_DIR)
+      .filter(function(f) { return f.endsWith('.json'); })
+      .map(function(f) {
+        var fpath = path.join(HISTORY_DIR, f);
+        var st = fs.statSync(fpath);
+        return { f: f, path: fpath, size: st.size, mtime: st.mtimeMs };
+      })
+      .sort(function(a, b) { return a.mtime - b.mtime }); // 오래된 순
+    var totalSize = remaining.reduce(function(a, b) { return a + b.size; }, 0);
+    while (totalSize > HISTORY_DIR_MAX_BYTES && remaining.length > 0) {
+      var oldest = remaining.shift();
+      try {
+        fs.unlinkSync(oldest.path);
+        totalSize -= oldest.size;
+        console.log('  [HISTORY] cleaned (size):', oldest.f);
+      } catch(e2) {}
+    }
   } catch(e) { console.log('  [HISTORY] clean error:', e.message); }
 }
 cleanHistory();
+// 1시간마다 주기적으로 정리 (장기 실행 시 디스크 폭주 방지)
+setInterval(cleanHistory, 60 * 60 * 1000);
 
 // --- Daily Stats ---
 var STATS_FILE = path.join(__dirname, 'agent-stats.json');
@@ -415,7 +737,10 @@ const server = http.createServer(function(req, res) {
           session_pid: session.pid || '',
           session_name: session.name || '',
           session_cwd: session.cwd || '',
-          session_tty: session.tty || ''
+          session_tty: session.tty || '',
+          // 훅 원본 데이터 중 히스토리에 필요한 필드
+          prompt: toolInput.prompt || '',
+          transcript_path: toolInput.transcript_path || '',
         };
 
         // Agent 도구인 경우 에이전트 정보 추출
@@ -582,7 +907,9 @@ const server = http.createServer(function(req, res) {
             }
             sessions[targetPid].lastActivity = new Date().toISOString();
             sessions[targetPid].eventCount = (sessions[targetPid].eventCount || 0) + 1;
-            if (session.name && session.name !== 'unknown') {
+            // 세션 이름은 첫 등록 시 또는 사용자가 수동으로 rename 안 한 경우에만 hook session.name으로 갱신
+            // (recordSessionEvent에서 transcript의 /rename을 우선시하기 위함)
+            if (session.name && session.name !== 'unknown' && !sessions[targetPid]._renamedFromTranscript) {
               var oldName = sessions[targetPid].name;
               sessions[targetPid].name = session.name;
               if (oldName !== session.name) {
@@ -892,8 +1219,14 @@ const server = http.createServer(function(req, res) {
     return;
   }
 
-  // API: 세션 히스토리 목록
+  // API: 세션 히스토리 목록 (?q=검색어&agent=에이전트&days=N)
   if (url === '/api/history' && req.method === 'GET') {
+    var parsedUrl = new URL(req.url, 'http://localhost');
+    var q = (parsedUrl.searchParams.get('q') || '').toLowerCase().trim();
+    var agentFilter = parsedUrl.searchParams.get('agent') || '';
+    var daysParam = Math.max(0, parseInt(parsedUrl.searchParams.get('days') || '0', 10) || 0);
+    var cutoff = daysParam > 0 ? Date.now() - daysParam * 24 * 60 * 60 * 1000 : 0;
+
     fs.readdir(HISTORY_DIR, function(err, allFiles) {
       if (err) {
         console.log('  [HISTORY] read error:', err.message);
@@ -903,7 +1236,19 @@ const server = http.createServer(function(req, res) {
       }
       var files = allFiles.filter(function(f) { return f.endsWith('.json'); });
       files.sort().reverse();
-      var targets = files.slice(0, 50);
+      // 파일명 prefilter: YYYY-MM-DD_HHmmss_name.json (로컬 타임존, saveSessionHistory의 종료 시각)
+      // 본 필터(rec.endTime)와 동일 기준으로 비교 — 일관성 유지
+      if (cutoff > 0) {
+        files = files.filter(function(f) {
+          var m = f.match(/^(\d{4}-\d{2}-\d{2})_/);
+          if (!m) return true;
+          var fileDay = new Date(m[1] + 'T23:59:59').getTime();
+          return fileDay >= cutoff;
+        });
+      }
+      // 검색/필터 없으면 50개만, 있으면 더 넓게 스캔 (200개 cap)
+      var hasFilter = !!(q || agentFilter);
+      var targets = files.slice(0, hasFilter ? 200 : 50);
       var list = [];
       var done = 0;
       if (targets.length === 0) {
@@ -911,15 +1256,42 @@ const server = http.createServer(function(req, res) {
         res.end('[]');
         return;
       }
+      var responded = false;
+      var partial = false;
+      function respond() {
+        if (responded) return;
+        responded = true;
+        var result = list.filter(Boolean).slice(0, 50);
+        res.writeHead(200, {'Content-Type': 'application/json; charset=utf-8'});
+        res.end(JSON.stringify({ items: result, partial: partial }));
+      }
+      // 안전망: 5초 내 모든 read 미완료 시 부분 결과 반환
+      var safetyTimer = setTimeout(function() { partial = true; respond(); }, 5000);
       targets.forEach(function(f, idx) {
         fs.readFile(path.join(HISTORY_DIR, f), 'utf8', function(e, content) {
+          // 이미 응답한 후라면 (timeout 발동 등) early return — CPU/메모리 낭비 방지
+          if (responded) return;
           if (!e) {
-            try { list[idx] = JSON.parse(content); } catch(pe) { console.log('  [HISTORY] parse error:', f, pe.message); }
+            try {
+              var rec = JSON.parse(content);
+              var matched = true;
+              // endTime 기준 (prefilter와 동일 기준 — 세션이 끝난 시점)
+              var recTime = rec.endTime ? new Date(rec.endTime).getTime() : (rec.startTime ? new Date(rec.startTime).getTime() : 0);
+              if (cutoff && recTime && recTime < cutoff) matched = false;
+              if (matched && agentFilter && !(rec.agents && rec.agents[agentFilter])) matched = false;
+              if (matched && q) {
+                var hay = (rec.name || '') + ' ' + (rec.cwd || '');
+                if (rec.turns) rec.turns.forEach(function(tn) { hay += ' ' + (tn.prompt || '') + ' ' + (tn.summary || ''); });
+                if (rec.files) hay += ' ' + Object.keys(rec.files).join(' ');
+                if (hay.toLowerCase().indexOf(q) === -1) matched = false;
+              }
+              if (matched) list[idx] = rec;
+            } catch(pe) { console.log('  [HISTORY] parse error:', f, pe.message); }
           }
           done++;
           if (done === targets.length) {
-            res.writeHead(200, {'Content-Type': 'application/json; charset=utf-8'});
-            res.end(JSON.stringify(list.filter(Boolean)));
+            clearTimeout(safetyTimer);
+            respond();
           }
         });
       });
@@ -927,9 +1299,68 @@ const server = http.createServer(function(req, res) {
     return;
   }
 
+  // API: Privacy 토글 (프롬프트 기록 여부)
+  if (url === '/api/privacy' && req.method === 'GET') {
+    res.writeHead(200, {'Content-Type': 'application/json'});
+    res.end(JSON.stringify({ enabled: isPrivacyOn() }));
+    return;
+  }
+  if (url === '/api/privacy' && req.method === 'POST') {
+    if (!isAllowedOrigin(req)) {
+      res.writeHead(403, {'Content-Type': 'application/json'});
+      res.end(JSON.stringify({ error: 'forbidden origin' }));
+      return;
+    }
+    var body = '';
+    var aborted = false;
+    req.on('data', function(chunk) {
+      if (aborted) return;
+      body += chunk;
+      if (body.length > 1024) { // 1KB DoS 방어
+        aborted = true;
+        res.writeHead(413, {'Content-Type': 'application/json'});
+        res.end(JSON.stringify({ error: 'payload too large' }));
+        req.destroy();
+      }
+    });
+    req.on('end', function() {
+      if (aborted) return;
+      try {
+        var data = JSON.parse(body || '{}');
+        var scrubbed = 0;
+        if (data.enabled) {
+          fs.writeFileSync(PRIVACY_FILE, '1', 'utf8');
+          // 1) 활성 트래커들의 메모리에 쌓인 프롬프트 즉시 비움
+          Object.values(sessionTrackers).forEach(function(t) {
+            (t.turns || []).forEach(function(turn) { turn.prompt = ''; turn.summary = ''; });
+          });
+          // 2) scrubDisk 옵션이 true이면 디스크 history도 일괄 정리 (기본 true)
+          if (data.scrubDisk !== false) scrubbed = scrubHistoryPrompts();
+        } else {
+          try {
+            if (fs.existsSync(PRIVACY_FILE)) fs.unlinkSync(PRIVACY_FILE);
+          } catch(e2) { /* race: 이미 삭제됨 */ }
+        }
+        res.writeHead(200, {'Content-Type': 'application/json'});
+        res.end(JSON.stringify({ ok: true, enabled: isPrivacyOn(), scrubbed: scrubbed }));
+      } catch(e) {
+        res.writeHead(400, {'Content-Type': 'application/json'});
+        res.end(JSON.stringify({ error: e.message }));
+      }
+    });
+    return;
+  }
+
   // API: 서버 재시작
   if (url === '/api/restart' && req.method === 'POST') {
+    if (!isAllowedOrigin(req)) {
+      res.writeHead(403, {'Content-Type': 'application/json'});
+      res.end(JSON.stringify({ error: 'forbidden origin' }));
+      return;
+    }
     console.log('\n  \x1b[33mUI에서 재시작 요청\x1b[0m\n');
+    // 응답 전에 트래커 저장 (응답 후 새 이벤트로 인한 윈도우 최소화)
+    saveAllTrackers();
     broadcastEvent({ event: 'server_restart', reason: 'user requested' });
     res.writeHead(200, {'Content-Type': 'application/json'});
     res.end(JSON.stringify({ok: true}));
@@ -944,7 +1375,13 @@ const server = http.createServer(function(req, res) {
 
   // API: 서버 종료
   if (url === '/api/shutdown' && req.method === 'POST') {
+    if (!isAllowedOrigin(req)) {
+      res.writeHead(403, {'Content-Type': 'application/json'});
+      res.end(JSON.stringify({ error: 'forbidden origin' }));
+      return;
+    }
     console.log('\n  \x1b[33mUI에서 종료 요청 → 서버 종료\x1b[0m\n');
+    saveAllTrackers();
     broadcastEvent({ event: 'server_shutdown', reason: 'user requested' });
     res.writeHead(200, {'Content-Type': 'application/json'});
     res.end(JSON.stringify({ok: true}));

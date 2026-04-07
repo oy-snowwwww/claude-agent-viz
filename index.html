@@ -98,6 +98,22 @@
     .hist-tag{font-size:.4rem;padding:1px 5px;border-radius:3px;font-family:monospace}
     .hist-tag.agent{background:rgba(0,255,200,.08);color:var(--accent)}
     .hist-tag.tool{background:rgba(167,139,250,.08);color:var(--accent2)}
+    .hist-tools{display:flex;align-items:center;gap:10px}
+    .hist-privacy{display:flex;align-items:center;gap:4px;font-size:.5rem;font-family:monospace;color:var(--text-secondary);cursor:pointer;user-select:none}
+    .hist-privacy input{cursor:pointer}
+    .hist-search{padding:10px 18px;border-bottom:1px solid var(--border);display:flex;gap:8px;align-items:center}
+    .hist-search input[type=text]{flex:1;background:var(--bg);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:monospace;font-size:.55rem;padding:6px 10px;outline:none}
+    .hist-search input[type=text]:focus{border-color:var(--accent)}
+    .hist-search select{background:var(--bg);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:monospace;font-size:.5rem;padding:5px 6px;outline:none;cursor:pointer}
+    .hist-search select:focus{border-color:var(--accent)}
+    .hist-turn{margin-top:6px;padding:6px 8px;background:rgba(0,255,200,.03);border-left:2px solid var(--accent);border-radius:3px}
+    .hist-turn-q{font-size:.55rem;font-family:monospace;color:var(--text);font-weight:600;display:flex;gap:6px;align-items:flex-start}
+    .hist-turn-q .hqnum{color:var(--accent);flex-shrink:0}
+    .hist-turn-q .hqtime{color:var(--text-secondary);font-size:.45rem;margin-left:auto;flex-shrink:0}
+    .hist-turn-prompt{white-space:pre-wrap;word-break:break-word;flex:1;min-width:0}
+    .hist-turn-sum{margin-top:3px;font-size:.5rem;font-family:monospace;color:var(--text-secondary);white-space:pre-wrap;word-break:break-word;padding-left:14px;border-left:1px dashed var(--border);margin-left:2px}
+    .hist-turn-meta{margin-top:3px;font-size:.4rem;font-family:monospace;color:var(--text-secondary);opacity:.7}
+    mark.hist-hl{background:rgba(251,191,36,.35);color:var(--text);padding:0 1px;border-radius:2px}
 
     .help-overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:150;display:none;align-items:center;justify-content:center;backdrop-filter:blur(4px)}
     .help-overlay.show{display:flex}
@@ -520,7 +536,25 @@
     <div class="hist-modal">
       <div class="hist-header">
         <h2>&#128337; 세션 히스토리</h2>
-        <button onclick="toggleHistory()">&times;</button>
+        <div class="hist-tools">
+          <label class="hist-privacy" title="프롬프트 기록 on/off">
+            <input type="checkbox" id="histPrivacy" onchange="togglePrivacy(this.checked)">
+            <span>🔒 기록 안 함</span>
+          </label>
+          <button onclick="toggleHistory()">&times;</button>
+        </div>
+      </div>
+      <div class="hist-search">
+        <input type="text" id="histSearchQ" placeholder="🔍 프롬프트/파일명/세션명 검색..." oninput="scheduleHistSearch()">
+        <select id="histSearchDays" onchange="fetchHistory()">
+          <option value="0">전체 기간</option>
+          <option value="1">오늘</option>
+          <option value="3">최근 3일</option>
+          <option value="7">최근 7일</option>
+        </select>
+        <select id="histSearchAgent" onchange="fetchHistory()">
+          <option value="">모든 에이전트</option>
+        </select>
       </div>
       <div class="hist-body">
         <div class="hist-list" id="histList">
@@ -712,7 +746,6 @@
       _masterTask: prev._masterTask || '',
       _turnCount: prev._turnCount || 0,
       _thinkStart: prev._thinkStart || null,
-      _thinkHistory: prev._thinkHistory || [],
       _lastDoneTime: prev._lastDoneTime || null,
       _completed: false,
     };
@@ -1190,40 +1223,16 @@
   function renderTimeline(){
     var box=document.getElementById('timelineBody');if(!box)return;box.innerHTML='';
     var instances=getLiveInstances();
-    // Master thinking 구간 수집 (세션별)
-    var curSess=currentSession&&sessions[currentSession]?sessions[currentSession]:null;
-    var masterEntries=curSess?curSess._thinkHistory||[]:[];
-    var curThinkStart=curSess?curSess._thinkStart:null;
-    if(curThinkStart) masterEntries=masterEntries.concat([{start:curThinkStart,end:null}]);
-    if(instances.length===0&&masterEntries.length===0){box.innerHTML='<div class="tl-empty">\uD65C\uB3D9 \uC5C6\uC74C</div>';return}
+    // 타임라인은 에이전트 활동만 표시 (Master는 액티비티 패널에서 확인)
+    if(instances.length===0){box.innerHTML='<div class="tl-empty">\uC5D0\uC774\uC804\uD2B8 \uD65C\uB3D9 \uC5C6\uC74C</div>';return}
     // 시간 범위 계산
     var minStart=Infinity,maxEnd=0,now=Date.now();
-    masterEntries.forEach(function(m){if(m.start<minStart)minStart=m.start;var end=m.end||now;if(end>maxEnd)maxEnd=end});
     instances.forEach(function(inst){
       if(inst.startTime<minStart)minStart=inst.startTime;
       var end=inst.doneTime||now;
       if(end>maxEnd)maxEnd=end;
     });
     var totalMs=Math.max(maxEnd-minStart,1000);
-    // Master 바 렌더링
-    if(masterEntries.length>0){
-      var row=document.createElement('div');row.className='tl-row';
-      var lbl=document.createElement('span');lbl.className='tl-label';lbl.style.color='#c084fc';lbl.textContent='Master';
-      var track=document.createElement('div');track.className='tl-track';var lastSec=0;
-      masterEntries.forEach(function(m){
-        var bar=document.createElement('div');bar.className='tl-bar'+(m.end?'':' working');
-        var startPct=((m.start-minStart)/totalMs)*100;
-        var endTime=m.end||now;
-        var widthPct=((endTime-m.start)/totalMs)*100;
-        bar.style.left=startPct+'%';bar.style.width=Math.max(widthPct,1)+'%';bar.style.background='#c084fc';
-        var sec=Math.round((endTime-m.start)/1000);
-        bar.title='Master '+sec+'s';
-        track.appendChild(bar);
-        lastSec=sec;
-      });
-      var timeLabel=document.createElement('span');timeLabel.className='tl-bar-label';timeLabel.textContent=lastSec+'s';
-      row.appendChild(lbl);row.appendChild(track);row.appendChild(timeLabel);box.appendChild(row);
-    }
     // 각 에이전트 바 렌더링
     instances.forEach(function(inst){
       var ai=getAgentInfo(inst.agentId);var name=ai?ai.name:inst.agentId;
@@ -1448,23 +1457,95 @@
   function toggleHelp(){document.getElementById('helpOverlay').classList.toggle('show')}
 
   // === Session History ===
+  var _histSearchTimer=null;
+  var _histCurrentQ='';
+  var _histFetchSeq=0; // 응답 순서 가드 (stale 결과 무시)
+  var _histAgentCache={}; // 에이전트 옵션 누적 캐시 (필터 전환 시 사라지지 않도록)
   function toggleHistory(){
     var el=document.getElementById('histOverlay');
     var isOpen=el.classList.toggle('show');
-    if(isOpen)fetchHistory();
+    if(isOpen){fetchHistory();fetchPrivacy();}
+  }
+  function scheduleHistSearch(){
+    if(_histSearchTimer)clearTimeout(_histSearchTimer);
+    _histSearchTimer=setTimeout(fetchHistory,300);
   }
 
   function fetchHistory(){
-    fetch(API+'/api/history').then(function(r){return r.json()}).then(function(data){
-      renderHistory(data);
+    var q=document.getElementById('histSearchQ').value.trim();
+    var days=document.getElementById('histSearchDays').value;
+    var agent=document.getElementById('histSearchAgent').value;
+    _histCurrentQ=q;
+    var mySeq=++_histFetchSeq;
+    var params=new URLSearchParams();
+    if(q)params.set('q',q);
+    if(days&&days!=='0')params.set('days',days);
+    if(agent)params.set('agent',agent);
+    var url=API+'/api/history'+(params.toString()?'?'+params.toString():'');
+    fetch(url).then(function(r){return r.json()}).then(function(resp){
+      if(mySeq!==_histFetchSeq)return; // stale 응답 무시
+      // 응답 포맷: { items: [...], partial: bool }
+      var items=Array.isArray(resp)?resp:(resp.items||[]);
+      var partial=!Array.isArray(resp)&&resp.partial===true;
+      renderHistory(items,partial);
+      updateAgentFilterOptions(items);
     }).catch(function(){
+      if(mySeq!==_histFetchSeq)return;
       document.getElementById('histList').innerHTML='<div class="hist-empty">서버 연결 실패</div>';
     });
   }
 
-  function renderHistory(list){
+  function updateAgentFilterOptions(list){
+    // 결과에 등장한 에이전트 타입을 캐시에 누적 (필터 적용 시에도 사라지지 않음)
+    (list||[]).forEach(function(s){Object.keys(s.agents||{}).forEach(function(a){_histAgentCache[a]=true})});
+    var sel=document.getElementById('histSearchAgent');
+    var current=sel.value;
+    var names=Object.keys(_histAgentCache).sort();
+    var html='<option value="">모든 에이전트</option>';
+    names.forEach(function(n){html+='<option value="'+esc(n)+'"'+(n===current?' selected':'')+'>'+esc(n)+'</option>'});
+    sel.innerHTML=html;
+  }
+
+  function fetchPrivacy(){
+    fetch(API+'/api/privacy').then(function(r){return r.json()}).then(function(d){
+      document.getElementById('histPrivacy').checked=!!d.enabled;
+    }).catch(function(){});
+  }
+  function togglePrivacy(on){
+    if(on){
+      // ON 시 디스크 정리 여부 묻기
+      var ok=confirm('프롬프트 기록을 끕니다.\n\n이미 저장된 히스토리의 프롬프트와 응답 요약도 함께 삭제할까요?\n\n[확인] 디스크 정리 + 이후 기록 안 함\n[취소] 이후 기록만 안 함 (기존 데이터 유지)');
+      fetch(API+'/api/privacy',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({enabled:true,scrubDisk:ok})})
+        .then(function(r){return r.json()})
+        .then(function(d){
+          toast('프롬프트 기록 OFF'+(d.scrubbed>0?' ('+d.scrubbed+'개 정리)':''));
+          if(document.getElementById('histOverlay').classList.contains('show'))fetchHistory();
+        })
+        .catch(function(){toast('변경 실패','err')});
+    }else{
+      fetch(API+'/api/privacy',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({enabled:false})})
+        .then(function(r){return r.json()})
+        .then(function(d){toast('프롬프트 기록 ON')})
+        .catch(function(){toast('변경 실패','err')});
+    }
+  }
+
+  function highlight(text,q){
+    if(!q||!text)return esc(text||'');
+    // 검색어도 esc해서 HTML escape된 본문(예: &lt;div&gt;)과 매칭되도록
+    var safeText=esc(text);
+    var safeQ=esc(q);
+    try{
+      var re=new RegExp('('+safeQ.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+')','gi');
+      return safeText.replace(re,'<mark class="hist-hl">$1</mark>');
+    }catch(e){return safeText}
+  }
+
+  function renderHistory(list,partial){
     var el=document.getElementById('histList');
-    if(!list||list.length===0){el.innerHTML='<div class="hist-empty">히스토리가 없습니다<br>세션이 종료되면 여기에 기록됩니다</div>';return}
+    if(!list||list.length===0){el.innerHTML='<div class="hist-empty">'+(_histCurrentQ?'검색 결과가 없습니다':'히스토리가 없습니다<br>세션이 종료되면 여기에 기록됩니다')+'</div>';return}
+    var q=_histCurrentQ;
+    var partialHtml=partial?'<div class="hist-empty" style="opacity:.7;padding:8px">⚠ 일부만 표시됨 (5초 timeout)</div>':'';
 
     var html='';
     list.forEach(function(s){
@@ -1485,24 +1566,28 @@
       // 상세 (펼침)
       var detHtml='';
 
+      // 질문 목록 (turns)
+      if(s.turns&&s.turns.length>0){
+        s.turns.forEach(function(t){
+          var turnMeta='';
+          var agentNames=Object.keys(t.agents||{});
+          if(agentNames.length>0) turnMeta+=agentNames.map(function(a){return esc(a)+'×'+t.agents[a]}).join(' · ');
+          var toolNames=Object.keys(t.tools||{});
+          if(toolNames.length>0){if(turnMeta)turnMeta+=' · ';turnMeta+=toolNames.map(function(tn){return esc(tn)+' '+t.tools[tn]}).join(' · ')}
+          if(t.sec>0){if(turnMeta)turnMeta+=' · ';turnMeta+=t.sec+'초'}
+          detHtml+='<div class="hist-turn">'
+            +'<div class="hist-turn-q"><span class="hqnum">Q'+t.q+'</span><span class="hist-turn-prompt">'+(t.prompt?highlight(t.prompt,q):'<span style="color:var(--text-secondary);opacity:.6">(기록 안 됨)</span>')+'</span></div>'
+            +(t.summary?'<div class="hist-turn-sum">'+highlight(t.summary,q)+'</div>':'')
+            +(turnMeta?'<div class="hist-turn-meta">'+turnMeta+'</div>':'')
+            +'</div>';
+        });
+      }
+
       // 응답 시간
       if(s.avgResponseSec>0){
         detHtml+='<div class="hist-ev"><span class="hist-ev-time"></span><span class="hist-ev-type thinking">응답</span><span class="hist-ev-detail">평균 '+(s.avgResponseSec||0)+'초';
         if(s.longestQuestion){detHtml+=' · 최대 Q'+(s.longestQuestion.q||0)+' ('+(s.longestQuestion.sec||0)+'초)'}
         detHtml+='</span></div>';
-      }
-
-      // 에이전트
-      agentKeys.forEach(function(a){
-        var info=s.agents[a];
-        detHtml+='<div class="hist-ev"><span class="hist-ev-time"></span><span class="hist-ev-type agent">에이전트</span><span class="hist-ev-detail">'+esc(a)+' — '+info.count+'회'+(info.avgSec>0?' · 평균 '+info.avgSec+'초':'')+'</span></div>';
-      });
-
-      // 도구
-      var allTools=Object.keys(s.tools||{}).sort(function(a,b){return s.tools[b]-s.tools[a]});
-      if(allTools.length>0){
-        var toolSummary=allTools.map(function(k){return esc(k)+' '+s.tools[k]}).join(' · ');
-        detHtml+='<div class="hist-ev"><span class="hist-ev-time"></span><span class="hist-ev-type tool">도구</span><span class="hist-ev-detail">'+toolSummary+'</span></div>';
       }
 
       // 파일
@@ -1511,13 +1596,13 @@
         fileKeys.forEach(function(f,i){
           var info=s.files[f];var short=f.split('/').slice(-2).join('/');
           var ops=[];if(info.edit>0)ops.push('Edit '+info.edit);if(info.read>0)ops.push('Read '+info.read);
-          detHtml+='<div class="hist-ev"><span class="hist-ev-time"></span><span class="hist-ev-type" style="background:rgba(251,191,36,.1);color:#fbbf24">'+(i===0?'파일':'')+'</span><span class="hist-ev-detail">'+esc(short)+' <span style="color:var(--text-secondary)">'+ops.join(' · ')+'</span></span></div>';
+          detHtml+='<div class="hist-ev"><span class="hist-ev-time"></span><span class="hist-ev-type" style="background:rgba(251,191,36,.1);color:#fbbf24">'+(i===0?'파일':'')+'</span><span class="hist-ev-detail">'+highlight(short,q)+' <span style="color:var(--text-secondary)">'+ops.join(' · ')+'</span></span></div>';
         });
       }
 
       html+='<div class="hist-item" onclick="this.classList.toggle(\'expanded\')">'
         +'<div class="hist-row">'
-        +'<span class="hist-name">'+esc(s.name||'Session')+'</span>'
+        +'<span class="hist-name">'+highlight(s.name||'Session',q)+'</span>'
         +'<span class="hist-meta"><span>질문 <strong>'+(s.questions||0)+'</strong></span>'+(s.avgResponseSec>0?'<span>평균 <strong>'+(s.avgResponseSec||0)+'</strong>초</span>':'')+(duration?'<span>세션 <strong>'+esc(duration)+'</strong></span>':'')+'</span>'
         +'</div>'
         +'<div class="hist-time">'+dateStr+' '+timeStr+(end?' ~ '+String(end.getHours()).padStart(2,'0')+':'+String(end.getMinutes()).padStart(2,'0'):'')+'</div>'
@@ -1525,7 +1610,7 @@
         +'<div class="hist-events">'+detHtml+'</div>'
         +'</div>';
     });
-    el.innerHTML=html;
+    el.innerHTML=partialHtml+html;
   }
   var restartConfirmTimer=null;
   function restartServer(){
@@ -1634,7 +1719,19 @@
     if(evt==='connected')return;
     updateDailyStatFromEvent(data);
     if(evt==='session_registered'){if(data.session)registerSession(data.session);addLog(null,'\uC138\uC158: '+(data.session?data.session.name:''),'ok',data.session?data.session.pid:'',data.session?data.session.name:'');return}
-    if(evt==='session_renamed'){if(sessions[data.session_pid]){sessions[data.session_pid].name=data.session_name;renderSessionTabs()}return}
+    if(evt==='session_renamed'){
+      if(sessions[sp]){
+        sessions[sp].name=data.session_name||sn;
+        _tabsBuilt=''; // 캐시 무효화 → 탭 DOM 재구성
+        renderSessionTabs();
+        // 로그 필터 라벨도 갱신
+        if(currentSession===sp){
+          var lblEl=document.getElementById('logFilterLabel');
+          if(lblEl)lblEl.textContent=' ['+sessions[sp].name+']';
+        }
+      }
+      return;
+    }
     if(evt==='session_stopped'){
       var stoppedPid=data.session_pid;
       if(sessions[stoppedPid]){sessions[stoppedPid].alive=false;renderAll()}
@@ -1674,7 +1771,7 @@
       if(sp&&sessions[sp]){
         sessions[sp]._turnCount=(sessions[sp]._turnCount||0)+1;
         sessions[sp]._masterSt='thinking';sessions[sp]._masterTask='생각 중...';
-        sessions[sp]._thinkStart=Date.now();sessions[sp]._thinkHistory=[];
+        sessions[sp]._thinkStart=Date.now();
         delete sessions[sp]._completed;
       }
       var tc=sp&&sessions[sp]?sessions[sp]._turnCount:0;
@@ -1690,12 +1787,7 @@
       var anyWorking=Object.values(liveInstances).some(function(i){return i.sessionPid===sp&&i.st==='working'});
       var sec=Math.round((Date.now()-s._thinkStart)/1000);
       var tc=s._turnCount||0;
-      // 세션별 히스토리 저장
-      if(s&&s._thinkStart){
-        if(!s._thinkHistory)s._thinkHistory=[];
-        s._thinkHistory.push({start:s._thinkStart,end:Date.now()});
-        s._thinkStart=null;
-      }
+      s._thinkStart=null;
       if(!anyWorking){
         var doneMsg='Q'+tc+' 완료'+(sec>0?' ('+sec+'s)':'');
         addLog({name:'Master',color:'#fbbf24'},'── '+doneMsg+' ──','ok',sp,sn);
@@ -1740,10 +1832,6 @@
       } else if(sp&&sessions[sp]&&sessions[sp]._masterSt==='thinking'){
         sessions[sp]._masterTask=tn;renderAll();
       }
-      return;
-    }
-    if(evt==='session_renamed'){
-      if(sessions[sp]){sessions[sp].name=sn||data.session_name;_tabsBuilt='';renderSessionTabs()}
       return;
     }
 
