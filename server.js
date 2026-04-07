@@ -1396,6 +1396,25 @@ const server = http.createServer(function(req, res) {
     return;
   }
 
+  // 정적 파일 서빙 (css/, js/) — Path Traversal 방어
+  var staticMatch = url.match(/^\/(css|js)\/([a-zA-Z0-9_\-.]+)$/);
+  if (staticMatch && req.method === 'GET') {
+    var subdir = staticMatch[1];
+    var filename = staticMatch[2];
+    var filePath = path.join(__dirname, subdir, filename);
+    // path.resolve로 실제 경로 검증 (../ 등 방어)
+    var resolvedPath = path.resolve(filePath);
+    var allowedBase = path.resolve(__dirname, subdir);
+    if (!resolvedPath.startsWith(allowedBase + path.sep) || !fs.existsSync(resolvedPath)) {
+      res.writeHead(404); res.end('Not Found');
+      return;
+    }
+    var contentType = subdir === 'css' ? 'text/css; charset=utf-8' : 'application/javascript; charset=utf-8';
+    res.writeHead(200, {'Content-Type': contentType, 'Cache-Control': 'no-cache'});
+    res.end(fs.readFileSync(resolvedPath, 'utf8'));
+    return;
+  }
+
   res.writeHead(404); res.end('Not Found');
 });
 
