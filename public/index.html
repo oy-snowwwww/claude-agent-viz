@@ -178,13 +178,15 @@
 
   <div class="toast" id="toast"></div>
 
-  <!-- 분리된 JS 모듈 (로드 순서: constants → state → utils → environment → creature → history → 인라인 메인) -->
+  <!-- 분리된 JS 모듈 (로드 순서: constants → state → utils → environment → creature → history → notifications → animations → 인라인 메인) -->
   <script src="/js/constants.js"></script>
   <script src="/js/state.js"></script>
   <script src="/js/utils.js"></script>
   <script src="/js/environment.js"></script>
   <script src="/js/creature.js"></script>
   <script src="/js/history.js"></script>
+  <script src="/js/notifications.js"></script>
+  <script src="/js/animations.js"></script>
   <script>
   // state-dependent helpers (아직 분리 안 됨 — 3단계에서 events.js 등으로 이동 예정)
   function getAgentInfo(aid){return agents.find(function(a){return a.id===aid||a.name===aid})||null}
@@ -976,51 +978,7 @@
   }
   function toast(m,t){var el=document.getElementById('toast');el.textContent=m;el.style.background=t==='err'?'var(--negative)':'var(--positive)';el.classList.add('show');setTimeout(function(){el.classList.remove('show')},1800)}
 
-  // === Browser Notification ===
-  var _notifEnabled=localStorage.getItem('agviz-notif')==='on';
-  function initNotifBtn(){var btn=document.getElementById('notifBtn');if(btn)btn.classList.toggle('on',_notifEnabled)}
-  initNotifBtn();
 
-  function enableNotif(){
-    _notifEnabled=true;localStorage.setItem('agviz-notif','on');initNotifBtn();toast('알림 ON');
-    new Notification('Claude Agent Viz',{body:'알림이 활성화되었습니다. 탭을 벗어나면 작업 완료 시 알림을 받습니다.'});
-  }
-  function toggleNotif(){
-    if(!_notifEnabled){
-      if(!('Notification' in window)){toast('이 브라우저는 알림을 지원하지 않습니다','err');return}
-      if(Notification.permission==='granted'){enableNotif();return}
-      // default 또는 denied 모두 한번 요청 시도 (일부 환경에서 denied도 재요청 가능)
-      Notification.requestPermission().then(function(p){
-        if(p==='granted'){enableNotif()}
-        else{toast('알림 권한이 필요합니다. 주소창 왼쪽 아이콘 > 알림 > 허용','err')}
-      });
-    } else {
-      _notifEnabled=false;localStorage.setItem('agviz-notif','off');initNotifBtn();toast('알림 OFF');
-    }
-  }
-
-  function sendNotif(title,body){
-    if(!_notifEnabled||!document.hidden)return;
-    if(!('Notification' in window)||Notification.permission!=='granted')return;
-    var n=new Notification(title,{body:body,tag:'agviz'});
-    n.onclick=function(){window.focus();n.close()};
-    setTimeout(function(){n.close()},8000);
-  }
-
-  // === Animations ===
-  function sparks(wid,color){
-    var el=document.getElementById('ws-'+wid);var ws=document.getElementById('workspace');if(!el||!ws)return;
-    var r=el.getBoundingClientRect();var wr=ws.getBoundingClientRect();var cx=r.left-wr.left+r.width/2;var cy=r.top-wr.top+r.height/2;
-    for(var i=0;i<8;i++){(function(idx){setTimeout(function(){var p=document.createElement('div');p.className='spark';p.style.background=color;p.style.left=cx+'px';p.style.top=cy+'px';p.style.transition='all 0.6s ease-out';ws.appendChild(p);requestAnimationFrame(function(){p.style.transform='translate('+(Math.random()*50-25)+'px,'+(Math.random()*-40-10)+'px)';p.style.opacity='0'});setTimeout(function(){p.remove()},700)},idx*50)})(i)}
-  }
-  function flyDot(fid,tid){
-    var f=document.getElementById('ws-'+fid);var t=document.getElementById('ws-'+tid);var ws=document.getElementById('workspace');if(!f||!t||!ws)return;
-    var fr=f.getBoundingClientRect();var tr=t.getBoundingClientRect();var wr=ws.getBoundingClientRect();
-    var fx=fr.left-wr.left+fr.width/2,fy=fr.top-wr.top+fr.height/2;var tx=tr.left-wr.left+tr.width/2,ty=tr.top-wr.top+tr.height/2;
-    var dot=document.createElement('div');dot.className='fly-dot';dot.style.left=fx+'px';dot.style.top=fy+'px';ws.appendChild(dot);
-    var start=performance.now(),dur=500;
-    function anim(now){var p=Math.min((now-start)/dur,1);var e=1-Math.pow(1-p,3);dot.style.left=(fx+(tx-fx)*e)+'px';dot.style.top=(fy+(ty-fy)*e)+'px';dot.style.opacity=p<.7?'1':String(1-(p-.7)/.3);if(p<1)requestAnimationFrame(anim);else dot.remove()}requestAnimationFrame(anim);
-  }
 
   // === SSE ===
   var evtSource=null;
@@ -1216,18 +1174,6 @@
     else{addLog(null,evt+' '+(data.tool_name||''),'',sp,sn)}
   }
 
-  // === Celebrate ===
-  function celebrate(){
-    var ws=document.getElementById('workspace');if(!ws)return;
-    var colors=['#00ffc8','#a78bfa','#fbbf24','#00d4ff','#f472b6','#10b981','#fb923c','#ef4444'];
-    for(var i=0;i<30;i++){(function(idx){setTimeout(function(){
-      var p=document.createElement('div');
-      var size=4+Math.random()*8;
-      p.style.cssText='position:absolute;pointer-events:none;z-index:20;border-radius:'+(Math.random()>.5?'50%':'2px')+';width:'+size+'px;height:'+size+'px;background:'+colors[idx%colors.length]+';left:'+(Math.random()*90+5)+'%;top:'+(Math.random()*90+5)+'%;animation:popFade 1.4s ease-out forwards';
-      ws.appendChild(p);setTimeout(function(){p.remove()},1500);
-    },idx*40)})(i)}
-  }
-
   // === Logo ===
   (function(){var el=document.getElementById('logo');var c=['#00ffc8','#a78bfa','#fbbf24','#00d4ff','#f472b6','#10b981','#fb923c'];var p=[1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1];for(var i=0;i<25;i++){var s=document.createElement('i');s.style.background=p[i]?c[i%c.length]:'transparent';s.style.borderRadius='1px';el.appendChild(s)}})();
 
@@ -1237,6 +1183,7 @@
   // === Init ===
   initEnvironment(); // environment.js
   initCreatureSystem(); // creature.js
+  initNotifBtn(); // notifications.js
   fetchMaster();fetchSessions();fetchMcpServers();fetchHooks();fetchDailyStats();
   // inactive 상태 주기적 갱신 (60초마다 세션 탭 re-render)
   setInterval(function(){if(Object.keys(sessions).length>0)renderSessionTabs()},60000);
