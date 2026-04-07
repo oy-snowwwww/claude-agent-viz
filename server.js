@@ -15,7 +15,8 @@ const PORT = parseInt(process.env.AGENT_VIZ_PORT || '54321', 10);
 const AGENTS_DIR = path.join(process.env.HOME, '.claude', 'agents');
 const MCP_JSON = path.join(process.env.HOME, '.mcp.json');
 const SETTINGS_JSON = path.join(process.env.HOME, '.claude', 'settings.json');
-const HTML_PATH = path.join(__dirname, 'index.html');
+const PUBLIC_DIR = path.join(__dirname, 'public');
+const HTML_PATH = path.join(PUBLIC_DIR, 'index.html');
 const GLOBAL_CLAUDE_MD = path.join(process.env.HOME, 'CLAUDE.md');
 
 // Path Traversal 방어: 대상 경로가 허용 디렉토리 하위인지 검증
@@ -1396,15 +1397,15 @@ const server = http.createServer(function(req, res) {
     return;
   }
 
-  // 정적 파일 서빙 (css/, js/) — Path Traversal 방어
+  // 정적 파일 서빙 (public/css/, public/js/) — Path Traversal 방어
   var staticMatch = url.match(/^\/(css|js)\/([a-zA-Z0-9_\-.]+)$/);
   if (staticMatch && req.method === 'GET') {
     var subdir = staticMatch[1];
     var filename = staticMatch[2];
-    var filePath = path.join(__dirname, subdir, filename);
+    var filePath = path.join(PUBLIC_DIR, subdir, filename);
     // path.resolve로 실제 경로 검증 (../ 등 방어)
     var resolvedPath = path.resolve(filePath);
-    var allowedBase = path.resolve(__dirname, subdir);
+    var allowedBase = path.resolve(PUBLIC_DIR, subdir);
     if (!resolvedPath.startsWith(allowedBase + path.sep) || !fs.existsSync(resolvedPath)) {
       res.writeHead(404); res.end('Not Found');
       return;
