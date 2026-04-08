@@ -50,3 +50,8 @@ var PMAPS = {
   _sonnet:   [[0,0,0,1,0,0,0],[0,0,1,1,1,0,0]],
   _haiku:    [[0,0,0,0,0,0,0],[0,0,1,1,1,0,0]]
 };
+
+// CommonJS 조건부 export (Node 테스트 환경에서만, 브라우저에는 영향 없음)
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = { pickVillageTier: pickVillageTier, VILLAGE_TIER_MIN_W: VILLAGE_TIER_MIN_W, PMAPS: PMAPS };
+}

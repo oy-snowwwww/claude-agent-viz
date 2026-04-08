@@ -111,6 +111,8 @@ function buildPix(id, color, size, model) {
 //        또는 동적: el.dataset.tip = '설명'; (JS)
 // fixed position이라 부모 overflow에 잘리지 않고, viewport 경계 자동 보정.
 (function initGlobalTip() {
+  // Node 테스트 환경에서는 document/window 없음 → IIFE 즉시 종료 (순수 함수만 require로 사용)
+  if (typeof document === 'undefined' || typeof window === 'undefined') return;
   var tipEl = null;
   // 마지막 target 캐싱 — 같은 target에서 mouseover가 반복 발생해도 reflow 방지
   var _lastTarget = null;
@@ -187,3 +189,8 @@ function buildPix(id, color, size, model) {
   window.addEventListener('scroll', hideTip, true);
   window.addEventListener('resize', hideTip);
 })();
+
+// CommonJS 조건부 export (Node 테스트 전용 — AGENT_COLORS 등 전역 의존 없는 순수 함수만)
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = { esc: esc, shade: shade, instKey: instKey };
+}
