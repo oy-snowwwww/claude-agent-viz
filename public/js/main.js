@@ -82,6 +82,9 @@ initCreatureSystem();      // creature.js
 initNotifBtn();            // notifications.js
 initVillageTier();         // utils.js — 마을 Tier 자동 감지 + village 활성화
 if (typeof startEventTicks === 'function' && !document.hidden) startEventTicks();  // 게임화 이벤트 틱
+// 게임화 포인트 초기 로드 — 프리뷰 모드가 아닐 때만 서버에서 실제 상태 가져옴
+if (typeof fetchPoints === 'function' && !window.gamePreviewMode) fetchPoints();
+if (typeof renderPointsBadge === 'function') renderPointsBadge();  // 프리뷰 모드에서도 배지는 표시
 fetchMaster(); fetchSessions(); fetchMcpServers(); fetchHooks(); fetchDailyStats();
 
 // inactive 상태 주기적 갱신 (60초마다 세션 탭 re-render)

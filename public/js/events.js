@@ -240,6 +240,9 @@ function handleLiveEvent(data) {
   var evt = data.event; var sp = data.session_pid || ''; var sn = data.session_name || '';
   if (evt === 'connected') return;
   updateDailyStatFromEvent(data);
+  // 게임화 포인트 이벤트 — points.js가 로드되어 있을 때만 호출. 로그 기록은 안 함 (중요 로그 가독성 보호)
+  if (typeof updatePointsFromEvent === 'function') updatePointsFromEvent(data);
+  if (evt === 'points_updated') return;
   // session_start 계열 이벤트는 lastActivity 갱신 대상이 아님
   if (_activityEvents[evt] && sp && sessions[sp]) { sessions[sp].lastActivity = new Date().toISOString() }
   var handler = _eventHandlers[evt];

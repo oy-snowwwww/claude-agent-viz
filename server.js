@@ -19,6 +19,13 @@ const PUBLIC_DIR = path.join(__dirname, 'public');
 const HTML_PATH = path.join(PUBLIC_DIR, 'index.html');
 const GLOBAL_CLAUDE_MD = path.join(process.env.HOME, 'CLAUDE.md');
 
+// 게임화 카탈로그 — constants.js와 공유 (단일 진실 공급원)
+// constants.js는 브라우저/Node 양쪽에서 로드 가능하도록 CommonJS 조건부 export 지원
+const GAME_CONSTANTS = require(path.join(PUBLIC_DIR, 'js', 'constants.js'));
+const GAME_ITEMS = GAME_CONSTANTS.ITEMS || {};
+const POINTS_RULES = GAME_CONSTANTS.POINTS_RULES || {};
+const computeBuffs = GAME_CONSTANTS.computeBuffs || function() { return {}; };
+
 // Path Traversal 방어: 대상 경로가 허용 디렉토리 하위인지 검증
 function safePath(baseDir, userInput) {
   var resolved = path.resolve(baseDir, userInput);
@@ -692,6 +699,141 @@ function recordStat(event, toolName, agentType) {
   saveStats();
 }
 
+// === 게임화: 포인트 저장/획득/구매 ===
+// points.json은 STATS_FILE 옆에 저장 (같은 __dirname)
+// 스키마: { version, total, lifetime, inventory: { itemId: count }, createdAt, lastEarnedAt }
+// - version: 스키마 마이그레이션용
+// - total: 현재 사용 가능한 포인트 (소수점 누적, UI는 정수 반올림)
+// - lifetime: 누적 획득 (초기화해도 유지 — 자랑용)
+// - inventory: 아이템 ID → 스택 수
+var POINTS_FILE = path.join(__dirname, 'points.json');
+
+// 신규 사용자 환영 보너스 — points.json이 없을 때 1회 지급
+// 200P면 unlock_meteor(100P) + unlock_pulse(120P) 등 두세 가지 시도 가능 → 첫 인상 풍성
+// lifetime에는 포함 안 함 (받은 것이지 번 것이 아니므로 누적 획득에서 제외)
+var STARTER_BONUS = 200;
+
+function loadPoints() {
+  try {
+    if (fs.existsSync(POINTS_FILE)) {
+      var data = JSON.parse(fs.readFileSync(POINTS_FILE, 'utf8'));
+      // 누락 필드 기본값 채우기 (역호환)
+      if (typeof data.version !== 'number') data.version = 1;
+      if (typeof data.total !== 'number') data.total = 0;
+      if (typeof data.lifetime !== 'number') data.lifetime = 0;
+      if (!data.inventory || typeof data.inventory !== 'object') data.inventory = {};
+      return data;
+    }
+  } catch(e) {
+    console.log('  [POINTS] load error:', e.message);
+  }
+  // 신규 사용자 — 환영 보너스 지급. lifetime은 0 (받은 보너스는 누적 획득에 포함 X)
+  console.log('  [POINTS] 신규 사용자 — 환영 보너스 ' + STARTER_BONUS + 'P 지급');
+  return {
+    version: 1,
+    total: STARTER_BONUS,
+    lifetime: 0,
+    inventory: {},
+    createdAt: new Date().toISOString(),
+  };
+}
+
+function savePoints() {
+  try {
+    fs.writeFileSync(POINTS_FILE, JSON.stringify(pointsData), 'utf8');
+  } catch(e) {
+    console.log('  [POINTS] save error:', e.message);
+  }
+}
+
+var pointsData = loadPoints();
+
+// 점수 획득 — recordStat 옆에서 호출
+// SSE 'points_updated' 브로드캐스트로 클라이언트 즉시 갱신
+function recordPoints(event) {
+  var delta = POINTS_RULES[event] || 0;
+  if (delta === 0) return;
+  pointsData.total = (pointsData.total || 0) + delta;
+  pointsData.lifetime = (pointsData.lifetime || 0) + delta;
+  pointsData.lastEarnedAt = new Date().toISOString();
+  savePoints();
+  broadcastEvent({
+    event: 'points_updated',
+    total: pointsData.total,
+    lifetime: pointsData.lifetime,
+    inventory: pointsData.inventory,
+    delta: delta,
+    reason: event,
+  });
+}
+
+// 구매 처리 — 포인트 차감 + 인벤토리 증가
+// 반환: { ok, error?, total?, inventory? }
+function purchaseItem(itemId) {
+  var def = GAME_ITEMS[itemId];
+  if (!def) return { ok: false, error: 'invalid item' };
+  var currentStack = (pointsData.inventory || {})[itemId] || 0;
+  if (currentStack >= def.maxStack) return { ok: false, error: 'max stack reached' };
+  if ((pointsData.total || 0) < def.price) {
+    return { ok: false, error: 'insufficient points', required: def.price, have: pointsData.total };
+  }
+  pointsData.total -= def.price;
+  if (!pointsData.inventory) pointsData.inventory = {};
+  pointsData.inventory[itemId] = currentStack + 1;
+  savePoints();
+  broadcastEvent({
+    event: 'points_updated',
+    total: pointsData.total,
+    lifetime: pointsData.lifetime,
+    inventory: pointsData.inventory,
+    purchasedItem: itemId,
+  });
+  return { ok: true, total: pointsData.total, inventory: pointsData.inventory };
+}
+
+// 초기화 — mode: 'refund' (아이템 환불, lifetime 유지) | 'full' (완전 초기화)
+function resetPoints(mode) {
+  if (mode === 'refund') {
+    var refundAmount = 0;
+    Object.keys(pointsData.inventory || {}).forEach(function(id) {
+      var def = GAME_ITEMS[id];
+      if (def) refundAmount += def.price * (pointsData.inventory[id] || 0);
+    });
+    pointsData.total = (pointsData.total || 0) + refundAmount;
+    pointsData.inventory = {};
+    savePoints();
+    broadcastEvent({
+      event: 'points_updated',
+      total: pointsData.total,
+      lifetime: pointsData.lifetime,
+      inventory: {},
+      refunded: refundAmount,
+    });
+    return { ok: true, refunded: refundAmount, total: pointsData.total };
+  }
+  if (mode === 'full') {
+    // 완전 초기화 = 신규 사용자 시뮬레이션 → 환영 보너스 STARTER_BONUS도 함께 지급
+    // (loadPoints fallback과 동일한 동작 보장 — lifetime은 0)
+    pointsData = {
+      version: 1,
+      total: STARTER_BONUS,
+      lifetime: 0,
+      inventory: {},
+      createdAt: new Date().toISOString(),
+    };
+    savePoints();
+    broadcastEvent({
+      event: 'points_updated',
+      total: STARTER_BONUS,
+      lifetime: 0,
+      inventory: {},
+      fullReset: true,
+    });
+    return { ok: true, total: STARTER_BONUS };
+  }
+  return { ok: false, error: 'invalid mode' };
+}
+
 // --- Session Tracking ---
 var sessions = {}; // pid → { pid, name, cwd, startTime, lastActivity, eventCount }
 var pendingEnds = {}; // pid → setTimeout handle (세션 종료 디바운스)
@@ -951,6 +1093,9 @@ const server = http.createServer(function(req, res) {
 
         // 일일 통계 기록
         recordStat(event, parsed.tool_name, parsed.agent_type);
+
+        // 게임화 포인트 획득 (POINTS_RULES에 정의된 이벤트만)
+        recordPoints(event);
 
         // 모든 SSE 클라이언트에 브로드캐스트
         broadcastEvent(parsed);
@@ -1269,6 +1414,112 @@ const server = http.createServer(function(req, res) {
       weekly: weekly,
       total: statsData.total || {},
     }));
+    return;
+  }
+
+  // === 게임화: 포인트 API ===
+
+  // GET /api/points — 현재 상태 조회
+  if (url === '/api/points' && req.method === 'GET') {
+    res.writeHead(200, {'Content-Type': 'application/json; charset=utf-8'});
+    res.end(JSON.stringify({
+      version: pointsData.version || 1,
+      total: Math.floor(pointsData.total || 0),       // UI 표시용 정수
+      totalRaw: pointsData.total || 0,                 // 소수점 포함 원본
+      lifetime: Math.floor(pointsData.lifetime || 0),
+      inventory: pointsData.inventory || {},
+      buffs: computeBuffs(pointsData.inventory || {}),
+      createdAt: pointsData.createdAt || null,
+      lastEarnedAt: pointsData.lastEarnedAt || null,
+    }));
+    return;
+  }
+
+  // POST /api/points/purchase — 아이템 구매 {itemId: "..."}
+  if (url === '/api/points/purchase' && req.method === 'POST') {
+    if (!isAllowedOrigin(req)) {
+      res.writeHead(403, {'Content-Type': 'application/json'});
+      res.end(JSON.stringify({ error: 'forbidden origin' }));
+      return;
+    }
+    req.setEncoding('utf8');
+    var pBody = '';
+    var pAborted = false;
+    req.on('data', function(chunk) {
+      if (pAborted) return;
+      pBody += chunk;
+      if (pBody.length > 1024) { // DoS 방어
+        pAborted = true;
+        res.writeHead(413, {'Content-Type': 'application/json'});
+        res.end(JSON.stringify({ error: 'payload too large' }));
+        req.destroy();
+      }
+    });
+    req.on('end', function() {
+      if (pAborted) return;
+      try {
+        var data = JSON.parse(pBody || '{}');
+        var itemId = (typeof data.itemId === 'string') ? data.itemId : '';
+        // 화이트리스트: GAME_ITEMS에 정의된 ID만
+        if (!itemId || !GAME_ITEMS[itemId]) {
+          res.writeHead(400, {'Content-Type': 'application/json'});
+          res.end(JSON.stringify({ error: 'invalid item' }));
+          return;
+        }
+        var result = purchaseItem(itemId);
+        if (!result.ok) {
+          res.writeHead(400, {'Content-Type': 'application/json'});
+          res.end(JSON.stringify(result));
+          return;
+        }
+        res.writeHead(200, {'Content-Type': 'application/json'});
+        res.end(JSON.stringify(result));
+      } catch(e) {
+        res.writeHead(400, {'Content-Type': 'application/json'});
+        res.end(JSON.stringify({ error: e.message }));
+      }
+    });
+    return;
+  }
+
+  // POST /api/points/reset — 초기화 {mode: "refund"|"full"}
+  if (url === '/api/points/reset' && req.method === 'POST') {
+    if (!isAllowedOrigin(req)) {
+      res.writeHead(403, {'Content-Type': 'application/json'});
+      res.end(JSON.stringify({ error: 'forbidden origin' }));
+      return;
+    }
+    req.setEncoding('utf8');
+    var rBody = '';
+    var rAborted = false;
+    req.on('data', function(chunk) {
+      if (rAborted) return;
+      rBody += chunk;
+      if (rBody.length > 1024) {
+        rAborted = true;
+        res.writeHead(413, {'Content-Type': 'application/json'});
+        res.end(JSON.stringify({ error: 'payload too large' }));
+        req.destroy();
+      }
+    });
+    req.on('end', function() {
+      if (rAborted) return;
+      try {
+        var data = JSON.parse(rBody || '{}');
+        var mode = data.mode;
+        if (mode !== 'refund' && mode !== 'full') {
+          res.writeHead(400, {'Content-Type': 'application/json'});
+          res.end(JSON.stringify({ error: 'invalid mode (refund|full)' }));
+          return;
+        }
+        var result = resetPoints(mode);
+        res.writeHead(200, {'Content-Type': 'application/json'});
+        res.end(JSON.stringify(result));
+      } catch(e) {
+        res.writeHead(400, {'Content-Type': 'application/json'});
+        res.end(JSON.stringify({ error: e.message }));
+      }
+    });
     return;
   }
 

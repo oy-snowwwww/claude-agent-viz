@@ -328,12 +328,17 @@
       0%,100%{transform:translate(0,0)}
       50%{transform:translate(8px,-4px)}
     }
+    /* 성운 맥동 — 인라인 --pulse-amp(0~0.3)로 진폭, --neb-base-opacity(0.75/0.9)로 기본 밝기 */
+    @keyframes village-nebula-pulse{
+      0%,100%{opacity:var(--neb-base-opacity, .75)}
+      50%{opacity:calc(var(--neb-base-opacity, .75) + var(--pulse-amp, 0))}
+    }
     .village-nebula{
       pointer-events:none;
       mix-blend-mode:screen;
-      filter:blur(22px);
-      will-change:transform;
-      opacity:.7;
+      will-change:transform,opacity;
+      opacity:var(--neb-base-opacity, .75);
+      /* filter는 village.js에서 크기 비례로 inline 설정 */
     }
 
     /* === 은하수는 점점이 밀집된 작은 별 무리로 표현 (village.js, .village-star 재사용) === */
@@ -353,11 +358,20 @@
       pointer-events:none;
     }
     .village-shooting-star::before{
-      content:'';position:absolute;right:1px;top:1px;
+      /* 꼬리 anchor를 별 중앙(50%/50%)으로 → 별 크기와 무관하게 꼬리가 별 중앙에서 시작 */
+      content:'';position:absolute;
+      right:50%;top:50%;
+      margin-top:-.5px;
       width:var(--shoot-trail-len,40px);height:1px;
       background:linear-gradient(to right,transparent,var(--shoot-color,rgba(255,255,255,.8)));
       transform-origin:right center;
       transform:rotate(var(--shoot-trail-angle,27deg));
+    }
+    /* 무지개 꼬리 (meteor_rainbow 아이템) — inline animation에 meteorHueRotate 추가 전달
+       filter가 요소 전체(자식 ::before 포함)에 걸려 머리/꼬리 동시 순환 */
+    @keyframes meteorHueRotate{
+      0%{filter:hue-rotate(0deg) saturate(1.6) brightness(1.1)}
+      100%{filter:hue-rotate(360deg) saturate(1.6) brightness(1.1)}
     }
 
     .ws-bubble{position:absolute;bottom:calc(100% + 8px);left:50%;transform:translateX(-50%);background:var(--surface);border:1px solid var(--border);border-radius:5px;padding:3px 8px;font-size:.5rem;font-family:monospace;color:var(--text);white-space:nowrap;opacity:0;transition:opacity .3s;box-shadow:0 2px 8px rgba(0,0,0,.4);pointer-events:none}
@@ -382,6 +396,273 @@
     /* 떠다니는 파티클 — --dy는 game-buff로 상승 높이 조정 (기본 -150px) */
     .ambient{position:absolute;width:3px;height:3px;border-radius:50%;pointer-events:none;z-index:0;opacity:0;animation:floatUp linear infinite}
     @keyframes floatUp{0%{opacity:0;transform:translate(0,0)}10%{opacity:.6}90%{opacity:.6}100%{opacity:0;transform:translate(var(--dx),var(--dy,-150px))}}
+
+    /* ========== 게임화: 포인트 배지 ========== */
+    .points-badge{
+      display:inline-flex;align-items:center;gap:4px;
+      padding:3px 10px;
+      background:linear-gradient(135deg,rgba(251,191,36,.15),rgba(167,139,250,.15));
+      border:1px solid rgba(251,191,36,.4);
+      border-radius:12px;
+      font-size:.55rem;font-family:monospace;
+      color:#fbbf24;
+      cursor:pointer;
+      transition:all .2s;
+      position:relative;
+      user-select:none;
+    }
+    .points-badge:hover{
+      background:linear-gradient(135deg,rgba(251,191,36,.25),rgba(167,139,250,.25));
+      border-color:rgba(251,191,36,.7);
+      box-shadow:0 0 8px rgba(251,191,36,.4);
+    }
+    .points-badge strong{font-weight:700;color:#fff}
+    .points-icon{font-size:.65rem}
+    .points-preview-tag{
+      font-size:.45rem;padding:1px 5px;
+      background:rgba(167,139,250,.3);
+      border-radius:6px;color:#a78bfa;
+    }
+    /* 포인트 획득 시 "+N" 플로팅 애니메이션 */
+    .points-float{
+      position:absolute;top:-4px;left:50%;
+      transform:translateX(-50%);
+      color:#10b981;
+      font-weight:700;font-size:.55rem;
+      pointer-events:none;
+      animation:pointsFloat 1.4s ease-out forwards;
+      text-shadow:0 0 4px rgba(16,185,129,.6);
+    }
+    @keyframes pointsFloat{
+      0%{opacity:0;transform:translate(-50%,0) scale(.8)}
+      20%{opacity:1;transform:translate(-50%,-4px) scale(1.1)}
+      80%{opacity:1;transform:translate(-50%,-20px) scale(1)}
+      100%{opacity:0;transform:translate(-50%,-30px) scale(.9)}
+    }
+
+    /* ========== 게임화: 상점 모달 ========== */
+    .shop-overlay{
+      position:fixed;inset:0;
+      background:rgba(8,8,16,.85);
+      backdrop-filter:blur(4px);
+      display:none;align-items:center;justify-content:center;
+      z-index:9998;
+    }
+    .shop-overlay.show{display:flex}
+    .shop-modal{
+      background:var(--surface,#111120);
+      border:1px solid rgba(251,191,36,.35);
+      border-radius:12px;
+      width:min(900px,94vw);
+      height:min(680px,88vh);
+      display:flex;flex-direction:column;
+      box-shadow:0 20px 60px rgba(0,0,0,.6),0 0 40px rgba(251,191,36,.1);
+      font-family:monospace;
+    }
+    .shop-header{
+      display:flex;align-items:center;gap:16px;
+      padding:14px 18px;
+      border-bottom:1px solid var(--border);
+      flex-shrink:0;
+    }
+    .shop-header h2{
+      margin:0;font-size:.85rem;color:#fbbf24;flex-shrink:0;
+    }
+    .shop-wallet{
+      flex:1;
+      font-size:.65rem;
+      color:#f5f5fa;
+    }
+    .shop-wallet strong{color:#fbbf24;font-size:.8rem}
+    .shop-lifetime{
+      color:#b8b8c8;
+      margin-left:10px;
+      font-size:.55rem;
+    }
+    .shop-preview-warning{
+      color:#a78bfa;
+      padding:3px 8px;
+      background:rgba(167,139,250,.15);
+      border:1px solid rgba(167,139,250,.4);
+      border-radius:4px;
+      font-size:.5rem;
+    }
+    .shop-close{
+      background:transparent;border:none;
+      color:#d0d0e0;
+      font-size:1.4rem;cursor:pointer;
+      padding:0 4px;
+      transition:color .2s;
+    }
+    .shop-close:hover{color:#fff}
+    .shop-tabs{
+      display:flex;flex-wrap:wrap;gap:4px;
+      padding:10px 18px;
+      border-bottom:1px solid var(--border);
+      flex-shrink:0;
+    }
+    .shop-tab{
+      padding:4px 10px;
+      background:var(--surface-alt,#1a1a28);
+      border:1px solid var(--border);
+      border-radius:6px;
+      color:#d8d8e8;
+      font-size:.55rem;font-family:monospace;
+      cursor:pointer;
+      transition:all .15s;
+    }
+    .shop-tab:hover{
+      background:rgba(251,191,36,.1);
+      border-color:rgba(251,191,36,.4);
+      color:#fbbf24;
+    }
+    .shop-tab.active{
+      background:rgba(251,191,36,.2);
+      border-color:#fbbf24;
+      color:#fbbf24;
+      font-weight:700;
+    }
+    .shop-grid{
+      flex:1;
+      padding:14px 18px;
+      overflow-y:auto;
+      display:grid;
+      grid-template-columns:repeat(auto-fill,minmax(220px,1fr));
+      gap:10px;
+      align-content:start;
+    }
+    .shop-grid::-webkit-scrollbar{width:6px}
+    .shop-grid::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+    .shop-category-locked{
+      grid-column:1/-1;
+      padding:10px 14px;
+      background:rgba(239,68,68,.1);
+      border:1px solid rgba(239,68,68,.3);
+      border-radius:6px;
+      color:#fca5a5;
+      font-size:.55rem;
+    }
+    .shop-category-locked strong{color:#fbbf24}
+    .shop-empty{
+      grid-column:1/-1;
+      text-align:center;
+      color:#b8b8c8;
+      font-size:.6rem;
+      padding:40px 0;
+    }
+    .shop-item{
+      background:var(--surface-alt,#1a1a28);
+      border:1px solid var(--border);
+      border-radius:8px;
+      padding:10px;
+      display:flex;flex-direction:column;
+      gap:6px;
+      transition:all .2s;
+      position:relative;
+    }
+    .shop-item:hover{
+      border-color:rgba(251,191,36,.5);
+      transform:translateY(-2px);
+      box-shadow:0 4px 12px rgba(0,0,0,.4);
+    }
+    .shop-item.locked{opacity:.5}
+    .shop-item.maxed{border-color:rgba(16,185,129,.4);background:rgba(16,185,129,.05)}
+    .shop-item.rarity-common{border-left:3px solid #9ca3af}
+    .shop-item.rarity-rare{border-left:3px solid #60a5fa}
+    .shop-item.rarity-epic{border-left:3px solid #a78bfa;box-shadow:0 0 8px rgba(167,139,250,.15)}
+    .shop-item.rarity-legendary{
+      border-left:3px solid #fbbf24;
+      background:linear-gradient(135deg,rgba(251,191,36,.08),var(--surface-alt,#1a1a28));
+      box-shadow:0 0 12px rgba(251,191,36,.2);
+    }
+    .shop-item-header{
+      display:flex;justify-content:space-between;align-items:center;gap:8px;
+    }
+    .shop-item-name{
+      color:#ffffff;font-size:.65rem;font-weight:700;
+      text-shadow:0 0 8px rgba(255,255,255,.15);
+    }
+    .shop-item-rarity{
+      font-size:.4rem;
+      padding:1px 6px;
+      border-radius:8px;
+      text-transform:uppercase;
+      font-weight:600;
+    }
+    .shop-item-rarity.common{background:rgba(156,163,175,.2);color:#9ca3af}
+    .shop-item-rarity.rare{background:rgba(96,165,250,.2);color:#60a5fa}
+    .shop-item-rarity.epic{background:rgba(167,139,250,.2);color:#a78bfa}
+    .shop-item-rarity.legendary{background:rgba(251,191,36,.25);color:#fbbf24}
+    .shop-item-desc{
+      color:#d0d0e0;
+      font-size:.55rem;
+      min-height:24px;
+      line-height:1.5;
+    }
+    .shop-item-stack{
+      color:#a8a8b8;
+      font-size:.5rem;
+    }
+    .shop-item.maxed .shop-item-stack{color:#10b981}
+    .shop-buy-btn{
+      background:linear-gradient(135deg,rgba(251,191,36,.2),rgba(167,139,250,.15));
+      border:1px solid rgba(251,191,36,.4);
+      border-radius:4px;
+      color:#fbbf24;
+      font-family:monospace;font-size:.55rem;font-weight:700;
+      padding:6px;
+      cursor:pointer;
+      transition:all .15s;
+      margin-top:auto;
+    }
+    .shop-buy-btn:hover:not(:disabled){
+      background:linear-gradient(135deg,rgba(251,191,36,.35),rgba(167,139,250,.25));
+      border-color:#fbbf24;
+      transform:scale(1.02);
+    }
+    .shop-buy-btn:disabled{
+      cursor:not-allowed;
+      opacity:.5;
+    }
+    .shop-buy-btn.insufficient{
+      background:rgba(156,163,175,.1);
+      border-color:rgba(156,163,175,.4);
+      color:#b0b0c0;
+    }
+    .shop-buy-btn.confirming{
+      background:rgba(239,68,68,.3);
+      border-color:#ef4444;
+      color:#fff;
+      animation:pulse .8s ease-in-out infinite;
+    }
+    .shop-footer{
+      padding:12px 18px;
+      border-top:1px solid var(--border);
+      display:flex;gap:10px;justify-content:flex-end;
+      flex-shrink:0;
+    }
+    .shop-refund-btn{
+      padding:6px 14px;
+      border-radius:6px;
+      font-family:monospace;font-size:.55rem;
+      cursor:pointer;
+      transition:all .15s;
+      font-weight:700;
+      background:rgba(96,165,250,.15);
+      border:1px solid rgba(96,165,250,.4);
+      color:#93c5fd;
+    }
+    .shop-refund-btn:hover{
+      background:rgba(96,165,250,.25);
+      border-color:#60a5fa;
+      color:#dbeafe;
+    }
+    .shop-refund-btn.confirming{
+      background:rgba(239,68,68,.4);
+      border-color:#ef4444;
+      color:#fff;
+      animation:pulse .8s ease-in-out infinite;
+    }
 
     /* ========== 게임화: 신규 이펙트 ========== */
 
@@ -415,33 +696,25 @@
     .village-stars-layer.evt-rainbow-wave{animation:evtRainbowWave 2s linear}
     @keyframes evtRainbowWave{0%{filter:hue-rotate(0deg)}100%{filter:hue-rotate(360deg)}}
 
-    /* 이벤트: 블랙홀 파동 (중앙 원형 확산) */
-    .evt-blackhole-ring{
+    /* Legendary: Supernova flash
+       이전: position:absolute;inset:0 — layer 박스 전체에 깔린 div → boundary에서 빛 잘려 사각형 박스 그대로 노출
+       해결: 작은 원형 div(20px) + scale 변환으로 점진 확산 → 박스 boundary 흔적 없음 */
+    .evt-supernova-flash{
       position:absolute;
+      left:50%;top:50%;
       width:20px;height:20px;
-      border:2px solid rgba(167,139,250,.8);
       border-radius:50%;
       transform:translate(-50%,-50%) scale(0);
-      pointer-events:none;
-      animation:evtBlackholeRing 2s ease-out forwards;
-      box-shadow:0 0 15px rgba(167,139,250,.6),inset 0 0 10px rgba(167,139,250,.4);
-    }
-    @keyframes evtBlackholeRing{
-      0%{transform:translate(-50%,-50%) scale(0);opacity:1}
-      100%{transform:translate(-50%,-50%) scale(25);opacity:0}
-    }
-
-    /* Legendary: Supernova flash */
-    .evt-supernova-flash{
-      position:absolute;inset:0;
-      background:radial-gradient(circle at center,rgba(255,255,255,.8) 0%,rgba(251,191,36,.3) 30%,transparent 70%);
+      background:radial-gradient(circle,rgba(255,255,255,.9) 0%,rgba(251,191,36,.5) 30%,rgba(255,107,107,.25) 60%,transparent 100%);
+      box-shadow:0 0 30px rgba(255,255,255,.6),0 0 60px rgba(251,191,36,.4);
       pointer-events:none;
       animation:evtSupernovaFlash 1.5s ease-out forwards;
     }
     @keyframes evtSupernovaFlash{
-      0%{opacity:0;transform:scale(.3)}
-      20%{opacity:1;transform:scale(1)}
-      100%{opacity:0;transform:scale(1.5)}
+      0%  {transform:translate(-50%,-50%) scale(0);  opacity:0}
+      15% {transform:translate(-50%,-50%) scale(1.5);opacity:1}
+      40% {transform:translate(-50%,-50%) scale(6);  opacity:.85}
+      100%{transform:translate(-50%,-50%) scale(18); opacity:0}
     }
     .evt-supernova-particle{
       position:absolute;
@@ -456,24 +729,147 @@
       100%{transform:translate(calc(-50% + var(--sx)),calc(-50% + var(--sy)));opacity:0}
     }
 
-    /* Legendary: Aurora (상단 상시 웨이브) */
-    .evt-aurora{
-      position:absolute;top:0;left:0;right:0;height:35%;
-      background:linear-gradient(180deg,
-        rgba(16,185,129,.15) 0%,
-        rgba(52,211,153,.1) 30%,
-        rgba(167,139,250,.08) 60%,
-        transparent 100%);
+    /* === galaxy_rotation 아이템 — 은하수 wrapper만 60초 1회전 (별/성운은 회전하지 않음) === */
+    .village-galaxy-wrapper.rotating{
+      animation:villageGalaxyRotate 60s linear infinite;
+      transform-origin:50% 50%;
+      will-change:transform;
+    }
+    @keyframes villageGalaxyRotate{
+      from{transform:rotate(0deg)}
+      to{transform:rotate(360deg)}
+    }
+
+    /* === 이벤트: Color Storm — 1초 강한 hue-rotate + 채도 부스트 === */
+    .village-stars-layer.evt-color-storm{
+      animation:evtColorStorm 1s linear forwards;
+    }
+    @keyframes evtColorStorm{
+      0%,100%{filter:hue-rotate(0deg) saturate(1)}
+      50%{filter:hue-rotate(180deg) saturate(1.6)}
+    }
+
+    /* === 이벤트: Pulse Chain — 큰 별이 일시적으로 진폭 큰 맥동 (0.8s) === */
+    .village-pulse-star.evt-pulse-chain{
+      animation:evtPulseChain .8s ease-in-out forwards;
+    }
+    @keyframes evtPulseChain{
+      0%,100%{transform:scale(1);opacity:1;filter:brightness(1)}
+      50%{transform:scale(2.2);opacity:1;filter:brightness(1.8)}
+    }
+
+    /* === Legendary: Twin Moons — 좌우 끝에 행성 2개 상시 ===
+       회전(자기 중심) + floating motion (위아래 드리프트) 동시 적용
+       multi radial-gradient로 crater 패턴 표현 → 회전이 시각화됨 */
+    .evt-twinmoon{
+      position:absolute;
+      width:46px;height:46px;
+      border-radius:50%;
       pointer-events:none;
       mix-blend-mode:screen;
-      filter:blur(30px);
-      animation:evtAuroraWave 15s ease-in-out infinite;
-      will-change:transform,opacity;
+      will-change:transform;
     }
-    @keyframes evtAuroraWave{
-      0%,100%{transform:translateX(0) scaleY(1);opacity:.6}
-      33%{transform:translateX(-20px) scaleY(1.15);opacity:.85}
-      66%{transform:translateX(15px) scaleY(.9);opacity:.7}
+    .evt-twinmoon-left{
+      left:30px;top:30%;
+      background:
+        radial-gradient(circle at 60% 65%,rgba(60,40,20,.45) 4%,transparent 9%),
+        radial-gradient(circle at 30% 70%,rgba(60,40,20,.35) 3%,transparent 7%),
+        radial-gradient(circle at 70% 35%,rgba(60,40,20,.30) 3%,transparent 6%),
+        radial-gradient(circle at 35% 35%,rgba(255,240,220,.85) 0%,rgba(220,200,180,.4) 60%,transparent 100%);
+      box-shadow:0 0 20px rgba(255,240,220,.4),inset -8px -8px 12px rgba(60,40,20,.5);
+      animation:
+        evtTwinMoonRotate 30s linear infinite,
+        evtTwinMoonFloatLeft 7s ease-in-out infinite;
+    }
+    .evt-twinmoon-right{
+      right:30px;top:55%;
+      background:
+        radial-gradient(circle at 30% 60%,rgba(20,30,60,.45) 4%,transparent 9%),
+        radial-gradient(circle at 65% 35%,rgba(20,30,60,.35) 3%,transparent 7%),
+        radial-gradient(circle at 55% 70%,rgba(20,30,60,.30) 3%,transparent 6%),
+        radial-gradient(circle at 35% 35%,rgba(180,200,255,.85) 0%,rgba(140,160,220,.4) 60%,transparent 100%);
+      box-shadow:0 0 20px rgba(180,200,255,.4),inset -8px -8px 12px rgba(20,30,60,.5);
+      animation:
+        evtTwinMoonRotate 35s linear infinite reverse,
+        evtTwinMoonFloatRight 9s ease-in-out infinite;
+    }
+    @keyframes evtTwinMoonRotate{
+      from{transform:rotate(0deg)}
+      to{transform:rotate(360deg)}
+    }
+    /* floating은 wrapper transform 충돌 피하려고 left/top 변경 (transform과 분리) */
+    @keyframes evtTwinMoonFloatLeft{
+      0%,100%{margin-top:0px}
+      50%{margin-top:18px}
+    }
+    @keyframes evtTwinMoonFloatRight{
+      0%,100%{margin-top:0px}
+      50%{margin-top:-15px}
+    }
+
+    /* === Legendary: Void Pulse — 빅뱅 (수축 → 폭발 → 정착, 총 4초) ===
+       layer 자체에 transform: scale 변환 → 모든 별이 함께 중앙으로 빨려들어감 → 폭발 → 자리 복귀
+       성운/은하수/twin moon은 fireVoidPulse() JS에서 임시로 opacity:0 처리 (사각형 잔상 방지)
+       각 키프레임에 animation-timing-function 지정 — 구간별 easing이 달라야 자연스러움
+       - 수축(0~35%): 강한 ease-in 가속 (별이 천천히 끌려가다 끝에서 폭발적으로 압축)
+       - 응축→폭발(38~46%): ease-out (한 점에서 explosive)
+       - 반동→정착: 감쇠 */
+    .village-stars-layer.evt-bigbang{
+      animation:evtBigBang 4s linear forwards;
+      transform-origin:50% 50%;
+      will-change:transform,opacity,filter;
+    }
+    @keyframes evtBigBang{
+      /* 0~20%: 수축 시작 — 강한 ease-in (천천히 시작 → 가속) */
+      0%   {transform:scale(1)   rotate(0deg);   opacity:1;    filter:brightness(1);    animation-timing-function:cubic-bezier(.85,0,.95,.2)}
+      /* 20%: 빠르게 opacity fade 시작 — 사각형 잔상 인지 차단 */
+      20%  {transform:scale(.4)  rotate(4deg);   opacity:.4;   filter:brightness(.85);  animation-timing-function:cubic-bezier(.6,0,.95,.3)}
+      /* 28%: 완전 어둠 (한 점 응축) */
+      28%  {transform:scale(.05) rotate(10deg);  opacity:0;    filter:brightness(.6);   animation-timing-function:linear}
+      /* 28~48%: 어둠 유지 (1.12s ~ 1.92s) — burst flash + 파티클 폭발 시점 */
+      48%  {transform:scale(.05) rotate(10deg);  opacity:0;    filter:brightness(.6);   animation-timing-function:cubic-bezier(.2,.7,.3,1)}
+      /* 48~60%: 폭발 — opacity 회복 + scale overshoot */
+      60%  {transform:scale(4)   rotate(0deg);   opacity:1;    filter:brightness(1.6);  animation-timing-function:ease-out}
+      /* 반동 → 정착 */
+      75%  {transform:scale(.85) rotate(0deg);   opacity:1;    filter:brightness(1.1);  animation-timing-function:ease-out}
+      88%  {transform:scale(1.05) rotate(0deg);  opacity:1;    filter:brightness(1.05)}
+      100% {transform:scale(1)   rotate(0deg);   opacity:1;    filter:brightness(1)}
+    }
+
+    /* burst flash — 폭발 시점 중앙에서 점진적 확산 (작게 시작 → 점차 커짐)
+       이전 버전은 burst 자체와 box-shadow가 너무 커서(반경 200px+) 한 번에 거대한 빛이 등장 →
+       그 빛이 workspace 박스 boundary에 잘려 사각형 모양으로 보였음.
+       해결: 시작 크기/box-shadow 절반 이하 + scale 곡선을 부드럽게 */
+    .evt-voidpulse-burst{
+      position:absolute;
+      width:5px;height:5px;border-radius:50%;
+      transform:translate(-50%,-50%) scale(0);
+      background:radial-gradient(circle,#fff 0%,#fbe7c4 25%,#fbbf24 55%,rgba(167,139,250,.5) 80%,transparent 100%);
+      box-shadow:0 0 20px #fff,0 0 40px #fbbf24,0 0 70px rgba(167,139,250,.35);
+      pointer-events:none;
+      animation:evtVoidPulseBurst 2.2s cubic-bezier(.15,.55,.3,1) forwards;
+    }
+    @keyframes evtVoidPulseBurst{
+      0%   {transform:translate(-50%,-50%) scale(0);    opacity:0}
+      5%   {transform:translate(-50%,-50%) scale(.3);   opacity:.4}
+      12%  {transform:translate(-50%,-50%) scale(1);    opacity:.85}
+      25%  {transform:translate(-50%,-50%) scale(3);    opacity:1}
+      50%  {transform:translate(-50%,-50%) scale(10);   opacity:.7}
+      100% {transform:translate(-50%,-50%) scale(35);   opacity:0}
+    }
+
+    /* 빅뱅 직후 워크스페이스 미세 shake (0.5초) */
+    .workspace.evt-bigbang-shake{
+      animation:evtBigBangShake .5s ease-out;
+    }
+    @keyframes evtBigBangShake{
+      0%,100%{transform:translate(0,0)}
+      15%{transform:translate(-3px,2px)}
+      30%{transform:translate(4px,-2px)}
+      45%{transform:translate(-3px,-2px)}
+      60%{transform:translate(2px,3px)}
+      75%{transform:translate(-2px,1px)}
+      90%{transform:translate(1px,-1px)}
     }
 
     /* Activity Panel */

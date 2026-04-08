@@ -29,7 +29,7 @@ https://github.com/user-attachments/assets/b3595469-2546-4624-adf8-9a119ea00c2d
 - **브라우저 알림** — 탭 비활성 시 에이전트 완료, 응답 완료 알림 (on/off 토글)
 - **일일 통계** — 오늘의 질문 수, 에이전트별/도구별 사용 횟수, 주간/누적 통계, 🔄 전체 초기화 지원
 - **마을(우주) 모드** — 우주 배경 + 별/은하수/nebula/별똥별. 워크스페이스 폭에 따라 캐릭터 크기 자동 조정 (Tier 1/2/3). 항상 활성 (이전 환경 효과 토글은 제거됨)
-- **🎮 게임화 — 우주 꾸미기 (Phase 1)** — 완전 검정 우주에서 시작, 활동하며 포인트를 모아 아이템으로 꾸며가는 Cookie Clicker 스타일. 47개 아이템(별/은하수/성운/별똥별/Ambient/이벤트/Legendary) + 11종 주기적 이벤트 발동. 프리뷰 모드 지원(`?preview=empty/mid/full`). ⚠ Phase 1은 비주얼만 — 실제 포인트/상점 UI는 Phase 2에서 추가
+- **🎮 게임화 — 우주 꾸미기 (Phase 2)** — 완전 검정 우주에서 시작, 활동하며 포인트를 모아 아이템으로 꾸며가는 Cookie Clicker 스타일. **53개 아이템** (해금 5 / 별 5 / 큰별 4 / 푸른별·주황별 각 3 / 반짝이는별 5 / 은하수 6 / 성운 4 / 별똥별 7 / 이벤트 7 / Legendary 4). 신규 사용자 환영 보너스 **200P** + 이벤트 훅 자동 포인트 획득(질문 +3, 도구 +0.5, 에이전트 완료 +10, 응답 +1) → **⭐ 포인트 배지** 클릭 시 **🛒 상점 모달** (11 카테고리 탭, Epic/Legendary 2단계 확인 구매, 환불 초기화) → 구매 즉시 우주에 반영 (SSE). 10종 주기 이벤트 + Twin Moons 상시 오버레이 + Void Pulse 빅뱅 (5분). 프리뷰 모드 지원(`?preview=empty/mid/full`) — 프리뷰 중에는 실제 포인트 저장 안 됨.
 - **성능 최적화** — 탭 비활성 시 애니메이션 자동 정지, renderAll 디바운스, 이벤트 마스터 틱 single-interval, DOM 파티클 상한 가드
 
 ## 요구사항
@@ -185,6 +185,7 @@ claude-agents off      # 세션 시작 시 자동 실행 OFF
 
 | 버튼 | 기능 |
 |------|------|
+| ⭐ 포인트 배지 | 현재 잔고 + 누적 표시. 클릭 시 🛒 상점 모달 열기 |
 | 🔔 | 브라우저 알림 on/off |
 | 🕐 | 세션 히스토리 |
 | ? | 도움말 |
@@ -304,7 +305,9 @@ CLAUDE.md
 │       ├── history.js         # 세션 히스토리 UI (검색·필터·삭제·cwd 칩)
 │       ├── notifications.js   # 브라우저 알림
 │       ├── animations.js      # 시각 이펙트 (sparks/flyDot/celebrate)
-│       ├── event-ticks.js     # 게임화 이벤트 마스터 틱 (12종 주기적 발동형 이펙트)
+│       ├── event-ticks.js     # 게임화 이벤트 마스터 틱 (10종 주기 이벤트 + Twin Moons 상시 오버레이)
+│       ├── points.js          # 게임화 포인트 — 배지 렌더 + SSE 수신 + 버프 동기화 (프리뷰 모드 격리)
+│       ├── shop.js            # 🛒 상점 모달 — 12 카테고리 탭, 구매 (Epic/Legendary 2단계 확인), 환불 초기화
 │       ├── api.js             # 서버 API 호출 래퍼 (fetch/save/delete)
 │       ├── log.js             # 로그 패널 (addLog, renderLogs, fmtTime)
 │       ├── sessions.js        # 세션/탭 관리 (register/switch/rename/reorder + 상태 헬퍼)
@@ -323,7 +326,8 @@ CLAUDE.md
 ├── privacy                    # Privacy 모드 플래그 (파일 존재 여부)
 ├── sessions/                  # 활성 세션 PID 파일
 ├── history/                   # 세션 히스토리 JSON (7일·10MB 가드, 1시간 주기 정리)
-└── agent-stats.json           # 일일/주간/누적 통계
+├── agent-stats.json           # 일일/주간/누적 통계
+└── points.json                # 게임화 포인트 (잔고·누적·인벤토리, 런타임 — .gitignore 처리)
 ```
 
 ## 화면에 뭐가 어디서 오는가
@@ -346,6 +350,9 @@ CLAUDE.md
 | **`/rename` 탭 동기화** | 같은 transcript의 `<command-name>/rename</command-name>` 추출 | `thinking_start` 시 최신 rename 감지 → 탭 이름 자동 갱신 |
 | **사용 안 함 토글** | `~/.claude/agent-viz/privacy` (파일 존재 여부) | `/api/privacy` 토글 — ON 시 `saveSessionHistory()` 스킵, 다음 세션부터 디스크에 기록 안 함 (디스크 정리는 별도 "전체 삭제" 액션) |
 | **민감정보 마스킹** | `server.js`의 `maskSecrets()` | `sk-*`/`ghp_*`/`AKIA*`/JWT/Bearer 자동 치환 |
+| **⭐ 포인트 배지** | `points.json` → `GET /api/points` + SSE `points_updated` | 잔고/누적/인벤토리/buffs. 이벤트 훅에서 `POINTS_RULES`에 따라 자동 획득 (질문 +3, 도구 +0.5, 에이전트 완료 +10, 응답 +1) |
+| **🛒 상점 모달** | `constants.js` `ITEMS` 카탈로그 + `pointsData.inventory` | 12 카테고리 탭 · `POST /api/points/purchase`로 구매 (화이트리스트/Origin/1KB DoS 가드) · `POST /api/points/reset` `mode:refund`로 환불 |
+| **우주 버프 반영** | `computeBuffs(inventory)` → `window.gameBuffs` → `village.js` / `workspace.js` / `event-ticks.js` | 구매 즉시 `renderVillage()` 재호출로 레이어 재생성 + Aurora 상시 오버레이 재부착 |
 
 ### 파일을 만들면 → 대시보드에 자동 반영
 

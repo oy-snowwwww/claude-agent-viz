@@ -11,15 +11,112 @@
 function _buffs() { return (typeof window !== 'undefined' && window.gameBuffs) || {}; }
 function _bf(key, def) { var v = _buffs()[key]; return (typeof v === 'number') ? v : (def || 0); }
 
+// === 레이아웃 캐시 ===
+// 문제: renderVillage()가 buff 변경 시 layer를 강제 재생성하면 Math.random() 호출이 매번 새 위치를 반환해
+//       성운/별 등이 이전과 다른 자리에 그려져서 사용자가 "위치가 갑자기 바뀜" 을 경험.
+// 해결: 위치/색/리듬은 비율(0~1) 기반으로 한 번만 결정하고 캐시. 이후 buff로 size/glow/개수만 동적 계산.
+//       w/h가 변하면 리사이즈로 보고 캐시 무효화.
+// 캐시 구조: 별 종류별로 spec 배열. spec은 한 별의 고유 위치/색/애니메이션 시드 정보
+var _layoutCache = null;
+
+function _ensureLayout(w, h) {
+  if (!_layoutCache || _layoutCache.w !== w || _layoutCache.h !== h) {
+    _layoutCache = {
+      w: w, h: h,
+      stars: [],         // { xRatio, yRatio, baseSize(1~3), dur, delay, colorIdx }
+      blueStars: [],     // { xRatio, yRatio, baseSize, dur, delay }
+      orangeStars: [],   // 동일
+      pulses: [],        // { xRatio, yRatio, baseSize(4~6), dur, delay, colorRoll }
+      rainbows: [],      // { xRatio, yRatio, baseSize(5~7), dur, delay }
+      nebulae: [],       // { xRatio, yRatio, sizeRatio, driftDur, driftDelay, pulseDur, pulseDelay }
+      nebulaColorOrder: NEBULA_COLORS.slice().sort(function() { return Math.random() - 0.5; }),
+    };
+  }
+  return _layoutCache;
+}
+
+// === Lazy generators — count가 늘어나면 추가 생성, 줄어들면 앞 N개만 사용해 위치 안정 ===
+
+function _ensureStarsCount(arr, count) {
+  // 확장 팔레트 포함 13색까지 colorIdx 0~12 — star_palette 미구매 시 8 이상은 fallback
+  var maxIdx = STAR_COLOR_PALETTE.length + STAR_COLOR_PALETTE_EXT.length;
+  while (arr.length < count) {
+    arr.push({
+      xRatio: Math.random(),
+      yRatio: Math.random(),
+      baseSize: 1 + Math.floor(Math.random() * 3),  // 1~3px
+      dur: 2 + Math.random() * 4,                    // 2~6초
+      delay: Math.random() * 3,                      // 0~3초
+      colorIdx: Math.floor(Math.random() * maxIdx),
+    });
+  }
+}
+
+function _ensureColoredStarsCount(arr, count) {
+  // 푸른별/주황별 공용 (색은 렌더 시 고정)
+  while (arr.length < count) {
+    arr.push({
+      xRatio: Math.random(),
+      yRatio: Math.random(),
+      baseSize: 1 + Math.floor(Math.random() * 3),
+      dur: 2 + Math.random() * 4,
+      delay: Math.random() * 3,
+    });
+  }
+}
+
+function _ensurePulsesCount(arr, count) {
+  while (arr.length < count) {
+    arr.push({
+      xRatio: Math.random(),
+      yRatio: Math.random() * 0.7,  // 상단 70% 영역만
+      baseSize: 4 + Math.floor(Math.random() * 3),  // 4~6px
+      dur: 3 + Math.random() * 3,
+      delay: Math.random() * 4,
+      colorRoll: Math.random(),     // 색 결정용 (블루/오렌지 확정 후 나머지)
+      randomColorIdx: Math.floor(Math.random() * 3),  // ['#ffffff','#a8c8ff','#ffd0a0'] 중
+    });
+  }
+}
+
+function _ensureRainbowsCount(arr, count) {
+  while (arr.length < count) {
+    arr.push({
+      xRatio: Math.random(),
+      yRatio: Math.random() * 0.7,
+      baseSize: 5 + Math.floor(Math.random() * 3),  // 5~7px
+      dur: 6 + Math.random() * 3,
+      delay: Math.random() * 3,
+    });
+  }
+}
+
+function _ensureNebulaeCount(arr, count) {
+  while (arr.length < count) {
+    arr.push({
+      xRatio: Math.random(),
+      yRatio: Math.random(),
+      sizeRatio: 0.44 + Math.random() * 0.56,        // 0.44~1.0 (200~450 / 450 비율)
+      driftDur: Math.round(35 + Math.random() * 25),
+      driftDelay: Math.round(Math.random() * 15),
+      pulseDur: (4 + Math.random() * 2).toFixed(1),
+      pulseDelay: (Math.random() * 3).toFixed(1),
+    });
+  }
+}
+
 // === 별 레이어 (반짝임 + 색깔 + 맥동 + nebula + 은하수) ===
 // 별 위치는 Math.random() — 매 새로고침 새 우주
 // resize 시 dataset.w/h 캐시로 재생성 방지
+// 기본 팔레트 — 80% 흰색에 푸른/주황 약간 (10/8 비율)
 var STAR_COLOR_PALETTE = [
   '#ffffff', '#ffffff', '#ffffff', '#ffffff', '#ffffff',
   '#ffffff', '#ffffff', '#ffffff',
   '#a8c8ff', // 푸른빛
   '#ffd0a0', // 주황빛
 ];
+// star_palette 아이템 구매 시 추가되는 색상 — 분홍/시안/연노랑 3종
+var STAR_COLOR_PALETTE_EXT = ['#ffb0d0', '#c0f0ff', '#fff5a8'];
 var NEBULA_COLORS = [
   'rgba(140, 70, 220, 0.32)', // 보라
   'rgba(70, 110, 230, 0.32)', // 파랑
@@ -140,14 +237,19 @@ function ensureStarsLayer() {
 
   // === 은하수 (해금 후) ===
   // unlockGalaxy 해금 필요. 밀도/크기는 버프로 배수, 색조는 blueTint/orangeTint 해금
+  // galaxy_rotation 활성 시 별도 wrapper에 회전 클래스 — 일반 별/성운은 회전하지 않게 격리
   if (_bf('unlockGalaxy') > 0) {
     var densityMul = 1 + _bf('galaxyDensityMul');
     var sizeMul = 1 + _bf('galaxySizeMul');
     var forceBlue = _bf('galaxyBlueTint') > 0;
     var forceOrange = _bf('galaxyOrangeTint') > 0;
     var firstTint = forceBlue ? 'blue' : (forceOrange ? 'orange' : 'white');
+    var galaxyContainer = document.createElement('div');
+    galaxyContainer.className = 'village-galaxy-wrapper' + (_bf('galaxyRotation') > 0 ? ' rotating' : '');
+    galaxyContainer.style.cssText = 'position:absolute;inset:0;pointer-events:none';
+    layer.appendChild(galaxyContainer);
 
-    var firstGalaxy = makeGalaxy(layer, w, h, {
+    var firstGalaxy = makeGalaxy(galaxyContainer, w, h, {
       scaleR: sizeMul,
       dotCountMul: densityMul,
       tint: firstTint,
@@ -165,7 +267,7 @@ function ensureStarsLayer() {
       // cyMin/cyMax 교대 (짝수 인덱스는 하단, 홀수는 상단)
       var cyMin = (gi % 2 === 0) ? 0.40 : 0.05;
       var cyMax = (gi % 2 === 0) ? 0.75 : 0.40;
-      var extraGalaxy = makeGalaxy(layer, w, h, {
+      var extraGalaxy = makeGalaxy(galaxyContainer, w, h, {
         scaleR: (0.55 + Math.random() * 0.15) * sizeMul,
         dotCountMul: 0.55 * densityMul,
         opacityMul: 0.55,
@@ -181,143 +283,188 @@ function ensureStarsLayer() {
     }
   }
 
-  // === Nebula 구름 (해금 후) ===
-  // unlockNebula 해금 필요. 첫 성운 해금 시 1개 등장, nebula_count로 +1씩 추가
+  // === Nebula 구름 (해금 후) — 위치는 _layoutCache에 비율로 고정, buff로는 크기/맥동만 동적 ===
+  // unlockNebula 해금 필요. 첫 성운 해금 시 1개 등장, nebula_count로 +1씩 추가 (최대 3개)
+  // nebula_purple로 보라 성운 1개 추가 (기존 count와 별개로 +1)
   if (_bf('unlockNebula') > 0) {
-    var numNebulae = 1 + Math.round(_bf('nebulaCountAdd'));  // 1 + stacks
+    var layout = _ensureLayout(w, h);
+    var basicNebulae = 1 + Math.round(_bf('nebulaCountAdd'));  // 1 + stacks
+    var purpleNebulae = _bf('nebulaPurpleAdd') > 0 ? 1 : 0;
+    var numNebulae = basicNebulae + purpleNebulae;
+    _ensureNebulaeCount(layout.nebulae, numNebulae);  // 부족하면 추가 생성, 있으면 재사용
     var nebulaSizeMul = 1 + _bf('nebulaSizeMul');
-    var nebulaSlowMul = 1 + _bf('nebulaSlowMul');  // 이동 속도 배수 (1.0 = 기본, 1.5 = 1.5배 느림)
-    var nebulaColors = NEBULA_COLORS.slice().sort(function() { return Math.random() - 0.5; });
+    // 화면 단축 축의 35%를 절대 상한 — 작은 화면에서 성운이 뷰포트를 덮지 않도록
+    var nebulaMaxSize = Math.round(Math.min(w, h) * 0.35);
+    var nebulaPulseAmp = _bf('nebulaPulseAdd');  // 0 = 없음, 최대 0.3 (stack 5)
     for (var n = 0; n < numNebulae; n++) {
-      var nebulaSize = Math.round((200 + Math.random() * 250) * nebulaSizeMul);
-      var nebulaColor = nebulaColors[n % nebulaColors.length];
-      var nx = Math.round(Math.random() * w - nebulaSize / 2);
-      var ny = Math.round(Math.random() * h - nebulaSize / 2);
-      var driftDur = Math.round((35 + Math.random() * 25) * nebulaSlowMul);
-      var driftDelay = Math.round(Math.random() * 15);
+      var spec = layout.nebulae[n];
+      // 크기는 sizeRatio × 450 × buff (buff 변경 시 같은 위치에서 커지기만)
+      var nebulaSize = Math.round(spec.sizeRatio * 450 * nebulaSizeMul);
+      if (nebulaSize > nebulaMaxSize) nebulaSize = nebulaMaxSize;
+      var nx = Math.round(spec.xRatio * w - nebulaSize / 2);
+      var ny = Math.round(spec.yRatio * h - nebulaSize / 2);
+      // 마지막 슬롯이 보라 성운 (purpleNebulae > 0인 경우)
+      var nebulaColor;
+      if (purpleNebulae > 0 && n === numNebulae - 1) {
+        nebulaColor = 'rgba(168, 85, 247, 0.36)';  // 진한 보라
+      } else {
+        nebulaColor = layout.nebulaColorOrder[n % layout.nebulaColorOrder.length];
+      }
+      // blur를 크기 비례로 — 고정 22px은 작은 성운을 뭉갬. 5.5% 비율 + 최소 10px 가드
+      var nebulaBlurPx = Math.max(10, Math.round(nebulaSize * 0.055));
+      // 작은 성운은 base opacity를 올려 가시성 보정 (blur로 희석되는 양 보상)
+      var nebulaBaseOpacity = nebulaSize < 220 ? 0.9 : 0.75;
+      // 맥동 — 각 성운별 캐시된 주기/딜레이 사용 (재렌더해도 같은 리듬)
+      var nebulaAnim = 'village-nebula-drift ' + spec.driftDur + 's ease-in-out ' + spec.driftDelay + 's infinite';
+      var varStyle = '--neb-base-opacity:' + nebulaBaseOpacity + ';';
+      if (nebulaPulseAmp > 0) {
+        nebulaAnim += ', village-nebula-pulse ' + spec.pulseDur + 's ease-in-out ' + spec.pulseDelay + 's infinite';
+        varStyle += '--pulse-amp:' + nebulaPulseAmp.toFixed(2) + ';';
+      }
       var nebula = document.createElement('div');
       nebula.className = 'village-nebula';
       nebula.style.cssText = 'position:absolute;' +
         'left:' + nx + 'px;top:' + ny + 'px;' +
         'width:' + nebulaSize + 'px;height:' + nebulaSize + 'px;' +
         'background:radial-gradient(circle, ' + nebulaColor + ' 0%, transparent 75%);' +
-        'animation:village-nebula-drift ' + driftDur + 's ease-in-out ' + driftDelay + 's infinite';
+        'filter:blur(' + nebulaBlurPx + 'px);' +
+        varStyle +
+        'animation:' + nebulaAnim;
       layer.appendChild(nebula);
     }
   }
 
-  // === 일반 별 (반짝임) ===
+  // === 일반 별 (반짝임) — layout 캐시 기반 ===
   // 시작 상태: 0개 (완전 검정 우주 — 캐릭터만 존재). star_count 아이템 구매 시 +10씩 (최대 +100)
+  var layoutStars = _ensureLayout(w, h);
   var baseStars = 0;
   var numStars = baseStars + Math.round(_bf('starCountAdd'));
   var twinkleMul = 1 / (1 + _bf('starTwinkleMul'));  // 속도 +10% → duration × 1/1.1
+  var starSizeAdd = Math.round(_bf('starSizeAdd'));  // 일반 별 전용 크기 보정 (+1px/stack)
+  var starGlowPx = Math.round(_bf('starBrightnessMul'));  // 일반 별 글로우 (0~5px)
+  // star_palette 활성 시 확장 팔레트(13색) 사용, 아니면 기본 10색만 (확장 인덱스는 fallback)
+  var palette = (_bf('starPaletteAdd') > 0) ? STAR_COLOR_PALETTE.concat(STAR_COLOR_PALETTE_EXT) : STAR_COLOR_PALETTE;
+  _ensureStarsCount(layoutStars.stars, numStars);
   for (var i = 0; i < numStars; i++) {
+    var sSpec = layoutStars.stars[i];
     var star = document.createElement('div');
     star.className = 'village-star';
-    var starSize = 1 + Math.floor(Math.random() * 3);
-    var starDur = (2 + Math.random() * 4) * twinkleMul;
-    var starDelay = Math.random() * 3;
-    var starColorIdx = Math.floor(Math.random() * STAR_COLOR_PALETTE.length);
-    var starColor = STAR_COLOR_PALETTE[starColorIdx];
+    var starSize = sSpec.baseSize + starSizeAdd;
+    var starDur = sSpec.dur * twinkleMul;
+    var starColor = palette[sSpec.colorIdx % palette.length];
+    var starGlowStyle = starGlowPx > 0 ? ('box-shadow:0 0 ' + starGlowPx + 'px ' + starColor + ';') : '';
     star.style.cssText = 'position:absolute;' +
-      'left:' + Math.round(Math.random() * w) + 'px;' +
-      'top:' + Math.round(Math.random() * h) + 'px;' +
+      'left:' + Math.round(sSpec.xRatio * w) + 'px;' +
+      'top:' + Math.round(sSpec.yRatio * h) + 'px;' +
       'width:' + starSize + 'px;height:' + starSize + 'px;' +
       'background:' + starColor + ';border-radius:50%;' +
-      'animation:village-twinkle ' + starDur.toFixed(2) + 's ease-in-out ' + starDelay.toFixed(2) + 's infinite';
+      starGlowStyle +
+      'animation:village-twinkle ' + starDur.toFixed(2) + 's ease-in-out ' + sSpec.delay.toFixed(2) + 's infinite';
     layer.appendChild(star);
   }
 
-  // === 푸른 별 (색상 고정 일반별) ===
-  // blue_ratio 아이템: +5 per stack (최대 50개)
+  // === 푸른 별 — layout 캐시 ===
+  // blue_ratio: +5 per stack (최대 50개), blue_glow로 글로우 반경 증가
   var numBlueStars = Math.round(_bf('blueStarAdd'));
+  var blueGlowMul = 1 + _bf('blueGlowMul');
+  var blueGlowPx = Math.round(3 * blueGlowMul);
+  _ensureColoredStarsCount(layoutStars.blueStars, numBlueStars);
   for (var bs = 0; bs < numBlueStars; bs++) {
+    var bSpec = layoutStars.blueStars[bs];
     var bStar = document.createElement('div');
     bStar.className = 'village-star';
-    var bSize = 1 + Math.floor(Math.random() * 3);
-    var bDur = (2 + Math.random() * 4) * twinkleMul;
-    var bDelay = Math.random() * 3;
     bStar.style.cssText = 'position:absolute;' +
-      'left:' + Math.round(Math.random() * w) + 'px;' +
-      'top:' + Math.round(Math.random() * h) + 'px;' +
-      'width:' + bSize + 'px;height:' + bSize + 'px;' +
+      'left:' + Math.round(bSpec.xRatio * w) + 'px;' +
+      'top:' + Math.round(bSpec.yRatio * h) + 'px;' +
+      'width:' + bSpec.baseSize + 'px;height:' + bSpec.baseSize + 'px;' +
       'background:#a8c8ff;border-radius:50%;' +
-      'box-shadow:0 0 3px #a8c8ff;' +
-      'animation:village-twinkle ' + bDur.toFixed(2) + 's ease-in-out ' + bDelay.toFixed(2) + 's infinite';
+      'box-shadow:0 0 ' + blueGlowPx + 'px #a8c8ff;' +
+      'animation:village-twinkle ' + (bSpec.dur * twinkleMul).toFixed(2) + 's ease-in-out ' + bSpec.delay.toFixed(2) + 's infinite';
     layer.appendChild(bStar);
   }
 
-  // === 주황 별 ===
+  // === 주황 별 — layout 캐시 ===
   var numOrangeStars = Math.round(_bf('orangeStarAdd'));
+  var orangeGlowMul = 1 + _bf('orangeGlowMul');
+  var orangeGlowPx = Math.round(3 * orangeGlowMul);
+  _ensureColoredStarsCount(layoutStars.orangeStars, numOrangeStars);
   for (var os = 0; os < numOrangeStars; os++) {
+    var oSpec = layoutStars.orangeStars[os];
     var oStar = document.createElement('div');
     oStar.className = 'village-star';
-    var oSize = 1 + Math.floor(Math.random() * 3);
-    var oDur = (2 + Math.random() * 4) * twinkleMul;
-    var oDelay = Math.random() * 3;
     oStar.style.cssText = 'position:absolute;' +
-      'left:' + Math.round(Math.random() * w) + 'px;' +
-      'top:' + Math.round(Math.random() * h) + 'px;' +
-      'width:' + oSize + 'px;height:' + oSize + 'px;' +
+      'left:' + Math.round(oSpec.xRatio * w) + 'px;' +
+      'top:' + Math.round(oSpec.yRatio * h) + 'px;' +
+      'width:' + oSpec.baseSize + 'px;height:' + oSpec.baseSize + 'px;' +
       'background:#ffd0a0;border-radius:50%;' +
-      'box-shadow:0 0 3px #ffd0a0;' +
-      'animation:village-twinkle ' + oDur.toFixed(2) + 's ease-in-out ' + oDelay.toFixed(2) + 's infinite';
+      'box-shadow:0 0 ' + orangeGlowPx + 'px #ffd0a0;' +
+      'animation:village-twinkle ' + (oSpec.dur * twinkleMul).toFixed(2) + 's ease-in-out ' + oSpec.delay.toFixed(2) + 's infinite';
     layer.appendChild(oStar);
   }
 
-  // === 큰 맥동 별 (해금 후) ===
-  // 시작: 0. unlockPulse 해금 시 기본 1개 + pulse_count 스택으로 +1씩 (최대 15)
+  // === 큰 맥동 별 (해금 후) — layout 캐시 ===
+  // 시작: 0. unlockPulse 해금 시 기본 1개 + pulse_count 스택으로 +1씩 (최대 11)
   if (_bf('unlockPulse') > 0) {
     var numPulse = 1 + Math.round(_bf('pulseCountAdd'));
     var pulseSizeBonus = Math.round(_bf('pulseSizeAdd'));
     var pulseGlowMul = 1 + _bf('pulseGlowMul');
-    // 푸른/주황 큰 별 확정 개수
+    var pulseSpeedMul = 1 / (1 + _bf('pulseSpeedMul'));  // 속도 +10%/stack → duration × 1/1.1
     var bluePulseCount = Math.round(_bf('bluePulseAdd'));
     var orangePulseCount = Math.round(_bf('orangePulseAdd'));
+    var glowR1 = Math.round(6 * pulseGlowMul);
+    var glowR2 = Math.round(12 * pulseGlowMul);
+    _ensurePulsesCount(layoutStars.pulses, numPulse);
 
     for (var p = 0; p < numPulse; p++) {
-      var pulseSize = 4 + Math.floor(Math.random() * 3) + pulseSizeBonus;
-      var pulseDur = 3 + Math.random() * 3;
-      var pulseDelay = Math.random() * 4;
-      // 색상 결정: 앞 N개는 푸른색, 다음 M개는 주황색, 나머지는 랜덤
+      var pSpec = layoutStars.pulses[p];
+      var pulseSize = pSpec.baseSize + pulseSizeBonus;
+      // 색상 결정: 앞 N개는 푸른색, 다음 M개는 주황색, 나머지는 캐시된 randomColorIdx로 고정
       var pulseColor;
       if (p < bluePulseCount) pulseColor = '#a8c8ff';
       else if (p < bluePulseCount + orangePulseCount) pulseColor = '#ffd0a0';
-      else pulseColor = ['#ffffff', '#a8c8ff', '#ffd0a0'][Math.floor(Math.random() * 3)];
+      else pulseColor = ['#ffffff', '#a8c8ff', '#ffd0a0'][pSpec.randomColorIdx];
 
-      var glowR1 = Math.round(6 * pulseGlowMul);
-      var glowR2 = Math.round(12 * pulseGlowMul);
       var pulseStar = document.createElement('div');
       pulseStar.className = 'village-pulse-star';
       pulseStar.style.cssText = 'position:absolute;' +
-        'left:' + Math.round(Math.random() * w) + 'px;' +
-        'top:' + Math.round(Math.random() * h * 0.7) + 'px;' +
+        'left:' + Math.round(pSpec.xRatio * w) + 'px;' +
+        'top:' + Math.round(pSpec.yRatio * h) + 'px;' +
         'width:' + pulseSize + 'px;height:' + pulseSize + 'px;' +
         'background:' + pulseColor + ';border-radius:50%;' +
         'box-shadow:0 0 ' + glowR1 + 'px ' + pulseColor + ',0 0 ' + glowR2 + 'px ' + pulseColor + ';' +
-        'animation:village-pulse ' + pulseDur.toFixed(2) + 's ease-in-out ' + pulseDelay.toFixed(2) + 's infinite';
+        'animation:village-pulse ' + (pSpec.dur * pulseSpeedMul).toFixed(2) + 's ease-in-out ' + pSpec.delay.toFixed(2) + 's infinite';
       layer.appendChild(pulseStar);
     }
   }
 
-  // === 반짝이는 별 (해금 후) ===
+  // === 반짝이는 별 (해금 후) — layout 캐시 ===
   // 시작: 0. unlockRainbow 해금 시 기본 1개 + rainbow_count 스택으로 +1씩 (최대 8)
   if (_bf('unlockRainbow') > 0) {
     var numRainbow = 1 + Math.round(_bf('rainbowCountAdd'));
-    var rainbowSpeedMul = 1 / (1 + _bf('rainbowSpeedMul'));  // 속도 +20% → duration ×1/1.2
+    var rainbowSpeedMul = 1 / (1 + _bf('rainbowSpeedMul'));
+    var rainbowSizeAdd = Math.round(_bf('rainbowSizeAdd'));
+    var rainbowGlowMul = 1 + _bf('rainbowGlowMul');
+    var rainbowTrail = _bf('rainbowTrail') > 0;  // 추가 외곽 글로우 잔상
+    var rbGlowR1 = Math.round(8 * rainbowGlowMul);
+    var rbGlowR2 = Math.round(14 * rainbowGlowMul);
+    var rbGlowR3 = Math.round(24 * rainbowGlowMul);  // trail용 추가 외곽 반경
+    _ensureRainbowsCount(layoutStars.rainbows, numRainbow);
     for (var rb = 0; rb < numRainbow; rb++) {
-      var rbSize = 5 + Math.floor(Math.random() * 3);
-      var rbDur = (6 + Math.random() * 3) * rainbowSpeedMul;
-      var rbDelay = Math.random() * 3;
+      var rbSpec = layoutStars.rainbows[rb];
+      var rbSize = rbSpec.baseSize + rainbowSizeAdd;
+      // trail 활성 시 box-shadow에 추가 광역 외곽 그림자 한 겹 더
+      var rbShadow = rainbowTrail
+        ? ('0 0 ' + rbGlowR1 + 'px currentColor, 0 0 ' + rbGlowR2 + 'px currentColor, 0 0 ' + rbGlowR3 + 'px currentColor')
+        : ('0 0 ' + rbGlowR1 + 'px currentColor, 0 0 ' + rbGlowR2 + 'px currentColor');
       var rbStar = document.createElement('div');
-      rbStar.className = 'village-rainbow-star';
+      rbStar.className = 'village-rainbow-star' + (rainbowTrail ? ' trail' : '');
       rbStar.style.cssText = 'position:absolute;' +
-        'left:' + Math.round(Math.random() * w) + 'px;' +
-        'top:' + Math.round(Math.random() * h * 0.7) + 'px;' +
+        'left:' + Math.round(rbSpec.xRatio * w) + 'px;' +
+        'top:' + Math.round(rbSpec.yRatio * h) + 'px;' +
         'width:' + rbSize + 'px;height:' + rbSize + 'px;' +
         'background:#ffffff;border-radius:50%;' +
-        'box-shadow:0 0 8px currentColor, 0 0 14px currentColor;' +
-        'animation:village-rainbow ' + rbDur.toFixed(2) + 's linear ' + rbDelay.toFixed(2) + 's infinite';
+        'box-shadow:' + rbShadow + ';' +
+        'animation:village-rainbow ' + (rbSpec.dur * rainbowSpeedMul).toFixed(2) + 's linear ' + rbSpec.delay.toFixed(2) + 's infinite';
       layer.appendChild(rbStar);
     }
   }
@@ -345,6 +492,16 @@ var SHOOTING_COLOR_PALETTE = [
 //   sizeMul         — 크기 배수
 //   tailMul         — 꼬리 길이 배수
 // → 이벤트 아이템(사방 별똥별, 전체 잔치, 유성우)에서 위치/방향 지정에 사용
+// 4방향 모드용 방향 테이블 — [angleMin, angleMax, startRegion]
+// startRegion: 'tl' | 'tr' | 'bl' | 'br' (좌상/우상/좌하/우하 시작 구역)
+// 각도 기준: 0°=우측, 90°=하단, 180°=좌측, 270°=상단 (CSS 좌표계)
+var METEOR_DIRECTIONS = [
+  { angleMin: 20,   angleMax: 60,   start: 'tl' },  // 우하단 방향 → 좌상단에서 출발
+  { angleMin: 120,  angleMax: 160,  start: 'tr' },  // 좌하단 방향 → 우상단에서 출발
+  { angleMin: 200,  angleMax: 240,  start: 'br' },  // 좌상단 방향 → 우하단에서 출발
+  { angleMin: -60,  angleMax: -20,  start: 'bl' },  // 우상단 방향 → 좌하단에서 출발
+];
+
 function spawnShootingStar(opts) {
   var layer = document.getElementById('village-stars-layer');
   if (!layer) return;
@@ -356,13 +513,36 @@ function spawnShootingStar(opts) {
   var star = document.createElement('div');
   star.className = 'village-shooting-star';
 
-  // 시작 위치 — 기본은 화면 좌우 전체 × 상단 85% 영역 (방향이 우하단이라 자연스럽게 화면 가로지름)
-  // 너무 아래에서 시작하면 짧게 보이지만 화면 전체에 별똥별이 분포되어 위쪽 편향 해소
-  star.style.left = (opts.startX != null ? opts.startX : (Math.random() * w)) + 'px';
-  star.style.top = (opts.startY != null ? opts.startY : (Math.random() * h * 0.85)) + 'px';
+  // 방향 결정 — meteor_direction 구매 시 4방향 랜덤, 아니면 기본 우하단
+  var angleRange;
+  var startRegion = null;
+  if (opts.angleRange) {
+    angleRange = opts.angleRange;
+  } else if (_bf('meteorDirection') > 0) {
+    var dir = METEOR_DIRECTIONS[Math.floor(Math.random() * METEOR_DIRECTIONS.length)];
+    angleRange = [dir.angleMin, dir.angleMax];
+    startRegion = dir.start;
+  } else {
+    angleRange = [-20, 40];
+  }
 
-  // 방향
-  var angleRange = opts.angleRange || [-20, 40];
+  // 시작 위치 — 4방향 모드면 방향 반대쪽 구역에서, 아니면 화면 전체 상단 85% 랜덤
+  var sx, sy;
+  if (opts.startX != null) sx = opts.startX;
+  else if (startRegion === 'tl') sx = Math.random() * w * 0.35;
+  else if (startRegion === 'tr') sx = w * 0.65 + Math.random() * w * 0.35;
+  else if (startRegion === 'bl') sx = Math.random() * w * 0.35;
+  else if (startRegion === 'br') sx = w * 0.65 + Math.random() * w * 0.35;
+  else sx = Math.random() * w;
+
+  if (opts.startY != null) sy = opts.startY;
+  else if (startRegion === 'tl' || startRegion === 'tr') sy = Math.random() * h * 0.35;
+  else if (startRegion === 'bl' || startRegion === 'br') sy = h * 0.55 + Math.random() * h * 0.35;
+  else sy = Math.random() * h * 0.85;
+
+  star.style.left = sx + 'px';
+  star.style.top = sy + 'px';
+
   var angleDeg = angleRange[0] + Math.random() * (angleRange[1] - angleRange[0]);
   var angleRad = angleDeg * Math.PI / 180;
   var distance = 150 + Math.random() * 120;
@@ -372,25 +552,25 @@ function spawnShootingStar(opts) {
   // 속도
   var dur = 0.8 + Math.random() * 1.2;
 
-  // 색 — forceColor 또는 버프(컬러 확률) 적용
+  // 색 — forceColor 우선, 아니면 무지개 버프면 rainbow 클래스, 기본은 흰색
   var color;
+  var isRainbow = false;
   if (opts.forceColor) {
     color = opts.forceColor;
+  } else if (_bf('meteorRainbow') > 0) {
+    // 무지개 꼬리 — 클래스로 CSS hue-rotate 애니메이션 적용, 기본색은 흰색 유지
+    color = '#ffffff';
+    isRainbow = true;
   } else {
-    // 기본 흰색 + 버프로 컬러 확률 상승
-    var colorChance = 0.10 + _bf('meteorColorAdd');  // 10% + 버프
-    if (Math.random() < colorChance) {
-      var colorOptions = ['#a8c8ff', '#ffd0a0', '#ffb0d0'];
-      color = colorOptions[Math.floor(Math.random() * colorOptions.length)];
-    } else {
-      color = '#ffffff';
-    }
+    color = '#ffffff';
   }
+  if (isRainbow) star.classList.add('rainbow');
 
-  // 크기/꼬리
-  var sizeMul = opts.sizeMul || 1;
+  // 크기/꼬리 — meteor_size 버프 반영. base 2~3px (이전 2~4)로 줄임 — 풀스택에서도 너무 크지 않게
+  var meteorSizeMul = 1 + _bf('meteorSizeMul');
+  var sizeMul = (opts.sizeMul || 1) * meteorSizeMul;
   var tailMul = (opts.tailMul || 1) * (1 + _bf('meteorTailMul'));
-  var size = Math.round((2 + Math.floor(Math.random() * 3)) * sizeMul);
+  var size = Math.round((2 + Math.floor(Math.random() * 2)) * sizeMul);
   var trailLen = Math.round((30 + Math.floor(Math.random() * 50)) * tailMul);
 
   star.style.setProperty('--shoot-dx', dx.toFixed(0) + 'px');
@@ -399,7 +579,10 @@ function spawnShootingStar(opts) {
   star.style.setProperty('--shoot-color', color);
   star.style.setProperty('--shoot-size', size + 'px');
   star.style.setProperty('--shoot-trail-len', trailLen + 'px');
-  star.style.animation = 'village-shootingstar ' + dur.toFixed(2) + 's linear forwards';
+  // 기본 이동 애니메이션 + 무지개 버프 시 hue-rotate 동시 적용 (inline animation이 CSS 규칙보다 우선해서 덮지 않게)
+  var anim = 'village-shootingstar ' + dur.toFixed(2) + 's linear forwards';
+  if (isRainbow) anim += ', meteorHueRotate 1.5s linear infinite';
+  star.style.animation = anim;
 
   layer.appendChild(star);
   setTimeout(function() { star.remove(); }, Math.round(dur * 1000) + 200);
@@ -414,9 +597,9 @@ function startShootingStars() {
   if (_bf('unlockMeteor') <= 0) return;
 
   function schedule() {
-    // 발생 간격 — 기본 2~6초, meteor_freq 버프로 주기 단축
+    // 발생 간격 — 기본 3~8초, meteor_freq 버프로 주기 단축
     var freqMul = 1 / (1 + _bf('meteorFreqMul'));
-    var delay = (2000 + Math.random() * 4000) * freqMul;
+    var delay = (3000 + Math.random() * 5000) * freqMul;
     _shootingStarTimer = setTimeout(function() {
       // burst 확률 — 기본 30% + meteorBurstAdd
       var burstChance = 0.30 + _bf('meteorBurstAdd');
@@ -458,7 +641,14 @@ function enableVillage() {
 // 캐릭터 크기는 CSS 변수(--char-size, .workspace.tier-N)로 처리됨
 function renderVillage() {
   try {
+    // 구매/환불/초기화로 buffs가 바뀐 경우 기존 레이어는 오래된 상태
+    // → 강제 제거 후 재생성 (ensureStarsLayer는 w/h가 같으면 early return하므로 제거 필수)
+    // 위치/색은 _layoutCache에 비율로 캐시되어 있어 재생성해도 같은 자리에 다시 그려짐
+    var existing = document.getElementById('village-stars-layer');
+    if (existing) existing.remove();
     ensureStarsLayer();
+    // 상시 표시형 legendary는 layer 안에 붙는 정적 오버레이 → layer 재생성 시 함께 사라짐 → 재부착
+    if (typeof setupTwinMoon === 'function') setupTwinMoon();
   } catch (e) {
     console.error('[village] renderVillage error:', e);
   }
