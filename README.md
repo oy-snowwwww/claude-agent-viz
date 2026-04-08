@@ -291,10 +291,10 @@ CLAUDE.md
 ```
 ~/.claude/agent-viz/
 ├── public/                    # 클라이언트 정적 파일 (브라우저에 서빙)
-│   ├── index.html             # UI 마크업 + 인라인 메인 스크립트
+│   ├── index.html             # UI 마크업 + <script> 태그만 (인라인 JS 없음)
 │   ├── css/
 │   │   └── styles.css         # 전체 스타일
-│   └── js/                    # JS 모듈 (8개, <script> 순서 로딩)
+│   └── js/                    # JS 모듈 (19개, <script> 순서 로딩)
 │       ├── constants.js       # 상수 (색상, 도구 목록, 픽셀맵, Village Tier)
 │       ├── state.js           # 전역 상태 (sessions, liveInstances, currentVillageTier 등)
 │       ├── utils.js           # 순수 헬퍼 (esc, shade, buildPix) + Village Tier 감지 + 글로벌 툴팁
@@ -302,7 +302,18 @@ CLAUDE.md
 │       ├── creature.js        # 픽셀 캐릭터 자율 행동 (roam/sleep/blink)
 │       ├── history.js         # 세션 히스토리 UI (검색·필터·삭제·cwd 칩)
 │       ├── notifications.js   # 브라우저 알림
-│       └── animations.js      # 시각 이펙트 (sparks/flyDot/celebrate)
+│       ├── animations.js      # 시각 이펙트 (sparks/flyDot/celebrate)
+│       ├── api.js             # 서버 API 호출 래퍼 (fetch/save/delete)
+│       ├── log.js             # 로그 패널 (addLog, renderLogs, fmtTime)
+│       ├── sessions.js        # 세션/탭 관리 (register/switch/rename/reorder + 상태 헬퍼)
+│       ├── workspace.js       # 워크스페이스 + 에이전트 목록 + Master 카드 렌더
+│       ├── panels.js          # Activity + Timeline 패널 렌더
+│       ├── stats.js           # Daily Stats 드롭다운 + SSE 실시간 업데이트
+│       ├── mcp-hooks.js       # MCP 서버 + Hooks 사이드바 렌더
+│       ├── modal.js           # 에이전트/마스터 설정 모달
+│       ├── server-control.js  # 재시작/종료/도움말/토스트
+│       ├── events.js          # SSE 연결 + 이벤트 타입별 핸들러 (handleLiveEvent)
+│       └── main.js            # 부트스트랩 — Theme, renderAll, Logo, init, Page Visibility
 ├── server.js                  # Node.js HTTP 서버
 ├── hook-handler.sh            # Claude Code 훅 → 서버 이벤트 브릿지
 ├── start.sh                   # 서버 시작/종료/상태 CLI
