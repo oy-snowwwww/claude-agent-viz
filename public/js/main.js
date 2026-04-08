@@ -4,8 +4,26 @@
 // - Logo 픽셀아트 IIFE
 // - 초기 fetch 호출 + SSE 연결
 // - Page Visibility 이벤트 (애니메이션 일시정지/재개)
+// - 게임화 버프 (window.gameBuffs) 초기화 + 프리뷰 모드 훅
 // 로드 순서: **마지막** (모든 파일 이후)
 // 의존: 전체 (renderList/Workspace/Activity/Timeline/Logs + init*, fetch*)
+
+// === 게임화 버프 초기화 (Phase 1: 프리뷰 모드 전용) ===
+// Phase 2에서 points.js가 실제 포인트 데이터로 window.gameBuffs를 갱신함
+// URL 파라미터 ?preview=full/mid/empty → 가상 인벤토리로 computeBuffs
+// ?preview 없으면 빈 우주 (모두 해금 안 됨)
+(function initGameBuffs() {
+  var preview = null;
+  try {
+    preview = new URLSearchParams(location.search).get('preview');
+  } catch (e) {}
+  var inventory = (typeof buildPreviewInventory === 'function') ? buildPreviewInventory(preview) : {};
+  window.gameBuffs = (typeof computeBuffs === 'function') ? computeBuffs(inventory) : {};
+  window.gamePreviewMode = preview;
+  if (preview) {
+    console.log('[agent-viz] Preview mode:', preview, 'buffs:', window.gameBuffs);
+  }
+})();
 
 // === Theme ===
 function applyTheme(t) {
@@ -63,6 +81,7 @@ function renderAll() {
 initCreatureSystem();      // creature.js
 initNotifBtn();            // notifications.js
 initVillageTier();         // utils.js — 마을 Tier 자동 감지 + village 활성화
+if (typeof startEventTicks === 'function' && !document.hidden) startEventTicks();  // 게임화 이벤트 틱
 fetchMaster(); fetchSessions(); fetchMcpServers(); fetchHooks(); fetchDailyStats();
 
 // inactive 상태 주기적 갱신 (60초마다 세션 탭 re-render)
@@ -85,11 +104,13 @@ document.addEventListener('visibilitychange', function() {
     stopBlinkInterval();
     stopWalkInterval();
     if (typeof stopShootingStars === 'function') stopShootingStars();
+    if (typeof stopEventTicks === 'function') stopEventTicks();
   } else {
     // 탭 활성: 재개
     startBlinkInterval();
     startWalkInterval();
     if (typeof startShootingStars === 'function') startShootingStars();
+    if (typeof startEventTicks === 'function') startEventTicks();
     renderAll();
   }
 });

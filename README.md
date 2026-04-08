@@ -29,7 +29,8 @@ https://github.com/user-attachments/assets/b3595469-2546-4624-adf8-9a119ea00c2d
 - **브라우저 알림** — 탭 비활성 시 에이전트 완료, 응답 완료 알림 (on/off 토글)
 - **일일 통계** — 오늘의 질문 수, 에이전트별/도구별 사용 횟수, 주간/누적 통계, 🔄 전체 초기화 지원
 - **마을(우주) 모드** — 우주 배경 + 별/은하수/nebula/별똥별. 워크스페이스 폭에 따라 캐릭터 크기 자동 조정 (Tier 1/2/3). 항상 활성 (이전 환경 효과 토글은 제거됨)
-- **성능 최적화** — 탭 비활성 시 애니메이션 자동 정지, renderAll 디바운스
+- **🎮 게임화 — 우주 꾸미기 (Phase 1)** — 완전 검정 우주에서 시작, 활동하며 포인트를 모아 아이템으로 꾸며가는 Cookie Clicker 스타일. 47개 아이템(별/은하수/성운/별똥별/Ambient/이벤트/Legendary) + 11종 주기적 이벤트 발동. 프리뷰 모드 지원(`?preview=empty/mid/full`). ⚠ Phase 1은 비주얼만 — 실제 포인트/상점 UI는 Phase 2에서 추가
+- **성능 최적화** — 탭 비활성 시 애니메이션 자동 정지, renderAll 디바운스, 이벤트 마스터 틱 single-interval, DOM 파티클 상한 가드
 
 ## 요구사항
 
@@ -294,26 +295,27 @@ CLAUDE.md
 │   ├── index.html             # UI 마크업 + <script> 태그만 (인라인 JS 없음)
 │   ├── css/
 │   │   └── styles.css         # 전체 스타일
-│   └── js/                    # JS 모듈 (19개, <script> 순서 로딩)
-│       ├── constants.js       # 상수 (색상, 도구 목록, 픽셀맵, Village Tier)
+│   └── js/                    # JS 모듈 (20개, <script> 순서 로딩)
+│       ├── constants.js       # 상수 (색상, 도구 목록, 픽셀맵, Village Tier, 게임화 ITEMS 카탈로그)
 │       ├── state.js           # 전역 상태 (sessions, liveInstances, currentVillageTier 등)
 │       ├── utils.js           # 순수 헬퍼 (esc, shade, buildPix) + Village Tier 감지 + 글로벌 툴팁
-│       ├── village.js         # 마을(우주) 모드 — 별/은하수/nebula/별똥별
+│       ├── village.js         # 마을(우주) 모드 — 별/은하수/nebula/별똥별 (게임 버프 적용)
 │       ├── creature.js        # 픽셀 캐릭터 자율 행동 (roam/sleep/blink)
 │       ├── history.js         # 세션 히스토리 UI (검색·필터·삭제·cwd 칩)
 │       ├── notifications.js   # 브라우저 알림
 │       ├── animations.js      # 시각 이펙트 (sparks/flyDot/celebrate)
+│       ├── event-ticks.js     # 게임화 이벤트 마스터 틱 (12종 주기적 발동형 이펙트)
 │       ├── api.js             # 서버 API 호출 래퍼 (fetch/save/delete)
 │       ├── log.js             # 로그 패널 (addLog, renderLogs, fmtTime)
 │       ├── sessions.js        # 세션/탭 관리 (register/switch/rename/reorder + 상태 헬퍼)
-│       ├── workspace.js       # 워크스페이스 + 에이전트 목록 + Master 카드 렌더
+│       ├── workspace.js       # 워크스페이스 + 에이전트 목록 + Master 카드 렌더 (Ambient 버프 적용)
 │       ├── panels.js          # Activity + Timeline 패널 렌더
 │       ├── stats.js           # Daily Stats 드롭다운 + SSE 실시간 업데이트
 │       ├── mcp-hooks.js       # MCP 서버 + Hooks 사이드바 렌더
 │       ├── modal.js           # 에이전트/마스터 설정 모달
 │       ├── server-control.js  # 재시작/종료/도움말/토스트
 │       ├── events.js          # SSE 연결 + 이벤트 타입별 핸들러 (handleLiveEvent)
-│       └── main.js            # 부트스트랩 — Theme, renderAll, Logo, init, Page Visibility
+│       └── main.js            # 부트스트랩 — Theme, renderAll, Logo, init, Page Visibility, 게임 버프 초기화 + 프리뷰 모드
 ├── server.js                  # Node.js HTTP 서버
 ├── hook-handler.sh            # Claude Code 훅 → 서버 이벤트 브릿지
 ├── start.sh                   # 서버 시작/종료/상태 CLI

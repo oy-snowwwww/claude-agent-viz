@@ -379,9 +379,102 @@
     .ws-agent{animation:agentEnter .5s ease-out}
     @keyframes agentEnter{from{opacity:0;transform:translate(-50%,-50%) translateY(15px)}to{opacity:1;transform:translate(-50%,-50%) translateY(0)}}
 
-    /* 떠다니는 파티클 */
+    /* 떠다니는 파티클 — --dy는 game-buff로 상승 높이 조정 (기본 -150px) */
     .ambient{position:absolute;width:3px;height:3px;border-radius:50%;pointer-events:none;z-index:0;opacity:0;animation:floatUp linear infinite}
-    @keyframes floatUp{0%{opacity:0;transform:translate(0,0)}10%{opacity:.6}90%{opacity:.6}100%{opacity:0;transform:translate(var(--dx),-150px)}}
+    @keyframes floatUp{0%{opacity:0;transform:translate(0,0)}10%{opacity:.6}90%{opacity:.6}100%{opacity:0;transform:translate(var(--dx),var(--dy,-150px))}}
+
+    /* ========== 게임화: 신규 이펙트 ========== */
+
+    /* 반짝이는 별 (무지개 회전) — village.js에서 생성 */
+    @keyframes village-rainbow{
+      0%{filter:hue-rotate(0deg) brightness(1.1);opacity:.6}
+      25%{filter:hue-rotate(90deg) brightness(1.4);opacity:1}
+      50%{filter:hue-rotate(180deg) brightness(1.1);opacity:.7}
+      75%{filter:hue-rotate(270deg) brightness(1.4);opacity:1}
+      100%{filter:hue-rotate(360deg) brightness(1.1);opacity:.6}
+    }
+    .village-rainbow-star{position:absolute;will-change:filter,opacity;color:#a8c8ff}
+
+    /* 이벤트: 우주의 숨결 (전체 페이드) */
+    .village-stars-layer.evt-heartbeat{animation:evtHeartbeat .5s ease-in-out}
+    @keyframes evtHeartbeat{0%,100%{filter:brightness(1)}50%{filter:brightness(1.8)}}
+
+    /* 이벤트: 별빛 부스터 (밝기 2배) */
+    .village-stars-layer.evt-booster{animation:evtBooster 1s ease-in-out}
+    @keyframes evtBooster{0%,100%{filter:brightness(1)}50%{filter:brightness(2.2)}}
+
+    /* 이벤트: 은하수 번쩍 */
+    .village-stars-layer.evt-galaxy-flash{animation:evtGalaxyFlash 2s ease-in-out}
+    @keyframes evtGalaxyFlash{0%,100%{filter:brightness(1)}50%{filter:brightness(2.5) contrast(1.2)}}
+
+    /* 이벤트: 성운 개화 */
+    .village-nebula.evt-bloom{animation:evtNebulaBloom 3s ease-in-out;will-change:transform,opacity}
+    @keyframes evtNebulaBloom{0%,100%{transform:scale(1);opacity:.7}50%{transform:scale(1.5);opacity:1}}
+
+    /* 이벤트: 무지개 물결 */
+    .village-stars-layer.evt-rainbow-wave{animation:evtRainbowWave 2s linear}
+    @keyframes evtRainbowWave{0%{filter:hue-rotate(0deg)}100%{filter:hue-rotate(360deg)}}
+
+    /* 이벤트: 블랙홀 파동 (중앙 원형 확산) */
+    .evt-blackhole-ring{
+      position:absolute;
+      width:20px;height:20px;
+      border:2px solid rgba(167,139,250,.8);
+      border-radius:50%;
+      transform:translate(-50%,-50%) scale(0);
+      pointer-events:none;
+      animation:evtBlackholeRing 2s ease-out forwards;
+      box-shadow:0 0 15px rgba(167,139,250,.6),inset 0 0 10px rgba(167,139,250,.4);
+    }
+    @keyframes evtBlackholeRing{
+      0%{transform:translate(-50%,-50%) scale(0);opacity:1}
+      100%{transform:translate(-50%,-50%) scale(25);opacity:0}
+    }
+
+    /* Legendary: Supernova flash */
+    .evt-supernova-flash{
+      position:absolute;inset:0;
+      background:radial-gradient(circle at center,rgba(255,255,255,.8) 0%,rgba(251,191,36,.3) 30%,transparent 70%);
+      pointer-events:none;
+      animation:evtSupernovaFlash 1.5s ease-out forwards;
+    }
+    @keyframes evtSupernovaFlash{
+      0%{opacity:0;transform:scale(.3)}
+      20%{opacity:1;transform:scale(1)}
+      100%{opacity:0;transform:scale(1.5)}
+    }
+    .evt-supernova-particle{
+      position:absolute;
+      width:4px;height:4px;border-radius:50%;
+      box-shadow:0 0 8px currentColor;
+      pointer-events:none;
+      animation:evtSupernovaParticle 2.5s ease-out forwards;
+      --sx:0px;--sy:0px;
+    }
+    @keyframes evtSupernovaParticle{
+      0%{transform:translate(-50%,-50%);opacity:1}
+      100%{transform:translate(calc(-50% + var(--sx)),calc(-50% + var(--sy)));opacity:0}
+    }
+
+    /* Legendary: Aurora (상단 상시 웨이브) */
+    .evt-aurora{
+      position:absolute;top:0;left:0;right:0;height:35%;
+      background:linear-gradient(180deg,
+        rgba(16,185,129,.15) 0%,
+        rgba(52,211,153,.1) 30%,
+        rgba(167,139,250,.08) 60%,
+        transparent 100%);
+      pointer-events:none;
+      mix-blend-mode:screen;
+      filter:blur(30px);
+      animation:evtAuroraWave 15s ease-in-out infinite;
+      will-change:transform,opacity;
+    }
+    @keyframes evtAuroraWave{
+      0%,100%{transform:translateX(0) scaleY(1);opacity:.6}
+      33%{transform:translateX(-20px) scaleY(1.15);opacity:.85}
+      66%{transform:translateX(15px) scaleY(.9);opacity:.7}
+    }
 
     /* Activity Panel */
     .activity{flex:0 0 auto;border-top:1px solid var(--border);background:var(--surface);max-height:180px;overflow-y:auto;scrollbar-width:thin}

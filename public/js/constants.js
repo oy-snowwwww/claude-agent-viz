@@ -51,7 +51,145 @@ var PMAPS = {
   _haiku:    [[0,0,0,0,0,0,0],[0,0,1,1,1,0,0]]
 };
 
+// === 게임화 아이템 카탈로그 (v5) ===
+// 각 아이템: { name, desc, category, rarity, price, maxStack, effect: { key, delta } }
+// buffs 계산: inventory[id] * effect.delta → buffs[effect.key]에 누적
+// category: unlock | stars | pulse | rainbow | blue | orange | galaxy | nebula | meteor | ambient | event | legendary
+// rarity: common | rare | epic | legendary
+//
+// ⚠ 키 변경 시 village.js / workspace.js / event-ticks.js에서 참조하는 buffs 키도 함께 수정
+var ITEMS = {
+  // ─── 해금 아이템 (1회 구매) ───
+  unlock_pulse:    { name: '큰 별 해금',          desc: '큰 맥동 별 시스템을 활성화합니다',       category: 'unlock', rarity: 'common', price: 60,  maxStack: 1, effect: { key: 'unlockPulse',    delta: 1 } },
+  unlock_nebula:   { name: '성운 해금',           desc: '첫 성운 1개가 등장합니다',             category: 'unlock', rarity: 'common', price: 80,  maxStack: 1, effect: { key: 'unlockNebula',   delta: 1 } },
+  unlock_ambient:  { name: 'Ambient 해금',        desc: '올라가는 반짝이 파티클을 활성화합니다',   category: 'unlock', rarity: 'common', price: 100, maxStack: 1, effect: { key: 'unlockAmbient',  delta: 1 } },
+  unlock_galaxy:   { name: '은하수 해금',         desc: '첫 은하수가 등장합니다',               category: 'unlock', rarity: 'rare',   price: 150, maxStack: 1, effect: { key: 'unlockGalaxy',   delta: 1 } },
+  unlock_meteor:   { name: '별똥별 해금',         desc: '별똥별 시스템을 활성화합니다',          category: 'unlock', rarity: 'rare',   price: 50,  maxStack: 1, effect: { key: 'unlockMeteor',   delta: 1 } },
+  unlock_rainbow:  { name: '반짝이는 별 해금',    desc: '무지개 별 1개가 등장합니다',           category: 'unlock', rarity: 'epic',   price: 300, maxStack: 1, effect: { key: 'unlockRainbow',  delta: 1 } },
+
+  // ─── ⭐ 일반 별 ───
+  star_count:      { name: '별 10개 추가',        desc: '일반 별 +10개',                       category: 'stars',  rarity: 'common', price: 15, maxStack: 10, effect: { key: 'starCountAdd',    delta: 10   } },
+  star_twinkle:    { name: '반짝임 가속',         desc: '별 반짝임 속도 +10%',                  category: 'stars',  rarity: 'common', price: 20, maxStack: 5,  effect: { key: 'starTwinkleMul',  delta: 0.10 } },
+
+  // ─── 💫 큰 별 (pulse) ───
+  pulse_count:     { name: '등대 증설',           desc: '큰 별 +1개',                          category: 'pulse',  rarity: 'common', price: 40,  maxStack: 14, effect: { key: 'pulseCountAdd',   delta: 1    } },
+  pulse_size:      { name: '등대 확대',           desc: '큰 별 크기 +1px',                      category: 'pulse',  rarity: 'rare',   price: 120, maxStack: 3,  effect: { key: 'pulseSizeAdd',    delta: 1    } },
+  pulse_glow:      { name: '등대 강화',           desc: '큰 별 글로우 반경 +30%',               category: 'pulse',  rarity: 'common', price: 60,  maxStack: 5,  effect: { key: 'pulseGlowMul',    delta: 0.30 } },
+
+  // ─── 🔵 푸른 별 ───
+  blue_ratio:      { name: '푸른빛 결정',         desc: '푸른 별 +5개',                        category: 'blue',   rarity: 'rare',   price: 30,  maxStack: 10, effect: { key: 'blueStarAdd',     delta: 5    } },
+  blue_pulse:      { name: '푸른 등대',           desc: '큰 별 1개 푸른빛 확정',                category: 'blue',   rarity: 'epic',   price: 200, maxStack: 3,  effect: { key: 'bluePulseAdd',    delta: 1    } },
+
+  // ─── 🟠 주황 별 ───
+  orange_ratio:    { name: '호박빛 결정',         desc: '주황 별 +5개',                        category: 'orange', rarity: 'rare',   price: 30,  maxStack: 10, effect: { key: 'orangeStarAdd',   delta: 5    } },
+  orange_pulse:    { name: '호박 등대',           desc: '큰 별 1개 주황빛 확정',                category: 'orange', rarity: 'epic',   price: 200, maxStack: 3,  effect: { key: 'orangePulseAdd',  delta: 1    } },
+
+  // ─── 💎 반짝이는 별 (무지개 회전, 해금 후) ───
+  rainbow_count:   { name: '무지개 별 +1',        desc: '반짝이는 별 +1개',                    category: 'rainbow', rarity: 'rare',  price: 150, maxStack: 7,  effect: { key: 'rainbowCountAdd', delta: 1    } },
+  rainbow_speed:   { name: '무지개 가속',         desc: '색 전환 속도 +20%',                   category: 'rainbow', rarity: 'rare',  price: 80,  maxStack: 5,  effect: { key: 'rainbowSpeedMul', delta: 0.20 } },
+
+  // ─── 🌌 은하수 (해금 후) ───
+  galaxy_extra:    { name: '추가 은하수',         desc: '은하수 +1개 (최대 +3, 총 4개)',        category: 'galaxy', rarity: 'rare',   price: 400, maxStack: 3,  effect: { key: 'galaxyExtraAdd',  delta: 1    } },
+  galaxy_density:  { name: '은하수 응축',         desc: '별 밀도 +5%',                         category: 'galaxy', rarity: 'common', price: 50,  maxStack: 10, effect: { key: 'galaxyDensityMul',delta: 0.05 } },
+  galaxy_size:     { name: '은하수 팽창',         desc: '크기 +5%',                            category: 'galaxy', rarity: 'common', price: 60,  maxStack: 10, effect: { key: 'galaxySizeMul',   delta: 0.05 } },
+  galaxy_blue:     { name: '푸른 은하수',         desc: '색조 파랑 선호',                       category: 'galaxy', rarity: 'epic',   price: 250, maxStack: 1,  effect: { key: 'galaxyBlueTint',  delta: 1    } },
+  galaxy_orange:   { name: '주황 은하수',         desc: '색조 주황 선호',                       category: 'galaxy', rarity: 'epic',   price: 250, maxStack: 1,  effect: { key: 'galaxyOrangeTint',delta: 1    } },
+
+  // ─── ☁️ 성운 (해금 후) ───
+  nebula_count:    { name: '성운 확장',           desc: '성운 +1개',                           category: 'nebula', rarity: 'common', price: 80, maxStack: 5,  effect: { key: 'nebulaCountAdd',  delta: 1    } },
+  nebula_size:     { name: '성운 팽창',           desc: '크기 +10%',                           category: 'nebula', rarity: 'common', price: 40, maxStack: 10, effect: { key: 'nebulaSizeMul',   delta: 0.10 } },
+  nebula_slow:     { name: '성운 부유',           desc: '이동 속도 -10%',                      category: 'nebula', rarity: 'common', price: 35, maxStack: 5,  effect: { key: 'nebulaSlowMul',   delta: 0.10 } },
+
+  // ─── 🌠 별똥별 (해금 후) ───
+  meteor_freq:     { name: '유성 빈도',           desc: '발생 간격 -10%',                      category: 'meteor', rarity: 'common', price: 30,  maxStack: 8,  effect: { key: 'meteorFreqMul',   delta: 0.10 } },
+  meteor_burst:    { name: '연쇄 확률',           desc: 'burst 확률 +5%',                      category: 'meteor', rarity: 'common', price: 50,  maxStack: 10, effect: { key: 'meteorBurstAdd',  delta: 0.05 } },
+  meteor_burst_n:  { name: '연쇄 폭',             desc: 'burst 개수 +1',                       category: 'meteor', rarity: 'rare',   price: 120, maxStack: 3,  effect: { key: 'meteorBurstN',    delta: 1    } },
+  meteor_color:    { name: '컬러 유성',           desc: '컬러 확률 +1%',                       category: 'meteor', rarity: 'common', price: 25,  maxStack: 20, effect: { key: 'meteorColorAdd',  delta: 0.01 } },
+  meteor_tail:     { name: '긴 꼬리',             desc: '꼬리 길이 +10%',                      category: 'meteor', rarity: 'common', price: 25,  maxStack: 5,  effect: { key: 'meteorTailMul',   delta: 0.10 } },
+
+  // ─── ✨ Ambient (해금 후) ───
+  ambient_rate:    { name: '방출 가속',           desc: '생성 주기 -10%',                      category: 'ambient', rarity: 'common', price: 40, maxStack: 5, effect: { key: 'ambientRateMul',  delta: 0.10 } },
+  ambient_size:    { name: '파편 확대',           desc: '크기 +15%',                           category: 'ambient', rarity: 'common', price: 30, maxStack: 5, effect: { key: 'ambientSizeMul',  delta: 0.15 } },
+  ambient_height:  { name: '비행 고도',           desc: '상승 높이 +15%',                      category: 'ambient', rarity: 'common', price: 30, maxStack: 5, effect: { key: 'ambientHeightMul',delta: 0.15 } },
+  ambient_colors:  { name: '팔레트 확장',         desc: '색 +1종 (기본 6 → 최대 12)',           category: 'ambient', rarity: 'rare',   price: 60, maxStack: 6, effect: { key: 'ambientColorAdd', delta: 1    } },
+
+  // ─── 🎆 이벤트 아이템 (1회 구매, 주기적 발동) ───
+  event_heartbeat:    { name: '우주의 숨결',       desc: '15초마다 전체 별 fade 한 번 (0.5s)',   category: 'event', rarity: 'common', price: 250,  maxStack: 1, effect: { key: 'eventHeartbeat',   delta: 1 } },
+  event_booster:      { name: '별빛 부스터',       desc: '30초마다 모든 별 순간 2배 밝기 (1s)',  category: 'event', rarity: 'common', price: 300,  maxStack: 1, effect: { key: 'eventBooster',     delta: 1 } },
+  event_ambientburst: { name: 'Ambient 폭발',      desc: '30초마다 Ambient 15개 동시 분출 (2s)', category: 'event', rarity: 'rare',   price: 350,  maxStack: 1, effect: { key: 'eventAmbientBurst',delta: 1 } },
+  event_nebulabloom:  { name: '성운 개화',         desc: '30초마다 성운 크기 +50% (3s)',         category: 'event', rarity: 'rare',   price: 450,  maxStack: 1, effect: { key: 'eventNebulaBloom', delta: 1 } },
+  event_galaxyflash:  { name: '은하수 번쩍',       desc: '45초마다 은하수 halo 3배 밝기 (2s)',    category: 'event', rarity: 'rare',   price: 400,  maxStack: 1, effect: { key: 'eventGalaxyFlash', delta: 1 } },
+  event_meteorrush:   { name: '유성 러시',         desc: '1분마다 별똥별 5배 + burst 100% (8s)', category: 'event', rarity: 'rare',   price: 500,  maxStack: 1, effect: { key: 'eventMeteorRush',  delta: 1 } },
+  event_rainbowwave:  { name: '무지개 물결',       desc: '1분마다 모든 별 hue-rotate 한 바퀴 (2s)', category: 'event', rarity: 'epic', price: 600, maxStack: 1, effect: { key: 'eventRainbowWave', delta: 1 } },
+  event_fourway:      { name: '사방 별똥별',       desc: '1분 30초마다 4방향 동시 유성 (5s)',     category: 'event', rarity: 'epic',   price: 800,  maxStack: 1, effect: { key: 'eventFourway',     delta: 1 } },
+  event_blackhole:    { name: '블랙홀 파동',       desc: '2분마다 중앙에서 파동 확산 (3s)',       category: 'event', rarity: 'epic',   price: 700,  maxStack: 1, effect: { key: 'eventBlackhole',   delta: 1 } },
+  event_fullshower:   { name: '전체 별똥별 잔치',  desc: '3분마다 화면 전체에서 유성 폭풍 (10s)', category: 'event', rarity: 'epic',   price: 1000, maxStack: 1, effect: { key: 'eventFullShower',  delta: 1 } },
+
+  // ─── 🎊 Legendary (1회 구매) ───
+  legendary_supernova: { name: 'Supernova',          desc: '10분마다 화면 중앙 폭발 flash',       category: 'legendary', rarity: 'legendary', price: 1500, maxStack: 1, effect: { key: 'legendarySupernova', delta: 1 } },
+  legendary_aurora:    { name: 'Aurora Borealis',    desc: '상단에 오로라 웨이브 상시 표시',        category: 'legendary', rarity: 'legendary', price: 2000, maxStack: 1, effect: { key: 'legendaryAurora',    delta: 1 } },
+  legendary_cosmicrain:{ name: 'Cosmic Rain',        desc: '1시간마다 30초 유성우 폭풍',           category: 'legendary', rarity: 'legendary', price: 3000, maxStack: 1, effect: { key: 'legendaryCosmicRain',delta: 1 } },
+};
+
+// 점수 체계 v3 (소수점 누적, UI는 반올림)
+var POINTS_RULES = {
+  thinking_start: 3,     // 질문 제출
+  tool_use: 0.5,         // 도구 사용
+  agent_done: 10,        // 에이전트 완료
+  thinking_end: 1,       // 응답 완료
+};
+
+// === 아이템 카탈로그 → 버프 객체 계산 ===
+// inventory: { id: count } → buffs: { key: value }
+// unknown id는 무시 (역호환)
+function computeBuffs(inventory) {
+  var buffs = {};
+  if (!inventory) return buffs;
+  Object.keys(inventory).forEach(function(id) {
+    var def = ITEMS[id];
+    if (!def) return;
+    var count = Math.min(inventory[id] || 0, def.maxStack);
+    if (count <= 0) return;
+    var key = def.effect.key;
+    buffs[key] = (buffs[key] || 0) + def.effect.delta * count;
+  });
+  return buffs;
+}
+
+// === 프리뷰 모드 — 가상 인벤토리 생성 ===
+// mode: 'empty' | 'mid' | 'full' | null
+// empty: 모든 해금/업그레이드 없음 (빈 우주)
+// mid: 약 1개월 진행 (해금 4개 + 주요 업그레이드 절반)
+// full: 모든 아이템 max stack 완주
+function buildPreviewInventory(mode) {
+  if (mode === 'full') {
+    var inv = {};
+    Object.keys(ITEMS).forEach(function(id) { inv[id] = ITEMS[id].maxStack });
+    return inv;
+  }
+  if (mode === 'mid') {
+    return {
+      unlock_meteor: 1, unlock_nebula: 1, unlock_galaxy: 1, unlock_ambient: 1,
+      star_count: 5, star_twinkle: 2,
+      nebula_count: 2, nebula_size: 4,
+      galaxy_density: 4, galaxy_size: 4,
+      meteor_freq: 3, meteor_burst: 4, meteor_color: 8,
+      ambient_rate: 2, ambient_size: 2,
+      event_heartbeat: 1, event_booster: 1, event_ambientburst: 1,
+    };
+  }
+  return {}; // empty
+}
+
 // CommonJS 조건부 export (Node 테스트 환경에서만, 브라우저에는 영향 없음)
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { pickVillageTier: pickVillageTier, VILLAGE_TIER_MIN_W: VILLAGE_TIER_MIN_W, PMAPS: PMAPS };
+  module.exports = {
+    pickVillageTier: pickVillageTier,
+    VILLAGE_TIER_MIN_W: VILLAGE_TIER_MIN_W,
+    PMAPS: PMAPS,
+    ITEMS: ITEMS,
+    POINTS_RULES: POINTS_RULES,
+    computeBuffs: computeBuffs,
+    buildPreviewInventory: buildPreviewInventory,
+  };
 }

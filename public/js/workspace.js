@@ -218,24 +218,56 @@ function renderWorkspace() {
 }
 
 var _ambientRunning = false;
+var _ambientInterval = null;
+
+// Ambient 파티클 확장 팔레트 (기본 6색 + ambient_colors 스택으로 최대 12색)
+var AMBIENT_COLORS_BASE = ['#00ffc8', '#a78bfa', '#fbbf24', '#00d4ff', '#f472b6', '#84cc16'];
+var AMBIENT_COLORS_EXT  = ['#ffffff', '#ff6b6b', '#4fd1c5', '#e879f9', '#fcd34d', '#60a5fa'];
+
+// 버프 헬퍼 (village.js의 _bf와 동일)
+function _wsBf(key, def) {
+  var b = (typeof window !== 'undefined' && window.gameBuffs) || {};
+  var v = b[key];
+  return (typeof v === 'number') ? v : (def || 0);
+}
 
 function startAmbient(ws) {
   if (_ambientRunning) return;
+  // Ambient 해금 안 되어 있으면 시작 안 함 (빈 우주에서 시작)
+  if (_wsBf('unlockAmbient') <= 0) return;
   _ambientRunning = true;
-  var colors = ['#00ffc8', '#a78bfa', '#fbbf24', '#00d4ff', '#f472b6', '#84cc16'];
-  setInterval(function() {
+
+  // 버프 적용
+  var extraColors = Math.round(_wsBf('ambientColorAdd'));
+  var colors = AMBIENT_COLORS_BASE.concat(AMBIENT_COLORS_EXT.slice(0, extraColors));
+  var rateMul = 1 / (1 + _wsBf('ambientRateMul'));  // 생성 주기 단축
+  var sizeMul = 1 + _wsBf('ambientSizeMul');        // 크기 배수
+  var heightMul = 1 + _wsBf('ambientHeightMul');    // 상승 높이 배수
+
+  _ambientInterval = setInterval(function() {
     if (!document.getElementById('workspace')) return;
+    // DOM 파티클 상한 — ambient + shooting + 게임 이벤트 파티클 합쳐서 안전 가드
+    if (ws.querySelectorAll('.ambient').length >= 80) return;
     var p = document.createElement('div'); p.className = 'ambient';
     p.style.background = colors[Math.floor(Math.random() * colors.length)];
     p.style.left = Math.random() * 100 + '%';
     p.style.top = (Math.random() * 100) + '%';
     p.style.setProperty('--dx', (Math.random() * 40 - 20) + 'px');
+    p.style.setProperty('--dy', (-150 * heightMul) + 'px');
     p.style.animationDuration = (4 + Math.random() * 5) + 's';
-    var size = 2 + Math.random() * 3;
+    var size = (2 + Math.random() * 3) * sizeMul;
     p.style.width = size + 'px'; p.style.height = size + 'px';
     ws.appendChild(p);
     setTimeout(function() { p.remove() }, 9000);
-  }, 500);
+  }, Math.round(500 * rateMul));
+}
+
+// Ambient 재시작 (프리뷰 모드 전환 또는 해금 직후 호출)
+function restartAmbient() {
+  if (_ambientInterval) { clearInterval(_ambientInterval); _ambientInterval = null; }
+  _ambientRunning = false;
+  var ws = document.getElementById('workspace');
+  if (ws) startAmbient(ws);
 }
 
 function getPositions(n) {
