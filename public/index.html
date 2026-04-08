@@ -211,7 +211,6 @@
   <script src="/js/state.js"></script>
   <script src="/js/utils.js"></script>
   <script src="/js/village.js"></script>
-  <script src="/js/environment.js"></script>
   <script src="/js/creature.js"></script>
   <script src="/js/history.js"></script>
   <script src="/js/notifications.js"></script>
@@ -538,8 +537,6 @@
       var positions=getPositions(nodes.length);
       var existingIds={};
       ws.querySelectorAll('.ws-agent').forEach(function(el){existingIds[el.id]=true});
-      // 집 추가 (없으면)
-      if(!ws.querySelector('#ws-house')) ws.appendChild(buildHouse());
       // 삭제된 노드 제거
       ws.querySelectorAll('.ws-agent').forEach(function(el){
         var wid=el.id.replace('ws-','');
@@ -578,16 +575,6 @@
         var bub=el.querySelector('.ws-bubble');
         if(bub){bub.textContent=nd._task||'';bub.style.display=nd._task?'':'none'}
       });
-    }
-    // 집 배지 업데이트 (비활성 에이전트 수)
-    var house=ws.querySelector('#ws-house');
-    if(house){
-      var disabledCount=projectAgents.hasRestriction?agents.filter(function(a){return a.active&&projectAgents.enabled.indexOf(a.id)<0}).length:0;
-      var badge=house.querySelector('.ws-house-badge');
-      if(disabledCount>0){
-        if(!badge){badge=document.createElement('div');badge.className='ws-house-badge';house.appendChild(badge)}
-        badge.textContent='🏠 '+disabledCount;
-      } else {if(badge)badge.remove()}
     }
     // 상태별 이펙트: 아우라 (working), 이모션 (done)
     nodes.forEach(function(nd){
@@ -1236,7 +1223,6 @@
 
 
   // === Init ===
-  // village 모드 항상 ON — initEnvironment(4계절/날씨/구름) 건너뜀
   initCreatureSystem(); // creature.js
   initNotifBtn(); // notifications.js
   initVillageTier(); // utils.js — 마을 Tier 자동 감지 + village 활성화

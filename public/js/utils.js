@@ -31,45 +31,6 @@ function instKey(sp, ai) {
   return sp + '_' + ai;
 }
 
-// 워크스페이스 픽셀아트 "집" DOM 생성
-function buildHouse() {
-  var t = 'transparent', r = '#8B4513', w = '#D2B48C', d = '#654321', wi = '#87CEEB', g = '#228B22';
-  var houseMap = [
-    [t,t,t,t,r,t,t,t,t],
-    [t,t,t,r,r,r,t,t,t],
-    [t,t,r,r,r,r,r,t,t],
-    [t,r,r,r,r,r,r,r,t],
-    [w,w,w,w,w,w,w,w,w],
-    [w,wi,w,w,d,w,w,wi,w],
-    [w,wi,w,w,d,w,w,wi,w],
-    [w,w,w,w,d,w,w,w,w],
-    [g,g,g,g,g,g,g,g,g],
-  ];
-  var el = document.createElement('div');
-  el.className = 'ws-house';
-  el.id = 'ws-house';
-  var body = document.createElement('div');
-  body.className = 'ws-house-body';
-  houseMap.forEach(function(row) {
-    row.forEach(function(c) {
-      var cell = document.createElement('i');
-      cell.style.background = c;
-      body.appendChild(cell);
-    });
-  });
-  el.appendChild(body);
-  // 굴뚝 연기
-  var smoke = document.createElement('div');
-  smoke.className = 'ws-house-smoke';
-  for (var s = 0; s < 3; s++) {
-    var sp = document.createElement('span');
-    sp.style.animationDelay = (s * 1) + 's';
-    smoke.appendChild(sp);
-  }
-  el.appendChild(smoke);
-  return el;
-}
-
 // === Village Tier 자동 감지/적용 ===
 // 워크스페이스 폭에 따라 currentVillageTier 결정 + .tier-N 클래스 부착
 // CSS 변수 --char-size가 .workspace.tier-N으로 캐릭터 크기를 자동 적용

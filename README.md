@@ -294,14 +294,13 @@ CLAUDE.md
 │   ├── index.html             # UI 마크업 + 인라인 메인 스크립트
 │   ├── css/
 │   │   └── styles.css         # 전체 스타일
-│   └── js/                    # JS 모듈 (9개, <script> 순서 로딩)
+│   └── js/                    # JS 모듈 (8개, <script> 순서 로딩)
 │       ├── constants.js       # 상수 (색상, 도구 목록, 픽셀맵, Village Tier)
 │       ├── state.js           # 전역 상태 (sessions, liveInstances, currentVillageTier 등)
-│       ├── utils.js           # 순수 헬퍼 (esc, shade, buildPix) + Village Tier 감지
+│       ├── utils.js           # 순수 헬퍼 (esc, shade, buildPix) + Village Tier 감지 + 글로벌 툴팁
 │       ├── village.js         # 마을(우주) 모드 — 별/은하수/nebula/별똥별
-│       ├── environment.js     # (레거시) 환경 효과 — village 모드 전환 후 inactive
 │       ├── creature.js        # 픽셀 캐릭터 자율 행동 (roam/sleep/blink)
-│       ├── history.js         # 세션 히스토리 UI (검색·필터·Privacy·cwd 칩)
+│       ├── history.js         # 세션 히스토리 UI (검색·필터·삭제·cwd 칩)
 │       ├── notifications.js   # 브라우저 알림
 │       └── animations.js      # 시각 이펙트 (sparks/flyDot/celebrate)
 ├── server.js                  # Node.js HTTP 서버
@@ -405,7 +404,7 @@ model: sonnet
 - **의존성 없음** — npm 패키지, 외부 CDN 없이 Node.js 내장 모듈만 사용
 - **정적 파일 서빙** — `public/` 하위에 클라이언트 자산 (HTML/CSS/JS) 분리, 서버가 직접 서빙
 - **SSE (Server-Sent Events)** — 실시간 이벤트 스트리밍
-- **Vanilla JavaScript** — 프레임워크 없는 순수 JS, 빌드 시스템 없음 (ES 모듈 대신 `<script>` 순서 로딩으로 9개 파일 분리)
+- **Vanilla JavaScript** — 프레임워크 없는 순수 JS, 빌드 시스템 없음 (ES 모듈 대신 `<script>` 순서 로딩으로 8개 파일 분리)
 
 ## 라이선스
 

@@ -181,6 +181,13 @@
     .sess-tab.completed.faded{border-bottom-color:transparent;background:transparent;box-shadow:none;color:var(--text-secondary);transition:all .8s ease-out}
     @keyframes sessDonePulse{0%,100%{background:rgba(16,185,129,.08);box-shadow:0 0 4px rgba(16,185,129,.3)}50%{background:rgba(16,185,129,.25);box-shadow:0 0 14px rgba(16,185,129,.6)}}
     @keyframes spin{to{transform:rotate(360deg)}}
+    /* === 탭 드래그앤드롭 === */
+    .sess-tab{position:relative}
+    .sess-tab[draggable="true"]{cursor:grab}
+    .sess-tab.dragging{opacity:.4;cursor:grabbing}
+    .sess-tab.drop-left::before,.sess-tab.drop-right::after{content:'';position:absolute;top:4px;bottom:4px;width:2px;background:var(--accent);box-shadow:0 0 6px var(--accent);pointer-events:none}
+    .sess-tab.drop-left::before{left:-1px}
+    .sess-tab.drop-right::after{right:-1px}
     .sess-rename{background:var(--bg);border:1px solid var(--accent);border-radius:3px;color:var(--text);font-family:monospace;font-size:.55rem;padding:2px 6px;outline:none;width:110px}
     .empty-sessions{color:var(--text-secondary);font-size:.55rem;font-family:monospace;padding:6px 12px;opacity:.5}
 
@@ -218,16 +225,6 @@
     .ws-agent{animation:agentFadeIn .4s ease-out}
     @keyframes agentFadeIn{0%{opacity:0;transform:translate(-50%,-50%) scale(.7)}100%{opacity:1;transform:translate(-50%,-50%) scale(1)}}
 
-    /* House */
-    .ws-house{position:absolute;right:6%;bottom:15%;z-index:8;display:flex;flex-direction:column;align-items:center;pointer-events:none}
-    .ws-house-body{display:grid;grid-template-columns:repeat(9,8px);grid-template-rows:repeat(9,8px);image-rendering:pixelated}
-    .ws-house-badge{font-size:.45rem;font-family:monospace;color:var(--text-secondary);margin-top:2px;background:var(--surface);padding:1px 5px;border-radius:3px;border:1px solid var(--border);pointer-events:auto}
-    .ws-house-smoke{position:absolute;top:-8px;right:8px;pointer-events:none}
-    .ws-house-smoke span{display:block;width:4px;height:4px;border-radius:50%;background:var(--text-secondary);opacity:.3;animation:smokeRise 3s ease-out infinite}
-    .ws-house-smoke span:nth-child(2){animation-delay:1s;left:3px}
-    .ws-house-smoke span:nth-child(3){animation-delay:2s;left:-2px}
-    @keyframes smokeRise{0%{transform:translateY(0) scale(1);opacity:.4}100%{transform:translateY(-18px) scale(2);opacity:0}}
-
     /* Accessory */
     .ws-accessory{font-size:8px;position:absolute;bottom:-2px;right:-6px;z-index:3;filter:drop-shadow(0 1px 2px rgba(0,0,0,.5))}
 
@@ -260,34 +257,8 @@
     /* === Main Area === */
     .main{grid-column:2;grid-row:3;display:flex;flex-direction:column;overflow:hidden;background:var(--bg)}
 
-    /* Workspace */
+    /* Workspace (village 모드 전용 — 우주 배경은 village.js가 관리) */
     .workspace{flex:3;position:relative;overflow:visible;min-height:180px;clip-path:inset(0 -20px -10px -20px);transition:background 3s ease}
-    .workspace::before{content:'';position:absolute;inset:0;pointer-events:none;z-index:0;transition:opacity 3s ease}
-    .workspace::after{content:'';position:absolute;bottom:0;left:0;right:0;height:18%;pointer-events:none;z-index:0;border-radius:0;transition:background 3s ease}
-    /* 날씨 파티클 */
-    .weather-particle{position:absolute;pointer-events:none;z-index:1}
-    .rain{width:1px;background:linear-gradient(transparent,rgba(120,180,255,.6));animation:rainFall linear forwards}
-    .snow{border-radius:50%;background:rgba(255,255,255,.8);animation:snowFall linear forwards}
-    .leaf{font-size:8px;animation:leafFall linear forwards}
-    .petal{width:4px;height:4px;border-radius:50% 0;background:rgba(255,182,193,.7);animation:petalFall linear forwards}
-    @keyframes rainFall{0%{transform:translateY(-10px)}100%{transform:translateY(110%)}}
-    @keyframes snowFall{0%{transform:translateY(-10px) rotate(0deg)}100%{transform:translateY(110%) rotate(360deg)}}
-    @keyframes leafFall{0%{transform:translateY(-10px) rotate(0deg)}100%{transform:translateY(110%) rotate(720deg)}}
-    @keyframes petalFall{0%{transform:translateY(-10px) rotate(0deg) scale(1)}50%{transform:translateY(55%) rotate(180deg) scale(1.2)}100%{transform:translateY(110%) rotate(360deg) scale(0.8)}}
-    @keyframes twinkle{0%{opacity:.2}50%{opacity:1}100%{opacity:.2}}
-    @keyframes twinkleBright{0%{opacity:.4;transform:scale(1)}50%{opacity:1;transform:scale(1.5);box-shadow:0 0 4px white}100%{opacity:.4;transform:scale(1)}}
-    @keyframes fireflyFloat{0%{transform:translate(0,0);opacity:.3}25%{opacity:1}50%{transform:translate(15px,-10px);opacity:.5}75%{opacity:1}100%{transform:translate(-10px,8px);opacity:.2}}
-    /* 태양/달 */
-    .ws-celestial{position:absolute;font-size:20px;z-index:0;pointer-events:none;transition:left 6s linear,top 6s ease-in-out,opacity 2s ease;filter:drop-shadow(0 0 8px rgba(255,200,50,.5))}
-    /* 구름 */
-    .ws-cloud{position:absolute;z-index:0;pointer-events:none;font-size:18px;opacity:.5;filter:blur(0.5px)}
-    @keyframes cloudDrift{0%{left:-15%}100%{left:110%}}
-    /* 빤짝이 */
-    .sparkle-fall{position:absolute;pointer-events:none;z-index:0}
-    .sparkle-fall span{position:absolute;width:2px;height:2px;border-radius:50%;animation:sparkleFall linear forwards}
-    @keyframes sparkleFall{0%{transform:translateY(0) scale(1);opacity:.8}50%{opacity:1}100%{transform:translateY(110vh) scale(0);opacity:0}}
-    /* 땅 디테일 */
-    .ws-ground-detail{position:absolute;bottom:2%;pointer-events:none;z-index:1;font-size:10px;opacity:.7}
     .ws-agent{position:absolute;display:flex;flex-direction:column;align-items:center;transition:all .4s ease;z-index:10;cursor:default}
     .ws-agent:hover{z-index:30}
     .ws-agent.working .pix-lg{filter:drop-shadow(0 0 10px var(--glow));animation:working calc(.7s * var(--rnd-dur,1)) ease-in-out var(--rnd-delay,0s) infinite}
@@ -327,13 +298,10 @@
     .ws-badge.model-sonnet{background:rgba(0,255,200,.1);color:var(--accent)}
     .ws-badge.model-haiku{background:rgba(244,114,182,.12);color:#f472b6}
 
-    /* === Village 모드 — 우주 배경 + 집 숨김 (environment.js가 생성하던 요소들은 이미 DOM에 없음) === */
+    /* === Village 모드 — 우주 배경 (village.js가 별/은하수/nebula/별똥별 레이어 관리) === */
     /* 우주 배경은 다크 테마 기본. 라이트 테마에서는 살짝 밝은 navy(#1a1a2e)로 별/은하수 대비 유지 */
     .workspace.village-mode{background:#080812}
     html.theme-light .workspace.village-mode{background:#1a1a2e}
-    .workspace.village-mode .ws-house{display:none!important}
-    .workspace.village-mode::before,
-    .workspace.village-mode::after{display:none!important}
 
     /* === Tier별 캐릭터 크기 (CSS 변수, .workspace.tier-N 클래스로 오버라이드) === */
     .workspace{--char-size:36px}
