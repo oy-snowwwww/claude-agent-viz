@@ -150,6 +150,7 @@
         <h3>Session Tab</h3>
         <div class="help-tip"><strong>클릭</strong> &mdash; 해당 세션 필터 (로그, 에이전트)</div>
         <div class="help-tip"><strong>더블클릭</strong> &mdash; 세션 이름 변경</div>
+        <div class="help-tip"><strong>드래그앤드롭</strong> &mdash; 탭 순서 변경 (브라우저에 저장)</div>
         <div class="help-tip"><strong>&times; 버튼</strong> &mdash; 종료된 세션 탭 제거</div>
         <div class="help-tip">Claude Code 시작/종료 시 탭 자동 생성/제거</div>
         <div class="help-tip">Claude Code에서 <code>/rename</code> 실행 시 탭 이름 자동 갱신</div>
@@ -290,10 +291,42 @@
     fetchProjectAgents(cwd);
   }
   var _tabsBuilt=false;
+  // 드래그앤드롭으로 탭 순서 변경 — srcPid를 targetPid의 왼쪽/오른쪽으로 이동
+  function reorderTab(srcPid,targetPid,before){
+    if(!srcPid||!targetPid||srcPid===targetPid)return;
+    // 현재 렌더된 순서 기준으로 재정렬 (표시 순서 = 진실)
+    var currentOrder=Array.prototype.map.call(document.querySelectorAll('#sessionTabs .sess-tab'),function(t){return t.dataset.session;}).filter(Boolean);
+    var from=currentOrder.indexOf(srcPid);
+    if(from===-1)return;
+    currentOrder.splice(from,1);
+    var to=currentOrder.indexOf(targetPid);
+    if(to===-1)return;
+    currentOrder.splice(to+(before?0:1),0,srcPid);
+    _tabOrder=currentOrder;
+    saveTabOrder();
+    _tabsBuilt='';renderSessionTabs();
+  }
+
   function renderSessionTabs(){
     var box=document.getElementById('sessionTabs');
     var pids=Object.keys(sessions);
-    pids.sort(function(a,b){return(sessions[a].startTime||'').localeCompare(sessions[b].startTime||'')});
+    // 저장된 _tabOrder 우선 + 저장 안 된 새 세션은 startTime 순서로 뒤에
+    pids.sort(function(a,b){
+      var ia=_tabOrder.indexOf(a);
+      var ib=_tabOrder.indexOf(b);
+      if(ia===-1&&ib===-1)return(sessions[a].startTime||'').localeCompare(sessions[b].startTime||'');
+      if(ia===-1)return 1;
+      if(ib===-1)return -1;
+      return ia-ib;
+    });
+    // _tabOrder에 없는 새 pid를 뒤에 자동 등록 + 닫힌 세션 pruning
+    var presentSet={};pids.forEach(function(p){presentSet[p]=true});
+    var prunedOrder=_tabOrder.filter(function(p){return presentSet[p]});
+    var newPids=pids.filter(function(p){return _tabOrder.indexOf(p)===-1});
+    if(newPids.length||prunedOrder.length!==_tabOrder.length){
+      _tabOrder=prunedOrder.concat(newPids);
+      saveTabOrder();
+    }
 
     // 탭 구조 변경 감지 (세션 추가/삭제/선택 변경 시에만 전체 재구축)
     var structKey=currentSession+'|'+pids.map(function(p){return p+':'+(sessions[p].alive?'1':'0')+(sessions[p]._completed?'c':'')}).join(',');
@@ -329,16 +362,22 @@
       var lastAct=new Date(s.lastActivity||s.startTime).getTime();
       var isStale=!s.alive;
       var isInactive=s.alive&&(Date.now()-lastAct)>600000;
-      var tab=document.createElement('button');tab.className='sess-tab'+(currentSession===pid?' active':'')+(isStale?' stale':isInactive?' inactive':'')+(s._completed?' completed':'');tab.dataset.session=pid;
+      var tab=document.createElement('button');tab.className='sess-tab'+(currentSession===pid?' active':'')+(isStale?' stale':isInactive?' inactive':'')+(s._completed?' completed':'');tab.dataset.session=pid;tab.draggable=true;
       (function(p){
         tab.onclick=function(e){if(e.target.classList.contains('sess-close')||e.target.classList.contains('sess-rename'))return;if(sessClickTimer)return;sessClickTimer=setTimeout(function(){sessClickTimer=null;switchSession(p)},280)};
         tab.ondblclick=function(e){e.preventDefault();if(sessClickTimer){clearTimeout(sessClickTimer);sessClickTimer=null}startRenameSession(p)};
+        // === 드래그앤드롭 ===
+        tab.ondragstart=function(e){e.dataTransfer.effectAllowed='move';e.dataTransfer.setData('text/plain',p);tab.classList.add('dragging')};
+        tab.ondragend=function(){tab.classList.remove('dragging');document.querySelectorAll('#sessionTabs .sess-tab').forEach(function(t){t.classList.remove('drop-left','drop-right')})};
+        tab.ondragover=function(e){e.preventDefault();e.dataTransfer.dropEffect='move';var rect=tab.getBoundingClientRect();var isLeft=e.clientX<rect.left+rect.width/2;tab.classList.toggle('drop-left',isLeft);tab.classList.toggle('drop-right',!isLeft)};
+        tab.ondragleave=function(){tab.classList.remove('drop-left','drop-right')};
+        tab.ondrop=function(e){e.preventDefault();var srcPid=e.dataTransfer.getData('text/plain');if(!srcPid||srcPid===p)return;var rect=tab.getBoundingClientRect();var isLeft=e.clientX<rect.left+rect.width/2;reorderTab(srcPid,p,isLeft)};
       })(pid);
       var dot=document.createElement('span');dot.className='sess-dot';dot.style.background=s.alive?sColor:'var(--text-secondary)';dot.style.boxShadow=s.alive?'0 0 4px '+sColor:'none';dot.style.opacity=s.alive?'1':'.4';tab.appendChild(dot);
       var ns=document.createElement('span');ns.className='sess-name-text';ns.textContent=displayName;tab.appendChild(ns);
       var hasWorking=Object.values(liveInstances).some(function(i){return i.sessionPid===pid&&i.st==='working'})||(s._masterSt==='thinking'||s._masterSt==='working');
       if(hasWorking){var sp2=document.createElement('span');sp2.className='sess-spinner';tab.appendChild(sp2)}
-      var cl=document.createElement('span');cl.className='sess-close';cl.textContent='\u00d7';cl.onclick=function(e){e.stopPropagation();delete sessions[pid];Object.keys(liveInstances).forEach(function(k){if(liveInstances[k].sessionPid===pid)delete liveInstances[k]});if(currentSession===pid){var remaining=Object.keys(sessions);currentSession=remaining.length>0?remaining[0]:null}_tabsBuilt='';renderAll()};tab.appendChild(cl)
+      var cl=document.createElement('span');cl.className='sess-close';cl.textContent='\u00d7';cl.draggable=false;cl.onmousedown=function(e){e.stopPropagation()};cl.onclick=function(e){e.stopPropagation();delete sessions[pid];Object.keys(liveInstances).forEach(function(k){if(liveInstances[k].sessionPid===pid)delete liveInstances[k]});if(currentSession===pid){var remaining=Object.keys(sessions);currentSession=remaining.length>0?remaining[0]:null}_tabsBuilt='';renderAll()};tab.appendChild(cl)
       box.appendChild(tab);
     });
   }

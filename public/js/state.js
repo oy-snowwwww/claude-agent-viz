@@ -22,6 +22,22 @@ var sessions = {};           // pid → 세션 객체
 var currentSession = null;   // 현재 활성 탭의 pid
 var logEntries = [];         // 로그 패널 엔트리 (최대 MAX_LOGS개)
 
+// 사용자가 드래그앤드롭으로 저장한 탭 순서 (pid 배열, localStorage 영속)
+// 저장되지 않은 새 세션은 맨 뒤에 추가됨
+var _tabOrder = (function() {
+  try {
+    var raw = localStorage.getItem('agviz-tab-order');
+    if (!raw) return [];
+    var arr = JSON.parse(raw);
+    return Array.isArray(arr) ? arr : [];
+  } catch (e) { return []; }
+})();
+
+function saveTabOrder() {
+  try { localStorage.setItem('agviz-tab-order', JSON.stringify(_tabOrder)); }
+  catch (e) {}
+}
+
 // === 실행 중 에이전트 인스턴스 ===
 var liveInstances = {};      // key(sp_ai) → 인스턴스 객체
 
