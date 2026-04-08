@@ -369,17 +369,16 @@ function isValidTranscriptPath(p) {
 function isNoiseUserText(text) {
   if (!text) return true;
   var trimmed = text.trim();
-  // 알려진 wrapper 태그로 시작하는 경우
-  if (/^<(command-name|command-message|command-args|system-reminder|local-command-(stdout|stderr|caveat)|tool_use_error|user_input|bash-stdout|bash-stderr|bash-input|bash-output|request_metadata)/.test(trimmed)) return true;
   if (/^\[Request interrupted/.test(trimmed)) return true;
-  // 멀티라인 wrapper: 여러 <tag>...</tag> 블록을 strip 후 남은 텍스트 재검사
-  // 예: <system-reminder>...</system-reminder>\n<bash-input>...</bash-input>\n실제내용
+  // 멀티라인 wrapper strip 후 남은 텍스트 기준으로 판정:
+  //   - wrapper만 있으면(strip 결과 빈 문자열) noise
+  //   - wrapper + 실제 사용자 텍스트면 실제 텍스트를 살림 (noise 아님)
+  var TAG = '(command-name|command-message|command-args|system-reminder|local-command-(stdout|stderr|caveat)|tool_use_error|user_input|bash-stdout|bash-stderr|bash-input|bash-output|request_metadata)';
   var stripped = trimmed
-    .replace(/<(command-name|command-message|command-args|system-reminder|local-command-(stdout|stderr|caveat)|tool_use_error|user_input|bash-stdout|bash-stderr|bash-input|bash-output|request_metadata)[^>]*>[\s\S]*?<\/\1>/g, '')
-    .replace(/<(command-name|command-message|command-args|system-reminder|local-command-(stdout|stderr|caveat)|tool_use_error|user_input|bash-stdout|bash-stderr|bash-input|bash-output|request_metadata)[^>]*\/>/g, '')
+    .replace(new RegExp('<' + TAG + '[^>]*>[\\s\\S]*?</\\1>', 'g'), '')
+    .replace(new RegExp('<' + TAG + '[^>]*/>', 'g'), '')
     .trim();
-  if (!stripped) return true; // wrapper만 있고 실제 내용 없음
-  return false;
+  return !stripped;
 }
 
 // JSONL transcript에서 가장 최근 /rename 명령의 인자(새 이름)를 추출
@@ -626,10 +625,9 @@ function cleanHistory() {
     }
   } catch(e) { console.log('  [HISTORY] clean error:', e.message); }
 }
-cleanHistory();
-// 1시간마다 주기적으로 정리 (장기 실행 시 디스크 폭주 방지) — gracefulShutdown에서 clear
-var _cleanHistoryInterval = setInterval(cleanHistory, 60 * 60 * 1000);
-var _checkSessionsInterval = null; // server.listen 콜백에서 초기화
+// cleanHistory + interval 은 server.listen 블록 안에서 초기화 (require() 테스트 시 side-effect 방지)
+var _cleanHistoryInterval = null;
+var _checkSessionsInterval = null;
 
 // --- Daily Stats ---
 var STATS_FILE = path.join(__dirname, 'agent-stats.json');
@@ -712,13 +710,8 @@ function broadcastEvent(eventData) {
 // SSE keep-alive ping — 30초마다 모든 클라이언트에 주석 라인 전송
 // 이벤트가 없을 때 연결이 idle timeout으로 끊기는 것을 방지
 // graceful shutdown 시 clearInterval (SIGTERM/SIGINT 핸들러에서 정리)
-var _ssePingInterval = setInterval(function() {
-  sseClients = sseClients.filter(function(client) {
-    if (client.destroyed || client.writableEnded) return false;
-    try { client.write(': ping\n\n'); return true; }
-    catch(e) { return false; }
-  });
-}, 30000);
+// server.listen 블록 안에서 초기화 (require() 테스트 시 side-effect 방지)
+var _ssePingInterval = null;
 
 // --- HTTP Server ---
 const server = http.createServer(function(req, res) {
@@ -1680,18 +1673,47 @@ function gracefulShutdown() {
   saveAllTrackers();
   process.exit(0);
 }
-process.on('SIGTERM', gracefulShutdown);
-process.on('SIGINT', gracefulShutdown);
+// 직접 실행(`node server.js`) 시에만 listen + 모든 interval 시작 + SIGTERM/SIGINT 바인딩.
+// 테스트에서 require('./server') 할 때는 순수 함수 exports만 노출 (listen/interval X).
+if (require.main === module) {
+  process.on('SIGTERM', gracefulShutdown);
+  process.on('SIGINT', gracefulShutdown);
 
-server.listen(PORT, function() {
-  console.log('\n  \x1b[36m╔══════════════════════════════════════════╗\x1b[0m');
-  console.log('  \x1b[36m║\x1b[0m  \x1b[1m\x1b[32mClaude Agent Orchestrator\x1b[0m              \x1b[36m║\x1b[0m');
-  console.log('  \x1b[36m║\x1b[0m  \x1b[90mhttp://localhost:' + PORT + '\x1b[0m                  \x1b[36m║\x1b[0m');
-  console.log('  \x1b[36m║\x1b[0m  \x1b[90mAgents: ' + AGENTS_DIR + '\x1b[0m  \x1b[36m║\x1b[0m');
-  console.log('  \x1b[36m╚══════════════════════════════════════════╝\x1b[0m\n');
-  console.log('  \x1b[90m세션 헬스체크: 30초 간격\x1b[0m');
-  console.log('  \x1b[33mCtrl+C\x1b[0m 로 수동 종료\n');
+  // 시작 시 cleanHistory 1회 + 1시간 주기 정리
+  cleanHistory();
+  _cleanHistoryInterval = setInterval(cleanHistory, 60 * 60 * 1000);
 
-  // 30초마다 세션 체크 — gracefulShutdown에서 clear
-  _checkSessionsInterval = setInterval(checkSessions, 30000);
-});
+  // SSE keep-alive ping — 30초마다 모든 클라이언트에 주석 라인 전송
+  _ssePingInterval = setInterval(function() {
+    sseClients = sseClients.filter(function(client) {
+      if (client.destroyed || client.writableEnded) return false;
+      try { client.write(': ping\n\n'); return true; }
+      catch(e) { return false; }
+    });
+  }, 30000);
+
+  server.listen(PORT, function() {
+    console.log('\n  \x1b[36m╔══════════════════════════════════════════╗\x1b[0m');
+    console.log('  \x1b[36m║\x1b[0m  \x1b[1m\x1b[32mClaude Agent Orchestrator\x1b[0m              \x1b[36m║\x1b[0m');
+    console.log('  \x1b[36m║\x1b[0m  \x1b[90mhttp://localhost:' + PORT + '\x1b[0m                  \x1b[36m║\x1b[0m');
+    console.log('  \x1b[36m║\x1b[0m  \x1b[90mAgents: ' + AGENTS_DIR + '\x1b[0m  \x1b[36m║\x1b[0m');
+    console.log('  \x1b[36m╚══════════════════════════════════════════╝\x1b[0m\n');
+    console.log('  \x1b[90m세션 헬스체크: 30초 간격\x1b[0m');
+    console.log('  \x1b[33mCtrl+C\x1b[0m 로 수동 종료\n');
+
+    // 30초마다 세션 체크 — gracefulShutdown에서 clear
+    _checkSessionsInterval = setInterval(checkSessions, 30000);
+  });
+} else {
+  // 순수 함수만 노출 (side-effect 없는 검증 대상)
+  module.exports = {
+    maskSecrets: maskSecrets,
+    isNoiseUserText: isNoiseUserText,
+    isValidTranscriptPath: isValidTranscriptPath,
+    todayKey: todayKey,
+    safePath: safePath,
+    truncate: truncate,
+    parseFrontmatter: parseFrontmatter,
+    buildFrontmatter: buildFrontmatter,
+  };
+}

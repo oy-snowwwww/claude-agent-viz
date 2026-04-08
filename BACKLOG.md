@@ -15,7 +15,6 @@
 - [ ] **상태 관리 캡슐화** — 전역 객체(`sessions`, `sessionTrackers`, `liveInstances` 등) → `Session` 클래스로 이관
 - [ ] **`index.html` 모듈 분리** — 인라인 메인 스크립트를 `js/sessions.js`, `js/timeline.js`, `js/log.js` 등으로 분할 (빌드 시스템 없이)
 - [ ] **`handleLiveEvent()` 분리** — 거대한 switch를 개별 이벤트 핸들러 함수들로
-- [ ] **테스트 자동화** — 현재는 시각적 확인 + `test-events.sh` 시뮬레이터. 단위 테스트 도입 검토
 
 ## 알려진 한계
 
