@@ -1300,9 +1300,10 @@ const server = http.createServer(function(req, res) {
           return fileDay >= cutoff;
         });
       }
-      // 검색/필터 없으면 50개만, 있으면 더 넓게 스캔 (200개 cap)
+      // 검색/필터 없으면 50개만, 있으면 더 넓게 스캔 (1000개 cap)
+      // 7일 + 10MB 자동 정리가 있어서 1000개 상한은 사실상 "최근 n주간 전체" 수준
       var hasFilter = !!(q || agentFilter || daysParam > 0);
-      var targets = files.slice(0, hasFilter ? 200 : 50);
+      var targets = files.slice(0, hasFilter ? 1000 : 50);
       var list = [];
       var done = 0;
       if (targets.length === 0) {
@@ -1705,8 +1706,23 @@ if (require.main === module) {
     _checkSessionsInterval = setInterval(checkSessions, 30000);
   });
 } else {
-  // 순수 함수만 노출 (side-effect 없는 검증 대상)
+  // 테스트 전용 상태 초기화 헬퍼 — sessionTrackers/sessions/statsData를 테스트 간 격리
+  function _resetTestState() {
+    Object.keys(sessionTrackers).forEach(function(k) { delete sessionTrackers[k]; });
+    Object.keys(sessions).forEach(function(k) { delete sessions[k]; });
+    statsData = {
+      today: { date: todayKey(), prompts: 0, agents: {}, tools: {} },
+      history: [],
+      total: { since: todayKey(), prompts: 0, agents: {}, tools: {}, days: 0 },
+    };
+  }
+  // 테스트 전용: sessionTrackers/sessions 직접 접근 (격리 검증용)
+  function _getTestState() {
+    return { sessionTrackers: sessionTrackers, sessions: sessions, statsData: statsData };
+  }
+
   module.exports = {
+    // 순수 함수 (side-effect 없음)
     maskSecrets: maskSecrets,
     isNoiseUserText: isNoiseUserText,
     isValidTranscriptPath: isValidTranscriptPath,
@@ -1715,5 +1731,21 @@ if (require.main === module) {
     truncate: truncate,
     parseFrontmatter: parseFrontmatter,
     buildFrontmatter: buildFrontmatter,
+    // 세션 추적 (sessionTrackers 전역 상태에 의존 — _resetTestState로 격리)
+    getTracker: getTracker,
+    recordSessionEvent: recordSessionEvent,
+    ensureCurrentTurn: ensureCurrentTurn,
+    // transcript 파싱 (파일 시스템 read — 테스트에서 임시 파일 사용)
+    parseTranscriptTurns: parseTranscriptTurns,
+    extractLatestRenameFromTranscript: extractLatestRenameFromTranscript,
+    buildTurnSummaries: buildTurnSummaries,
+    // 통계
+    ensureToday: ensureToday,
+    // HTTP 헬퍼
+    isAllowedOrigin: isAllowedOrigin,
+    isPrivacyOn: isPrivacyOn,
+    // 테스트 유틸
+    _resetTestState: _resetTestState,
+    _getTestState: _getTestState,
   };
 }
