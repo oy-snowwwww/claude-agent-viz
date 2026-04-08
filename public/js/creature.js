@@ -62,7 +62,27 @@ var SAFETY_PX = 4;
 
 var _wsBoxCache = null;
 var _safeBoundsCache = null;
-function invalidateWsBoxCache() { _wsBoxCache = null; _safeBoundsCache = null; }
+function invalidateWsBoxCache() {
+  _wsBoxCache = null;
+  _safeBoundsCache = null;
+  // 모든 캐릭터의 현재 위치를 새 bounds로 즉시 clamp — 다음 tick 전에 bounds 밖에 떠 있는 문제 방지
+  if (typeof getSafeBounds === 'function') {
+    var b = getSafeBounds();
+    Object.keys(creatureLife).forEach(function(id) {
+      var c = creatureLife[id];
+      if (!c) return;
+      c.x = Math.max(b.minX, Math.min(b.maxX, c.x));
+      c.y = Math.max(b.minY, Math.min(b.maxY, c.y));
+      c.tx = Math.max(b.minX, Math.min(b.maxX, c.tx));
+      c.ty = Math.max(b.minY, Math.min(b.maxY, c.ty));
+      var el = document.getElementById('ws-' + id);
+      if (el) {
+        el.style.left = c.x.toFixed(2) + '%';
+        el.style.top = c.y.toFixed(2) + '%';
+      }
+    });
+  }
+}
 window.addEventListener('resize', invalidateWsBoxCache);
 
 function getWsBox() {

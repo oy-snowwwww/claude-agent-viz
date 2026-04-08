@@ -92,15 +92,20 @@ function updateHistMetaInfo(resp) {
   }
   var total = resp.totalCount != null ? resp.totalCount : 0;
   var filtered = resp.filteredCount != null ? resp.filteredCount : 0;
+  var partialSuffix = resp.partial ? ' ⚠ 부분 결과' : '';
   if (resp.hasFilter) {
-    el.textContent = filtered + '개 검색됨 / 전체 ' + total + '개 · 7일·10MB 보관';
+    el.textContent = filtered + '개 검색됨 / 전체 ' + total + '개 · 7일·10MB 보관' + partialSuffix;
   } else {
-    el.textContent = total + '개 · 7일·10MB 보관';
+    el.textContent = total + '개 · 7일·10MB 보관' + partialSuffix;
   }
 }
 
-// === 에이전트 필터 옵션 갱신 (캐시 누적) ===
+// === 에이전트 필터 옵션 갱신 ===
+// 첫 무필터 응답에서만 전체 에이전트 수집 → 이후는 fix (필터 적용 시 빠진 에이전트가 사라지는 문제 방지)
+var _histAgentOptionsFrozen = false;
 function updateAgentFilterOptions(list) {
+  // 한 번이라도 옵션을 고정한 후엔 더 이상 수집하지 않음
+  if (_histAgentOptionsFrozen) return;
   (list || []).forEach(function(s) {
     Object.keys(s.agents || {}).forEach(function(a) { _histAgentCache[a] = true; });
   });
@@ -112,6 +117,8 @@ function updateAgentFilterOptions(list) {
     html += '<option value="' + esc(n) + '"' + (n === current ? ' selected' : '') + '>' + esc(n) + '</option>';
   });
   sel.innerHTML = html;
+  // 검색/필터 없이 한 번 로드하면 그 결과로 옵션 확정
+  if (!_histCurrentQ && !current) _histAgentOptionsFrozen = true;
 }
 
 // === Privacy 토글 ===
@@ -188,9 +195,10 @@ function deleteHistoryItem(btn, filename) {
 }
 
 // === 검색어 하이라이트 ===
+// 양쪽 esc 후 매칭 → entity가 양쪽 동일하게 변환되므로 `&`/`<`/`>` 검색도 정상 동작
+// `<mark>` 태그는 replace 후 한 번만 삽입되므로 재귀 오염 없음
 function highlight(text, q) {
   if (!q || !text) return esc(text || '');
-  // 검색어도 esc해서 HTML escape된 본문(&lt;div&gt;)과 매칭
   var safeText = esc(text);
   var safeQ = esc(q);
   try {
@@ -318,7 +326,7 @@ function renderHistory(list, partial) {
     html += '<div class="hist-item" onclick="this.classList.toggle(\'expanded\')">'
       + '<div class="hist-row">'
       + '<span class="hist-name">' + highlight(s.name || 'Session', q) + '</span>'
-      + '<span class="hist-meta">' + cwdChip + '<span>질문 <strong>' + (s.questions || 0) + '</strong></span>'
+      + '<span class="hist-meta">' + cwdChip + '<span>질문 <strong>' + (s.questions || 0) + '</strong>' + (s.truncated ? '<span class="hist-truncated" data-tip="100개 초과분은 통계에만 누적">+</span>' : '') + '</span>'
       + (s.avgResponseSec > 0 ? '<span>평균 <strong>' + (s.avgResponseSec || 0) + '</strong>초</span>' : '')
       + (duration ? '<span>세션 <strong>' + esc(duration) + '</strong></span>' : '')
       + '</span>'

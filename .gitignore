@@ -1,11 +1,16 @@
-sessions/
-history/
+# 런타임 데이터 (루트 기준 anchor 통일)
+/sessions/
+/history/
 /privacy
+/enabled
+/agent-stats.json
+
+# 설정 / 에디터
 .idea/
 .claude/
 CLAUDE.md
-enabled
-agent-stats.json
+
+# 로그 / 바이너리
 *.log
 *.mov
 *.mp4

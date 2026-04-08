@@ -191,8 +191,13 @@ function maskSecrets(s) {
     .replace(/AKIA[0-9A-Z]{16}/g, '[REDACTED_AWS]')
     // JWT (3 segment base64url, 첫 segment는 일반적으로 eyJ로 시작)
     .replace(/eyJ[A-Za-z0-9_\-]{10,}\.[A-Za-z0-9_\-]{10,}\.[A-Za-z0-9_\-]{10,}/g, '[REDACTED_JWT]')
-    // Bearer 토큰 헤더
-    .replace(/Bearer\s+[A-Za-z0-9._\-]{20,}/gi, 'Bearer [REDACTED]');
+    // Bearer 토큰 — 일반 단어 false positive 방지를 위해 컨텍스트를 좁힘
+    // 1) Authorization 헤더 컨텍스트 (가장 확실)
+    .replace(/(Authorization\s*:\s*Bearer\s+)\S+/gi, '$1[REDACTED]')
+    // 2) Bearer + JWT 형태 (eyJ로 시작하는 3-segment base64url)
+    .replace(/\bBearer\s+eyJ[A-Za-z0-9_\-]+\.[A-Za-z0-9_\-]+\.[A-Za-z0-9_\-]+/g, 'Bearer [REDACTED]')
+    // 3) Bearer + 40자 이상 문자열 (일반 영어 단어는 40자 미만)
+    .replace(/\bBearer\s+[A-Za-z0-9._\-]{40,}/g, 'Bearer [REDACTED]');
 }
 
 // CSRF 방어: Origin 헤더가 있으면 host와 일치해야 함
@@ -231,6 +236,27 @@ function getTracker(pid) {
   return sessionTrackers[pid];
 }
 
+// thinking_start 없이 도착한 이벤트(recover 시나리오)를 위한 더미 turn 생성.
+// 활성 turn이 있으면 그대로 반환, 없으면 빈 prompt의 turn 생성. 100개 cap 초과 시 null.
+function ensureCurrentTurn(t) {
+  if (t.truncated) return null;
+  var cur = t.turns[t.turns.length - 1];
+  if (cur && !cur.endTime) return cur;
+  if (t.turns.length >= HISTORY_MAX_QUESTIONS_PER_SESSION) { t.truncated = true; return null; }
+  t.questions++;
+  var dummy = {
+    q: t.questions,
+    prompt: '', // recover 더미 — prompt 원본 없음
+    startTime: Date.now(),
+    endTime: null,
+    sec: 0,
+    tools: {},
+    agents: {},
+  };
+  t.turns.push(dummy);
+  return dummy;
+}
+
 function recordSessionEvent(pid, parsed) {
   if (!pid) return;
   var t = getTracker(pid);
@@ -239,7 +265,10 @@ function recordSessionEvent(pid, parsed) {
     t.questions++;
     t.thinkStart = Date.now();
     // transcript_path는 매 질문마다 갱신 (/clear 후 새 transcript 시작 대응)
-    if (parsed.transcript_path) t.transcriptPath = parsed.transcript_path;
+    // 저장 시점에 whitelist 검증 → invalid path가 메모리에 머물지 않게 (path traversal 방어)
+    if (parsed.transcript_path && isValidTranscriptPath(parsed.transcript_path)) {
+      t.transcriptPath = parsed.transcript_path;
+    }
     // /rename 명령 자동 감지 → 세션 이름 동기화 (transcript의 rename이 hook session.name보다 우선)
     if (parsed.transcript_path && sessions[pid]) {
       var renamed = extractLatestRenameFromTranscript(parsed.transcript_path);
@@ -290,8 +319,9 @@ function recordSessionEvent(pid, parsed) {
     t.agents[aKey].count++;
     t.agents[aKey].starts.push(Date.now());
     if (canUpdateTurn) {
-      var curT = t.turns[t.turns.length - 1];
-      if (curT && !curT.endTime) curT.agents[aKey] = (curT.agents[aKey] || 0) + 1;
+      // recover 시나리오에서 활성 turn 없으면 더미 생성
+      var curT = ensureCurrentTurn(t);
+      if (curT) curT.agents[aKey] = (curT.agents[aKey] || 0) + 1;
     }
   }
   if (parsed.event === 'agent_done' && parsed.agent_type) {
@@ -303,10 +333,10 @@ function recordSessionEvent(pid, parsed) {
   }
   if (parsed.event === 'tool_use' && parsed.tool_name) {
     t.tools[parsed.tool_name] = (t.tools[parsed.tool_name] || 0) + 1;
-    // 현재 turn에도 기록 (thinking_end 이전 + 100개 cap 미달일 때만)
+    // 현재 turn에도 기록 (100개 cap 미달일 때만, recover 시나리오에선 더미 turn 생성)
     if (canUpdateTurn) {
-      var curT2 = t.turns[t.turns.length - 1];
-      if (curT2 && !curT2.endTime) curT2.tools[parsed.tool_name] = (curT2.tools[parsed.tool_name] || 0) + 1;
+      var curT2 = ensureCurrentTurn(t);
+      if (curT2) curT2.tools[parsed.tool_name] = (curT2.tools[parsed.tool_name] || 0) + 1;
     }
     // 파일 경로 추출
     var input = parsed.tool_input || {};
@@ -339,8 +369,16 @@ function isValidTranscriptPath(p) {
 function isNoiseUserText(text) {
   if (!text) return true;
   var trimmed = text.trim();
-  if (/^<(command-name|command-message|command-args|system-reminder|local-command-(stdout|stderr|caveat)|tool_use_error|user_input|bash-stdout|bash-stderr)/.test(trimmed)) return true;
+  // 알려진 wrapper 태그로 시작하는 경우
+  if (/^<(command-name|command-message|command-args|system-reminder|local-command-(stdout|stderr|caveat)|tool_use_error|user_input|bash-stdout|bash-stderr|bash-input|bash-output|request_metadata)/.test(trimmed)) return true;
   if (/^\[Request interrupted/.test(trimmed)) return true;
+  // 멀티라인 wrapper: 여러 <tag>...</tag> 블록을 strip 후 남은 텍스트 재검사
+  // 예: <system-reminder>...</system-reminder>\n<bash-input>...</bash-input>\n실제내용
+  var stripped = trimmed
+    .replace(/<(command-name|command-message|command-args|system-reminder|local-command-(stdout|stderr|caveat)|tool_use_error|user_input|bash-stdout|bash-stderr|bash-input|bash-output|request_metadata)[^>]*>[\s\S]*?<\/\1>/g, '')
+    .replace(/<(command-name|command-message|command-args|system-reminder|local-command-(stdout|stderr|caveat)|tool_use_error|user_input|bash-stdout|bash-stderr|bash-input|bash-output|request_metadata)[^>]*\/>/g, '')
+    .trim();
+  if (!stripped) return true; // wrapper만 있고 실제 내용 없음
   return false;
 }
 
@@ -589,8 +627,9 @@ function cleanHistory() {
   } catch(e) { console.log('  [HISTORY] clean error:', e.message); }
 }
 cleanHistory();
-// 1시간마다 주기적으로 정리 (장기 실행 시 디스크 폭주 방지)
-setInterval(cleanHistory, 60 * 60 * 1000);
+// 1시간마다 주기적으로 정리 (장기 실행 시 디스크 폭주 방지) — gracefulShutdown에서 clear
+var _cleanHistoryInterval = setInterval(cleanHistory, 60 * 60 * 1000);
+var _checkSessionsInterval = null; // server.listen 콜백에서 초기화
 
 // --- Daily Stats ---
 var STATS_FILE = path.join(__dirname, 'agent-stats.json');
@@ -1318,7 +1357,17 @@ const server = http.createServer(function(req, res) {
                 rec.filename = f; // 클라이언트 개별 삭제용
                 list[idx] = rec;
               }
-            } catch(pe) { console.log('  [HISTORY] parse error:', f, pe.message); }
+            } catch(pe) {
+              console.log('  [HISTORY] parse error:', f, pe.message);
+              // 손상된 JSON은 .corrupt 확장자로 격리 (목록에서 제외 + 수동 확인 가능)
+              try {
+                var src = path.join(HISTORY_DIR, f);
+                var dst = src + '.corrupt';
+                fs.rename(src, dst, function(re) {
+                  if (!re) console.log('  [HISTORY] quarantined:', f, '→ .corrupt');
+                });
+              } catch(qe) { /* 실패해도 무해 */ }
+            }
           }
           done++;
           if (done === targets.length) {
@@ -1436,6 +1485,8 @@ const server = http.createServer(function(req, res) {
       res.end(JSON.stringify({ error: 'forbidden origin' }));
       return;
     }
+    // 멀티바이트 chunk 경계 깨짐 방지 — setEncoding 전에 chunk는 Buffer, 이후부터 string으로 decode됨
+    req.setEncoding('utf8');
     var body = '';
     var aborted = false;
     req.on('data', function(chunk) {
@@ -1607,7 +1658,10 @@ function saveAllTrackers() {
 }
 
 function gracefulShutdown() {
+  // 모든 module-level 타이머를 일괄 정리 (24h 백그라운드 운영 시 일관성)
   if (_ssePingInterval) { clearInterval(_ssePingInterval); _ssePingInterval = null; }
+  if (_cleanHistoryInterval) { clearInterval(_cleanHistoryInterval); _cleanHistoryInterval = null; }
+  if (_checkSessionsInterval) { clearInterval(_checkSessionsInterval); _checkSessionsInterval = null; }
   sseClients.forEach(function(c) { try { c.end(); } catch(e) {} });
   saveAllTrackers();
   process.exit(0);
@@ -1624,6 +1678,6 @@ server.listen(PORT, function() {
   console.log('  \x1b[90m세션 헬스체크: 30초 간격\x1b[0m');
   console.log('  \x1b[33mCtrl+C\x1b[0m 로 수동 종료\n');
 
-  // 30초마다 세션 체크
-  setInterval(checkSessions, 30000);
+  // 30초마다 세션 체크 — gracefulShutdown에서 clear
+  _checkSessionsInterval = setInterval(checkSessions, 30000);
 });
