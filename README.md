@@ -405,7 +405,7 @@ model: sonnet
 - **정적 파일 서빙** — `public/` 하위에 클라이언트 자산 (HTML/CSS/JS) 분리, 서버가 직접 서빙
 - **SSE (Server-Sent Events)** — 실시간 이벤트 스트리밍
 - **Vanilla JavaScript** — 프레임워크 없는 순수 JS, 빌드 시스템 없음 (ES 모듈 대신 `<script>` 순서 로딩으로 8개 파일 분리)
-- **단위 테스트** — Node 18+ 내장 `node:test` 모듈 (`bash test/run.sh`) — 순수 함수(maskSecrets, isNoiseUserText, safePath, isValidTranscriptPath, truncate, frontmatter) 39개 테스트
+- **단위/통합 테스트** — Node 18+ 내장 `node:test` (의존성 0). **99 tests** — 단위 81개(maskSecrets/isNoiseUserText/safePath/sessionTracker/transcript 파싱/httpHelpers/frontmatter/truncate) + HTTP 통합 18개(child 서버 spawn + 실제 API 검증). 실행: `bash test/run.sh [unit|integration|all]`
 
 ## 라이선스
 
