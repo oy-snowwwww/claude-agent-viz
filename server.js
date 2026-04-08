@@ -1537,12 +1537,26 @@ const server = http.createServer(function(req, res) {
     broadcastEvent({ event: 'server_restart', reason: 'user requested' });
     res.writeHead(200, {'Content-Type': 'application/json'});
     res.end(JSON.stringify({ok: true}));
-    // gracefulShutdown 내부에서 saveAllTrackers + _ssePingInterval clearInterval + SSE end 전부 처리
+    // 순서: 500ms 대기(응답 전송 완료) → 타이머/SSE/트래커 정리 → server.close() → 포트 해제 확인 후 자식 spawn → 부모 exit
+    // (이전: spawn 후 즉시 process.exit → 포트 race로 자식이 EADDRINUSE로 조용히 죽는 버그)
     setTimeout(function() {
-      var spawn = require('child_process').spawn;
-      var child = spawn('nohup', ['node', __filename], { detached: true, stdio: 'ignore' });
-      child.unref();
-      gracefulShutdown();
+      if (_ssePingInterval) { clearInterval(_ssePingInterval); _ssePingInterval = null; }
+      if (_cleanHistoryInterval) { clearInterval(_cleanHistoryInterval); _cleanHistoryInterval = null; }
+      if (_checkSessionsInterval) { clearInterval(_checkSessionsInterval); _checkSessionsInterval = null; }
+      sseClients.forEach(function(c) { try { c.end(); } catch(e) {} });
+      saveAllTrackers();
+      var _spawned = false;
+      function spawnChild() {
+        if (_spawned) return;
+        _spawned = true;
+        var spawn = require('child_process').spawn;
+        var child = spawn(process.execPath, [__filename], { detached: true, stdio: 'ignore', cwd: __dirname });
+        child.unref();
+        process.exit(0);
+      }
+      server.close(spawnChild);
+      // server.close()가 기존 keep-alive connection 때문에 지연될 수 있음 → 2초 안전망
+      setTimeout(spawnChild, 2000).unref();
     }, 500);
     return;
   }
