@@ -33,20 +33,30 @@
     .daily-stat:hover{border-color:var(--accent);box-shadow:0 0 6px var(--glow)}
     .daily-stat strong{color:var(--accent)}
     .daily-dropdown{display:none;position:absolute;top:100%;right:0;margin-top:6px;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:10px 14px;min-width:200px;box-shadow:0 8px 24px rgba(0,0,0,.4);z-index:50}
+    /* hover bridge: .daily-stat과 .daily-dropdown 사이 6px gap을 invisible 영역으로 잇기 (천천히 마우스 이동 시 hover 끊김 방지) */
+    .daily-stat::after{content:'';position:absolute;top:100%;left:0;right:0;height:10px;display:none}
+    .daily-stat:hover::after{display:block}
     .daily-stat:hover .daily-dropdown{display:block}
     .daily-title{font-size:.6rem;font-weight:600;color:var(--text);margin-bottom:8px;font-family:-apple-system,'Apple SD Gothic Neo',sans-serif}
     .daily-section{font-size:.55rem;font-weight:600;color:var(--text);margin-top:8px;margin-bottom:3px}
+    /* details 접힘 — 도구 섹션처럼 항목 많은 곳에 사용 */
+    details.daily-collapse{margin-top:0}
+    details.daily-collapse summary.daily-section{cursor:pointer;list-style:none;display:flex;align-items:center;gap:5px;user-select:none}
+    details.daily-collapse summary.daily-section::-webkit-details-marker{display:none}
+    details.daily-collapse summary.daily-section::before{content:'▶';font-size:.4rem;color:var(--text-secondary);display:inline-block;transition:transform .15s ease}
+    details.daily-collapse[open] summary.daily-section::before{transform:rotate(90deg)}
+    details.daily-collapse summary.daily-section:hover{color:var(--accent)}
     .daily-row{display:flex;justify-content:space-between;font-size:.5rem;color:var(--text-secondary);padding:1px 0}
     .daily-row span:last-child{color:var(--accent);font-weight:600}
     .daily-row.sub{padding-left:10px}
     .daily-row.sub::before{content:'├';color:var(--border);margin-right:4px}
     .daily-row.sub.last::before{content:'└'}
+    .daily-title-head{display:flex;justify-content:space-between;align-items:center}
+    .daily-reset{background:transparent;border:none;color:var(--text-secondary);font-size:.6rem;line-height:1;cursor:pointer;padding:2px 5px;border-radius:3px;transition:all .15s;opacity:.7}
+    .daily-reset:hover{color:var(--negative);background:rgba(244,63,94,.12);opacity:1}
     .theme-btn{background:var(--surface-hover);border:1px solid var(--border);color:var(--text);border-radius:50%;width:24px;height:24px;cursor:pointer;font-size:.7rem;display:flex;align-items:center;justify-content:center;padding:0}
     .theme-btn:hover{border-color:var(--accent)}
-    /* 빠른 tooltip */
-    [data-tip]{position:relative}
-    [data-tip]::after{content:attr(data-tip);position:absolute;top:calc(100% + 6px);left:50%;transform:translateX(-50%);background:var(--surface);color:var(--text);font-size:.5rem;font-family:monospace;padding:2px 6px;border-radius:3px;border:1px solid var(--border);white-space:nowrap;pointer-events:none;opacity:0;transition:opacity .1s;z-index:60;box-shadow:0 2px 8px rgba(0,0,0,.3)}
-    [data-tip]:hover::after{opacity:1}
+    /* 빠른 tooltip은 utils.js의 글로벌 툴팁(JS, fixed position)이 처리 — CSS [data-tip]::after는 ::after를 쓰는 다른 element와 충돌하므로 사용하지 않음 */
     .help-btn,.stop-btn,.notif-btn{background:var(--surface-hover);border:1px solid var(--border);border-radius:50%;width:24px;height:24px;cursor:pointer;font-size:.7rem;font-family:monospace;font-weight:700;display:flex;align-items:center;justify-content:center;line-height:1}
     .notif-btn{color:var(--text-secondary);font-size:.75rem;transition:all .2s;opacity:.4}
     .notif-btn:hover{border-color:var(--accent);box-shadow:0 0 8px var(--glow);opacity:.7}
@@ -63,8 +73,12 @@
     .hist-overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:150;display:none;align-items:center;justify-content:center;backdrop-filter:blur(4px)}
     .hist-overlay.show{display:flex}
     .hist-modal{background:var(--surface);border:1px solid var(--border);border-radius:12px;width:680px;max-width:92vw;max-height:85vh;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.5);display:flex;flex-direction:column}
+    /* 히스토리 모달 안의 muted 텍스트 공통 색상 — text-secondary보다 살짝 밝게 (작은 화면 가독성) */
+    /* color-mix 요구: Chrome 111+, Safari 16.2+, Firefox 113+ (2023년 이후 브라우저) */
+    .hist-overlay{--hist-muted:color-mix(in srgb, var(--text) 35%, var(--text-secondary))}
     .hist-header{padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
-    .hist-header h2{font-size:.8rem;font-weight:700;font-family:monospace;display:flex;align-items:center;gap:6px}
+    .hist-header h2{font-size:.8rem;font-weight:700;font-family:monospace;display:flex;align-items:center;gap:8px}
+    .hist-meta-info{font-size:.5rem;font-weight:400;color:var(--hist-muted);font-family:monospace}
     .hist-header button{background:none;border:none;color:var(--text-secondary);cursor:pointer;font-size:1rem;padding:2px 6px;border-radius:4px}
     .hist-header button:hover{color:var(--negative)}
     .hist-body{flex:1;overflow-y:auto;scrollbar-width:thin}
@@ -74,26 +88,39 @@
     .hist-item.expanded{border-color:var(--accent)}
     .hist-row{display:flex;align-items:center;gap:10px}
     .hist-name{font-size:.65rem;font-weight:600;font-family:monospace;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-    .hist-meta{font-size:.5rem;font-family:monospace;color:var(--text-secondary);display:flex;gap:8px;flex-shrink:0}
+    /* hist-meta: 작은 화면 가독성을 위해 --hist-muted 공통 변수 사용, strong(숫자)은 --accent 유지 */
+    .hist-meta{font-size:.5rem;font-family:monospace;color:var(--hist-muted);display:flex;gap:8px;flex-shrink:0;align-items:center}
     .hist-meta strong{color:var(--accent)}
-    .hist-time{font-size:.45rem;font-family:monospace;color:var(--text-secondary);margin-top:2px}
+    .hist-cwd{display:inline-flex;align-items:center;gap:2px;padding:1px 6px;border-radius:3px;background:rgba(167,139,250,.08);color:var(--accent2);font-size:.45rem;white-space:nowrap;cursor:pointer;transition:background .15s,transform .1s}
+    .hist-cwd:hover{background:rgba(167,139,250,.22)}
+    .hist-cwd:active{transform:scale(.96)}
+    html.theme-light .hist-cwd{background:rgba(124,58,237,.12)}
+    html.theme-light .hist-cwd:hover{background:rgba(124,58,237,.24)}
+    .hist-cwd-label{display:inline-block;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:bottom}
+    .hist-time{font-size:.45rem;font-family:monospace;color:var(--hist-muted);margin-top:2px}
     .hist-events{margin-top:8px;border-top:1px solid var(--border);padding-top:6px;display:none;max-height:250px;overflow-y:auto;scrollbar-width:thin}
     .hist-item.expanded .hist-events{display:block}
-    .hist-ev{display:flex;align-items:center;gap:6px;padding:2px 0;font-size:.5rem;font-family:monospace;color:var(--text-secondary)}
-    .hist-ev-time{color:var(--text-secondary);flex-shrink:0;width:55px}
+    .hist-ev{display:flex;align-items:center;gap:6px;padding:2px 0;font-size:.5rem;font-family:monospace;color:var(--hist-muted)}
+    .hist-ev-time{color:var(--hist-muted);flex-shrink:0;width:55px}
     .hist-ev-type{padding:1px 4px;border-radius:2px;font-weight:600;flex-shrink:0}
     .hist-ev-type.thinking{background:rgba(251,191,36,.12);color:#fbbf24}
     .hist-ev-type.agent{background:rgba(0,255,200,.1);color:var(--accent)}
     .hist-ev-type.tool{background:rgba(167,139,250,.1);color:var(--accent2)}
     .hist-ev-detail{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-    .hist-empty{text-align:center;padding:30px;font-size:.6rem;font-family:monospace;color:var(--text-secondary);opacity:.5}
+    .hist-empty{text-align:center;padding:30px;font-size:.6rem;font-family:monospace;color:var(--hist-muted);opacity:.75}
     .hist-summary{display:flex;gap:6px;margin-top:4px;flex-wrap:wrap}
     .hist-tag{font-size:.4rem;padding:1px 5px;border-radius:3px;font-family:monospace}
     .hist-tag.agent{background:rgba(0,255,200,.08);color:var(--accent)}
     .hist-tag.tool{background:rgba(167,139,250,.08);color:var(--accent2)}
     .hist-tools{display:flex;align-items:center;gap:10px}
-    .hist-privacy{display:flex;align-items:center;gap:4px;font-size:.5rem;font-family:monospace;color:var(--text-secondary);cursor:pointer;user-select:none}
+    .hist-privacy{display:flex;align-items:center;gap:4px;font-size:.5rem;font-family:monospace;color:var(--hist-muted);cursor:pointer;user-select:none}
     .hist-privacy input{cursor:pointer}
+    .hist-header .hist-clear-all{background:rgba(244,63,94,.08);border:1px solid rgba(244,63,94,.3);color:var(--negative);font-family:monospace;font-size:.5rem;padding:3px 8px;border-radius:4px;cursor:pointer;transition:all .15s;line-height:1.2}
+    .hist-header .hist-clear-all:hover{background:rgba(244,63,94,.18);border-color:var(--negative);color:var(--negative)}
+    .hist-del{background:transparent;border:none;color:var(--text-secondary);font-family:monospace;font-size:.7rem;line-height:1;width:18px;height:18px;border-radius:3px;cursor:pointer;padding:0;margin-left:6px;flex-shrink:0;opacity:.35;transition:opacity .15s,background .15s,color .15s}
+    .hist-item:hover .hist-del{opacity:.7}
+    .hist-del:hover{opacity:1!important;background:rgba(244,63,94,.15);color:var(--negative)}
+    .hist-del[data-armed="1"]{opacity:1!important;background:rgba(244,63,94,.2);color:var(--negative)}
     .hist-search{padding:10px 18px;border-bottom:1px solid var(--border);display:flex;gap:8px;align-items:center}
     .hist-search input[type=text]{flex:1;background:var(--bg);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:monospace;font-size:.55rem;padding:6px 10px;outline:none}
     .hist-search input[type=text]:focus{border-color:var(--accent)}
@@ -102,10 +129,10 @@
     .hist-turn{margin-top:6px;padding:6px 8px;background:rgba(0,255,200,.03);border-left:2px solid var(--accent);border-radius:3px}
     .hist-turn-q{font-size:.55rem;font-family:monospace;color:var(--text);font-weight:600;display:flex;gap:6px;align-items:flex-start}
     .hist-turn-q .hqnum{color:var(--accent);flex-shrink:0}
-    .hist-turn-q .hqtime{color:var(--text-secondary);font-size:.45rem;margin-left:auto;flex-shrink:0}
+    .hist-turn-q .hqtime{color:var(--hist-muted);font-size:.45rem;margin-left:auto;flex-shrink:0}
     .hist-turn-prompt{white-space:pre-wrap;word-break:break-word;flex:1;min-width:0}
-    .hist-turn-sum{margin-top:3px;font-size:.5rem;font-family:monospace;color:var(--text-secondary);white-space:pre-wrap;word-break:break-word;padding-left:14px;border-left:1px dashed var(--border);margin-left:2px}
-    .hist-turn-meta{margin-top:3px;font-size:.4rem;font-family:monospace;color:var(--text-secondary);opacity:.7}
+    .hist-turn-sum{margin-top:3px;font-size:.5rem;font-family:monospace;color:var(--hist-muted);white-space:pre-wrap;word-break:break-word;padding-left:14px;border-left:1px dashed var(--border);margin-left:2px}
+    .hist-turn-meta{margin-top:3px;font-size:.4rem;font-family:monospace;color:var(--hist-muted);opacity:.85}
     mark.hist-hl{background:rgba(251,191,36,.35);color:var(--text);padding:0 1px;border-radius:2px}
 
     .help-overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:150;display:none;align-items:center;justify-content:center;backdrop-filter:blur(4px)}
@@ -233,7 +260,7 @@
     .main{grid-column:2;grid-row:3;display:flex;flex-direction:column;overflow:hidden;background:var(--bg)}
 
     /* Workspace */
-    .workspace{flex:3;position:relative;overflow:visible;min-height:180px;clip-path:inset(-30px -20px -10px -20px);transition:background 3s ease}
+    .workspace{flex:3;position:relative;overflow:visible;min-height:180px;clip-path:inset(0 -20px -10px -20px);transition:background 3s ease}
     .workspace::before{content:'';position:absolute;inset:0;pointer-events:none;z-index:0;transition:opacity 3s ease}
     .workspace::after{content:'';position:absolute;bottom:0;left:0;right:0;height:18%;pointer-events:none;z-index:0;border-radius:0;transition:background 3s ease}
     /* 날씨 파티클 */
@@ -260,9 +287,6 @@
     @keyframes sparkleFall{0%{transform:translateY(0) scale(1);opacity:.8}50%{opacity:1}100%{transform:translateY(110vh) scale(0);opacity:0}}
     /* 땅 디테일 */
     .ws-ground-detail{position:absolute;bottom:2%;pointer-events:none;z-index:1;font-size:10px;opacity:.7}
-    /* 계절 버튼 */
-    .season-btn{background:var(--surface-hover);border:1px solid var(--border);color:var(--text);border-radius:50%;width:24px;height:24px;cursor:pointer;font-size:.7rem;display:flex;align-items:center;justify-content:center;padding:0}
-    .season-btn:hover{border-color:var(--accent)}
     .ws-agent{position:absolute;display:flex;flex-direction:column;align-items:center;transition:all .4s ease;z-index:10;cursor:default}
     .ws-agent:hover{z-index:30}
     .ws-agent.working .pix-lg{filter:drop-shadow(0 0 10px var(--glow));animation:working calc(.7s * var(--rnd-dur,1)) ease-in-out var(--rnd-delay,0s) infinite}
@@ -301,6 +325,69 @@
     .ws-badge.model-opus{background:rgba(251,191,36,.12);color:#fbbf24}
     .ws-badge.model-sonnet{background:rgba(0,255,200,.1);color:var(--accent)}
     .ws-badge.model-haiku{background:rgba(244,114,182,.12);color:#f472b6}
+
+    /* === Village 모드 — 우주 배경 + 집 숨김 (environment.js가 생성하던 요소들은 이미 DOM에 없음) === */
+    .workspace.village-mode{background:#080812}
+    .workspace.village-mode .ws-house{display:none!important}
+    .workspace.village-mode::before,
+    .workspace.village-mode::after{display:none!important}
+
+    /* === Tier별 캐릭터 크기 (CSS 변수, .workspace.tier-N 클래스로 오버라이드) === */
+    .workspace{--char-size:36px}
+    .workspace.tier-2{--char-size:48px}
+    .workspace.tier-3{--char-size:64px}
+    .workspace .pix-lg{width:var(--char-size);height:var(--char-size)}
+
+    /* === 별 효과 === */
+    @keyframes village-twinkle{
+      0%,100%{opacity:.2}
+      50%{opacity:1}
+    }
+    .village-star{will-change:opacity}
+
+    /* 큰 맥동 별 (등대) */
+    @keyframes village-pulse{
+      0%,100%{opacity:.4;transform:scale(1)}
+      50%{opacity:1;transform:scale(1.4)}
+    }
+    .village-pulse-star{will-change:opacity,transform}
+
+    /* nebula 구름 (성운) — 부드럽지만 잘 보이게 */
+    @keyframes village-nebula-drift{
+      0%,100%{transform:translate(0,0)}
+      50%{transform:translate(8px,-4px)}
+    }
+    .village-nebula{
+      pointer-events:none;
+      mix-blend-mode:screen;
+      filter:blur(22px);
+      will-change:transform;
+      opacity:.7;
+    }
+
+    /* === 은하수는 점점이 밀집된 작은 별 무리로 표현 (village.js, .village-star 재사용) === */
+
+    /* === 별똥별 (CSS 변수로 방향/색/꼬리 길이 동적) === */
+    @keyframes village-shootingstar{
+      0%{transform:translate(0,0);opacity:0}
+      10%{opacity:1}
+      80%{opacity:1}
+      100%{transform:translate(var(--shoot-dx,180px),var(--shoot-dy,90px));opacity:0}
+    }
+    .village-shooting-star{
+      position:absolute;
+      width:var(--shoot-size,3px);height:var(--shoot-size,3px);
+      background:var(--shoot-color,#fff);border-radius:50%;
+      box-shadow:0 0 8px var(--shoot-color,#fff),0 0 16px var(--shoot-color,#fff);
+      pointer-events:none;
+    }
+    .village-shooting-star::before{
+      content:'';position:absolute;right:1px;top:1px;
+      width:var(--shoot-trail-len,40px);height:1px;
+      background:linear-gradient(to right,transparent,var(--shoot-color,rgba(255,255,255,.8)));
+      transform-origin:right center;
+      transform:rotate(var(--shoot-trail-angle,27deg));
+    }
 
     .ws-bubble{position:absolute;bottom:calc(100% + 8px);left:50%;transform:translateX(-50%);background:var(--surface);border:1px solid var(--border);border-radius:5px;padding:3px 8px;font-size:.5rem;font-family:monospace;color:var(--text);white-space:nowrap;opacity:0;transition:opacity .3s;box-shadow:0 2px 8px rgba(0,0,0,.4);pointer-events:none}
     .ws-bubble::after{content:'';position:absolute;top:100%;left:50%;transform:translateX(-50%);border:4px solid transparent;border-top-color:var(--border)}

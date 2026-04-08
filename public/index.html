@@ -22,8 +22,6 @@
         <button class="help-btn" onclick="toggleHelp()" data-tip="도움말">?</button>
         <button class="help-btn restart-btn" onclick="restartServer()" data-tip="재시작">&#8635;</button>
         <button class="help-btn stop-btn" onclick="shutdownServer()" data-tip="종료">&#9632;</button>
-        <button class="season-btn" onclick="toggleEnv()" id="envBtn" data-tip="환경효과">✨</button>
-        <button class="season-btn" onclick="cycleSeason()" id="seasonBtn" data-tip="봄">🌸</button>
         <button class="theme-btn" onclick="cycleTheme()" id="themeBtn" data-tip="Dark">🌙</button>
       </div>
     </header>
@@ -94,19 +92,20 @@
   <div class="hist-overlay" id="histOverlay" onclick="if(event.target===this)toggleHistory()">
     <div class="hist-modal">
       <div class="hist-header">
-        <h2>&#128337; 세션 히스토리</h2>
+        <h2>&#128337; 세션 히스토리 <span class="hist-meta-info" id="histMetaInfo"></span></h2>
         <div class="hist-tools">
-          <label class="hist-privacy" title="프롬프트 기록 on/off">
+          <label class="hist-privacy" data-tip="다음 세션부터 프롬프트/요약을 디스크에 저장하지 않습니다">
             <input type="checkbox" id="histPrivacy" onchange="togglePrivacy(this.checked)">
-            <span>🔒 기록 안 함</span>
+            <span>🔒 사용 안 함</span>
           </label>
+          <button class="hist-clear-all" onclick="clearAllHistory()" data-tip="저장된 히스토리 파일 전체 삭제 (되돌릴 수 없음)">🗑 전체 삭제</button>
           <button onclick="toggleHistory()">&times;</button>
         </div>
       </div>
       <div class="hist-search">
         <input type="text" id="histSearchQ" placeholder="🔍 프롬프트/파일명/세션명 검색..." oninput="scheduleHistSearch()">
         <select id="histSearchDays" onchange="fetchHistory()">
-          <option value="0">전체 기간</option>
+          <option value="0">전체</option>
           <option value="1">오늘</option>
           <option value="3">최근 3일</option>
           <option value="7">최근 7일</option>
@@ -131,10 +130,20 @@
       <div class="help-section">
         <h3>Terminal</h3>
         <div class="help-cmd"><code>claude-agents</code><span>서버 시작 + 브라우저 열기</span></div>
-        <div class="help-cmd"><code>claude-agents stop</code><span>서버 종료</span></div>
+        <div class="help-cmd"><code>claude-agents stop</code><span>서버 종료 (헤더 &#9632; 버튼과 동일)</span></div>
         <div class="help-cmd"><code>claude-agents status</code><span>현재 상태 확인</span></div>
         <div class="help-cmd"><code>claude-agents on</code><span>세션 시작 시 자동 실행 ON</span></div>
         <div class="help-cmd"><code>claude-agents off</code><span>자동 실행 OFF</span></div>
+      </div>
+
+      <div class="help-section">
+        <h3>Header Buttons</h3>
+        <div class="help-tip"><strong>&#128276;</strong> &mdash; 브라우저 알림 on/off (자세한 동작은 아래 "알림" 섹션)</div>
+        <div class="help-tip"><strong>&#128336;</strong> &mdash; 세션 히스토리 (자세한 동작은 아래 "히스토리 &amp; Privacy" 섹션)</div>
+        <div class="help-tip"><strong>?</strong> &mdash; 이 도움말</div>
+        <div class="help-tip"><strong>&#8635;</strong> &mdash; 서버 재시작 (SSE 자동 재연결)</div>
+        <div class="help-tip"><strong>&#9632;</strong> &mdash; 서버 종료</div>
+        <div class="help-tip"><strong>&#127769;/&#9728;&#65039;</strong> &mdash; 다크/라이트 테마 전환</div>
       </div>
 
       <div class="help-section">
@@ -143,35 +152,54 @@
         <div class="help-tip"><strong>더블클릭</strong> &mdash; 세션 이름 변경</div>
         <div class="help-tip"><strong>&times; 버튼</strong> &mdash; 종료된 세션 탭 제거</div>
         <div class="help-tip">Claude Code 시작/종료 시 탭 자동 생성/제거</div>
+        <div class="help-tip">Claude Code에서 <code>/rename</code> 실행 시 탭 이름 자동 갱신</div>
       </div>
 
       <div class="help-section">
         <h3>Workspace</h3>
         <div class="help-tip">에이전트 캐릭터가 실시간 상태를 표시</div>
-        <div class="help-tip"><strong>idle</strong> = 숨쉬기 애니메이션, <strong>working</strong> = 바운스 + 발광, <strong>done</strong> = 초록 글로우</div>
+        <div class="help-tip"><strong>idle</strong> = 숨쉬기 + 자율 배회(roam/sleep) + 눈 깜빡임</div>
+        <div class="help-tip"><strong>working</strong> = 바운스 + 발광 + 다리 움직임</div>
+        <div class="help-tip"><strong>done</strong> = 점프 + 초록 글로우</div>
         <div class="help-tip">Agent 도구 호출 시 Master &harr; Agent 사이 flyDot 애니메이션</div>
+        <div class="help-tip">우주 배경 (별 &middot; 은하수 &middot; nebula &middot; 별똥별). 워크스페이스 폭에 따라 캐릭터 크기 자동 조정 (Tier 1/2/3)</div>
       </div>
 
       <div class="help-section">
         <h3>Left Panel</h3>
-        <div class="help-tip"><strong>Master 카드</strong> &mdash; CLAUDE.md 편집</div>
+        <div class="help-tip"><strong>Master 카드</strong> &mdash; CLAUDE.md 편집 (Global / Project 탭)</div>
         <div class="help-tip"><strong>Agent 카드</strong> &mdash; 클릭으로 활성/비활성, 연필 아이콘으로 설정 편집</div>
         <div class="help-tip"><strong>+ New</strong> &mdash; 새 에이전트 정의 생성 (~/.claude/agents/)</div>
+        <div class="help-tip"><strong>MCP / Hooks</strong> &mdash; 등록된 MCP 서버, 훅 목록 확인</div>
+      </div>
+
+      <div class="help-section">
+        <h3>히스토리 &amp; Privacy</h3>
+        <div class="help-tip"><strong>&#128336; 버튼</strong> &mdash; 종료된 세션의 기록 열기</div>
+        <div class="help-tip">질문 프롬프트 원문 + 응답 요약 + 에이전트/도구/파일 통계 + 작업 폴더 칩 (parent/basename, 호버 시 전체 경로, <strong>클릭 시 클립보드 복사</strong>)</div>
+        <div class="help-tip"><strong>검색</strong> &mdash; 프롬프트/파일명/세션명 키워드, <strong>필터</strong> &mdash; 날짜/에이전트</div>
+        <div class="help-tip"><strong>&#128274; Privacy 토글</strong> &mdash; 프롬프트 기록 on/off (ON 시 디스크 저장 skip)</div>
+        <div class="help-tip">민감정보 자동 마스킹: <code>sk-*</code>, <code>ghp_*</code>, <code>AKIA*</code>, JWT, Bearer 토큰</div>
+        <div class="help-tip"><strong>&times; 버튼</strong> 개별 삭제, 전체 삭제 버튼으로 일괄 정리</div>
+        <div class="help-tip">자동 정리: 7일 경과 &middot; 10MB 초과 &middot; 1시간 주기</div>
       </div>
 
       <div class="help-section">
         <h3>알림</h3>
         <div class="help-tip"><strong>&#128276; 버튼</strong> &mdash; 브라우저 알림 on/off 토글</div>
-        <div class="help-tip">탭이 비활성일 때 에이전트 완료, 응답 완료 시 알림</div>
+        <div class="help-tip">탭이 비활성일 때만 발송 (에이전트 완료, 응답 완료 시)</div>
         <div class="help-tip">알림 클릭 시 대시보드 탭으로 포커스 이동</div>
       </div>
 
       <div class="help-section">
         <h3>Hook</h3>
-        <div class="help-tip">SessionStart &rarr; 서버 시작 + 세션 등록</div>
-        <div class="help-tip">PreToolUse (Agent) &rarr; 에이전트 시작 이벤트</div>
-        <div class="help-tip">PostToolUse (Agent) &rarr; 에이전트 완료 이벤트</div>
-        <div class="help-tip">세션 종료 &rarr; 탭 &times; 버튼 또는 2시간 자동 만료</div>
+        <div class="help-tip"><strong>SessionStart</strong> &rarr; 서버 시작 + 세션 등록</div>
+        <div class="help-tip"><strong>UserPromptSubmit</strong> &rarr; 질문 시작 (thinking_start)</div>
+        <div class="help-tip"><strong>Stop</strong> &rarr; 응답 완료 (thinking_end)</div>
+        <div class="help-tip"><strong>PreToolUse</strong> &rarr; 도구 사용 (Agent 매처는 agent_start)</div>
+        <div class="help-tip"><strong>PostToolUse (Agent)</strong> &rarr; 에이전트 완료</div>
+        <div class="help-tip"><strong>SessionEnd</strong> &rarr; 세션 종료 + 히스토리 저장</div>
+        <div class="help-tip">세션 제거: 탭 &times; 버튼 또는 2시간 무활동 자동 만료</div>
       </div>
     </div>
   </div>
@@ -182,6 +210,7 @@
   <script src="/js/constants.js"></script>
   <script src="/js/state.js"></script>
   <script src="/js/utils.js"></script>
+  <script src="/js/village.js"></script>
   <script src="/js/environment.js"></script>
   <script src="/js/creature.js"></script>
   <script src="/js/history.js"></script>
@@ -410,7 +439,7 @@
         var masterBusy=csMst==='thinking'||csMst==='working';
         var isLocked=isLive||masterBusy;
         var toggle=document.createElement('span');toggle.className='ag-toggle'+(isEnabled?' on':'')+(isLocked?' locked':'');
-        toggle.title=isLocked?'작업 중 — 변경 불가':(isEnabled?'이 프로젝트에서 활성':'이 프로젝트에서 비활성');
+        toggle.dataset.tip=isLocked?'작업 중 — 변경 불가':(isEnabled?'이 프로젝트에서 활성':'이 프로젝트에서 비활성');
         (function(agId,en){
           toggle.onclick=function(e){
             e.stopPropagation();
@@ -693,7 +722,7 @@
       if(!currentSession&&inst.sessionName) row.innerHTML+='<span class="act-session">'+esc(inst.sessionName)+'</span>';
       // 리셋 버튼 (done)
       if(inst.st==='done'){
-        var rb=document.createElement('span');rb.className='act-reset';rb.textContent='\u00d7';rb.title='\uC81C\uAC70';
+        var rb=document.createElement('span');rb.className='act-reset';rb.textContent='\u00d7';rb.dataset.tip='\uC81C\uAC70';
         (function(k){rb.onclick=function(e){e.stopPropagation();clearInstance(k)}})(inst.key);
         row.appendChild(rb);
       }
@@ -730,7 +759,7 @@
       var widthPct=((endTime-inst.startTime)/totalMs)*100;
       bar.style.left=startPct+'%';bar.style.width=Math.max(widthPct,1)+'%';bar.style.background=inst.color;
       var sec=Math.round((endTime-inst.startTime)/1000);
-      bar.title=name+' '+sec+'s';
+      bar.dataset.tip=name+' '+sec+'s';
       track.appendChild(bar);
       var timeLabel=document.createElement('span');timeLabel.className='tl-bar-label';timeLabel.textContent=sec+'s';
       row.appendChild(lbl);row.appendChild(track);row.appendChild(timeLabel);box.appendChild(row);
@@ -766,16 +795,26 @@
   var _renderTimer=null;
   function renderAll(){
     if(_renderTimer)clearTimeout(_renderTimer);
-    _renderTimer=setTimeout(function(){_renderTimer=null;try{renderList();renderWorkspace();renderActivity();renderTimeline();renderLogs();updateHeaderStat();renderSessionTabs()}catch(e){console.error('[agent-viz] renderAll error:',e)}},50);
+    _renderTimer=setTimeout(function(){_renderTimer=null;try{renderList();renderWorkspace();renderActivity();renderTimeline();renderLogs();updateHeaderStat();renderSessionTabs();if(typeof renderVillage==='function')renderVillage()}catch(e){console.error('[agent-viz] renderAll error:',e)}},50);
   }
 
   // === Modal ===
+  // 모달 열 때 항상 스크롤을 맨 위로 (이전 편집 위치가 유지되는 문제 방지)
+  // setTimeout 0: overlay show로 display 변경된 직후에 적용해야 scrollTop이 반영됨
+  function resetModalScroll(){
+    setTimeout(function(){
+      var b=document.querySelector('.modal .modal-body');if(b)b.scrollTop=0;
+      var fb=document.getElementById('fBody');if(fb)fb.scrollTop=0;
+      var fm=document.getElementById('fMaster');if(fm)fm.scrollTop=0;
+    },0);
+  }
   function openEdit(id){
     var ag=agents.find(function(a){return a.id===id});if(!ag)return;editingId=id;    document.getElementById('modalTitle').textContent=ag.name;document.getElementById('fName').value=ag.name;document.getElementById('fName').disabled=true;
     document.getElementById('fDesc').value=ag.description;document.getElementById('fModel').value=ag.model;document.getElementById('fBody').value=ag.body||'';
     document.getElementById('btnDel').style.display='';renderToolsGrid(ag.tools||[]);
     document.getElementById('agentFields').style.display='';document.getElementById('masterFields').style.display='none';    document.getElementById('btnSave').onclick=saveAgent;document.getElementById('btnDel').onclick=deleteAgent;
     document.getElementById('overlay').classList.add('show');
+    resetModalScroll();
   }
   function openNew(){
     editingId=null;document.getElementById('modalTitle').textContent='\uC0C8 \uC5D0\uC774\uC804\uD2B8';
@@ -784,6 +823,7 @@
     document.getElementById('btnDel').style.display='none';renderToolsGrid(['Read','Glob','Grep']);
     document.getElementById('agentFields').style.display='';document.getElementById('masterFields').style.display='none';    document.getElementById('btnSave').onclick=saveAgent;document.getElementById('btnDel').onclick=deleteAgent;
     document.getElementById('overlay').classList.add('show');
+    resetModalScroll();
   }
   function openMaster(){
     editingId='master';masterTab='global';document.getElementById('modalTitle').textContent='\u2605 Master';
@@ -791,12 +831,13 @@
     document.getElementById('btnDel').style.display='none';document.getElementById('fMaster').value=masterData.global||'';
     document.getElementById('masterFileLabel').textContent=masterData.globalPath||'~/CLAUDE.md';updateMasterTabs();
     document.getElementById('overlay').classList.add('show');
+    resetModalScroll();
   }
   function switchMasterTab(t){masterTab=t;document.getElementById('fMaster').value=t==='global'?(masterData.global||''):(masterData.project||'');document.getElementById('masterFileLabel').textContent=t==='global'?(masterData.globalPath||'~/CLAUDE.md'):(masterData.projectPath||'project/CLAUDE.md');updateMasterTabs()}
   function updateMasterTabs(){var bs=document.querySelectorAll('#masterTabs button');bs.forEach(function(b,i){b.className=(i===0&&masterTab==='global')||(i===1&&masterTab==='project')?'active':''})}
   function closeModal(){document.getElementById('overlay').classList.remove('show');document.getElementById('agentFields').style.display='';document.getElementById('masterFields').style.display='none'}
   var TOOL_TIPS={Read:'\uD30C\uC77C \uC77D\uAE30',Write:'\uC0C8 \uD30C\uC77C \uC0DD\uC131',Edit:'\uAE30\uC874 \uD30C\uC77C \uC218\uC815',Glob:'\uD30C\uC77C \uAC80\uC0C9 (\uD328\uD134)',Grep:'\uB0B4\uC6A9 \uAC80\uC0C9',Bash:'\uD130\uBBF8\uB110 \uBA85\uB839 \uC2E4\uD589',Agent:'\uB2E4\uB978 \uC5D0\uC774\uC804\uD2B8 \uD638\uCD9C',WebFetch:'URL \uB0B4\uC6A9 \uAC00\uC838\uC624\uAE30',WebSearch:'\uC6F9 \uAC80\uC0C9',NotebookEdit:'\uB178\uD2B8\uBD81 \uD3B8\uC9D1'};
-  function renderToolsGrid(sel){var g=document.getElementById('toolsGrid');g.innerHTML='';ALL_TOOLS.forEach(function(t){var c=document.createElement('span');c.className='tool-chip'+(sel.indexOf(t)>=0?' sel':'');c.textContent=t;c.title=TOOL_TIPS[t]||t;c.onclick=function(){c.classList.toggle('sel')};g.appendChild(c)})}
+  function renderToolsGrid(sel){var g=document.getElementById('toolsGrid');g.innerHTML='';ALL_TOOLS.forEach(function(t){var c=document.createElement('span');c.className='tool-chip'+(sel.indexOf(t)>=0?' sel':'');c.textContent=t;c.dataset.tip=TOOL_TIPS[t]||t;c.onclick=function(){c.classList.toggle('sel')};g.appendChild(c)})}
   function getSelectedTools(){var cs=document.querySelectorAll('#toolsGrid .tool-chip.sel');var t=[];cs.forEach(function(c){t.push(c.textContent)});return t}
   function saveAgent(){
     if(editingId==='master'){var ct=document.getElementById('fMaster').value;var saveCwd=masterData.cwd||'';fetch(API+'/api/master/'+masterTab,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({content:ct,cwd:saveCwd})}).then(function(r){return r.json()}).then(function(r){if(r.ok){toast(masterTab==='global'?'~/CLAUDE.md \uC800\uC7A5':(r.path||'\uD504\uB85C\uC81D\uD2B8')+' \uC800\uC7A5');if(masterTab==='global')masterData.global=ct;else masterData.project=ct}else toast('\uC2E4\uD328','err')}).catch(function(){toast('\uC5F0\uACB0 \uC2E4\uD328','err')});return}
@@ -864,7 +905,7 @@
         var cmd=h.command||'';
         // 경로 축약
         var shortCmd=cmd.replace(/\/Users\/[^/]+/g,'~').replace(/\/\.claude\/agent-viz\//,'');
-        var line=document.createElement('div');line.className='hook-handler';line.textContent=shortCmd;line.title=cmd;
+        var line=document.createElement('div');line.className='hook-handler';line.textContent=shortCmd;line.dataset.tip=cmd;
         g.appendChild(line);
         if(h.matcher){
           var m=document.createElement('div');m.className='hook-matcher';m.textContent='matcher: '+h.matcher;
@@ -884,10 +925,12 @@
   }
   function renderDailyStat(){
     var el=document.getElementById('dailyStat');if(!el)return;
+    // DOM 재생성 전 글로벌 툴팁 정리 (detached node에 박제된 툴팁 방지)
+    if(typeof window.hideGlobalTip==='function')window.hideGlobalTip();
     var d=dailyStatsData;
     var summary='📊 질문 <strong>'+d.prompts+'</strong> · 에이전트 <strong>'+d.totalAgents+'</strong> · 도구 <strong>'+d.totalTools+'</strong>';
 
-    var dd='<div class="daily-dropdown"><div class="daily-title">📊 오늘</div>';
+    var dd='<div class="daily-dropdown"><div class="daily-title daily-title-head">📊 오늘<button class="daily-reset" onclick="event.stopPropagation();resetStats()" data-tip="모든 통계(오늘/주간/전체) 초기화">🔄</button></div>';
 
     dd+='<div class="daily-section">질문 '+d.prompts+'회</div>';
 
@@ -897,12 +940,13 @@
     if(agentKeys.length===0){dd+='<div class="daily-row"><span>없음</span><span>-</span></div>'}
     agentKeys.forEach(function(k,i){dd+='<div class="daily-row sub'+(i===agentKeys.length-1?' last':'')+'"><span>'+k+'</span><span>'+d.agents[k]+'</span></div>'});
 
-    // 오늘 도구
+    // 오늘 도구 (기본 접힘 - 항목이 많아 화면 차지를 줄임)
     var toolKeys=Object.keys(d.tools||{}).sort(function(a,b){return d.tools[b]-d.tools[a]});
-    dd+='<div class="daily-section">도구 '+d.totalTools+'회</div>';
+    dd+='<details class="daily-collapse"><summary class="daily-section">도구 '+d.totalTools+'회</summary>';
     var showTools=toolKeys.slice(0,8);
     showTools.forEach(function(k,i){dd+='<div class="daily-row sub'+(i===showTools.length-1?' last':'')+'"><span>'+k+'</span><span>'+d.tools[k]+'</span></div>'});
     if(toolKeys.length>8){dd+='<div class="daily-row sub last"><span>외 '+(toolKeys.length-8)+'개</span><span></span></div>'}
+    dd+='</details>';
 
     // 주간 통계
     var w=d.weekly||{};
@@ -924,6 +968,17 @@
 
     dd+='</div>';
     el.innerHTML=summary+dd;
+  }
+  function resetStats(){
+    if(!confirm('모든 통계(오늘/주간/전체)를 초기화합니다.\n이 작업은 되돌릴 수 없습니다.\n\n계속하시겠습니까?'))return;
+    fetch(API+'/api/stats/reset',{method:'POST'}).then(function(r){return r.json()}).then(function(d){
+      if(d&&d.ok){
+        // 메모리 캐시도 비우고 즉시 갱신
+        dailyStatsData={prompts:0,totalAgents:0,totalTools:0,agents:{},tools:{},weekly:{prompts:0,agents:{},tools:{}},total:{since:d.since,prompts:0,agents:{},tools:{}}};
+        renderDailyStat();
+        toast('통계 초기화됨');
+      }else{toast('초기화 실패','err')}
+    }).catch(function(){toast('초기화 실패','err')});
   }
   // SSE 이벤트 수신 시 실시간 업데이트
   function updateDailyStatFromEvent(ev){
@@ -1181,9 +1236,10 @@
 
 
   // === Init ===
-  initEnvironment(); // environment.js
+  // village 모드 항상 ON — initEnvironment(4계절/날씨/구름) 건너뜀
   initCreatureSystem(); // creature.js
   initNotifBtn(); // notifications.js
+  initVillageTier(); // utils.js — 마을 Tier 자동 감지 + village 활성화
   fetchMaster();fetchSessions();fetchMcpServers();fetchHooks();fetchDailyStats();
   // inactive 상태 주기적 갱신 (60초마다 세션 탭 re-render)
   setInterval(function(){if(Object.keys(sessions).length>0)renderSessionTabs()},60000);
@@ -1192,34 +1248,22 @@
     agents=data.map(function(a,i){a.color=agColor(a.id,i);a.active=true;return a});setConn(true);_wsBuilt=false;renderAll();
     var cwd=(currentSession&&sessions[currentSession])?sessions[currentSession].cwd:'';
     if(cwd) fetchProjectAgents(cwd);
+    // village도 agents 로드 후 다시 렌더 (init 시점엔 빈 배열이라 안 보임)
+    if(typeof renderVillage==='function') renderVillage();
   }).catch(function(){setConn(false)}).finally(function(){connectSSE()});
 
   // === Page Visibility: 탭 비활성 시 애니메이션 일시정지 ===
   document.addEventListener('visibilitychange',function(){
-    var ws=document.getElementById('workspace');
     if(document.hidden){
-      // 탭 비활성: 모든 파티클/애니메이션 정지
-      if(_weatherInterval){clearInterval(_weatherInterval);_weatherInterval=null}
-      if(_sparkleInterval){clearInterval(_sparkleInterval);_sparkleInterval=null}
-      if(_envInterval){clearInterval(_envInterval);_envInterval=null}
-      if(_blinkInterval){clearInterval(_blinkInterval);_blinkInterval=null}
-      if(_walkInterval){clearInterval(_walkInterval);_walkInterval=null}
-      if(_seasonInterval){clearInterval(_seasonInterval);_seasonInterval=null}
-      if(ws&&ws._cloudInterval){clearInterval(ws._cloudInterval);ws._cloudInterval=null}
-      if(ws)ws.querySelectorAll('.weather-particle,.sparkle-fall').forEach(function(p){p.remove()});
+      // 탭 비활성: 모든 타이머/setTimeout 정지 (CLAUDE.md 강제 규칙)
+      stopBlinkInterval();
+      stopWalkInterval();
+      if(typeof stopShootingStars==='function')stopShootingStars();
     } else {
       // 탭 활성: 재개
-      _blinkInterval=setInterval(blinkEyes,1500);
-      if(_envEnabled){
-        startWeather();startSparkles();
-        if(ws)ws._cloudInterval=null;
-        _envInterval=setInterval(updateEnvironment,8000);
-      }
-      if(_envEnabled){
-        _seasonInterval=setInterval(seasonCycleCheck,3000);
-        updateEnvironment();
-      }
-      _walkInterval=setInterval(function(){document.querySelectorAll('.ws-agent.working .pix-lg,.ws-agent.idle .pix-lg').forEach(function(pix){var agent=pix.parentElement.parentElement||pix.parentElement;var id=agent.id?agent.id.replace('ws-',''):'';var c=creatureLife[id];if(agent.classList.contains('working')){if(Math.random()>.6)return;walkLegs(pix)}else if(c&&c.beh==='roam'){if(Math.random()>.5)return;walkLegs(pix)}})},350);
+      startBlinkInterval();
+      startWalkInterval();
+      if(typeof startShootingStars==='function')startShootingStars();
       renderAll();
     }
   });

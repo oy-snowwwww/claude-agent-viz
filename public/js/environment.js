@@ -1,6 +1,18 @@
-// 환경 효과 — 낮/밤 사이클, 4계절, 날씨 파티클, 우주 배경
+// ⚠️ DEPRECATED (village 모드 전환 후 inactive) ⚠️
+// 이 파일의 모든 함수(initEnvironment, toggleEnv, cycleSeason, updateEnvironment,
+// startWeather, startSparkles, seasonCycleCheck, createSpaceBackground 등)는
+// 현재 어떤 진입점에서도 호출되지 않습니다.
+//   - index.html의 initEnvironment() 호출은 주석 처리됨 (village 모드가 대체)
+//   - 헤더의 envBtn/seasonBtn이 제거되어 toggleEnv/cycleSeason의 onclick 진입점 없음
+//   - _envEnabled는 하드코딩 false로 고정되어 있어 visibilitychange 재개 분기도 no-op
+// 삭제 대신 보존하는 이유:
+//   - 향후 테마/모드 확장 시 재사용 후보 (계절별 배경·날씨 렌더링 자산)
+//   - 외부 기여자가 계절/날씨 패턴을 참고할 수 있음
+// 수정 금지 권장. 새 기능은 village.js에 추가하세요.
+//
+// ─────────────────────────────────────────────────────────────
+// (원본 주석) 환경 효과 — 낮/밤 사이클, 4계절, 날씨 파티클, 우주 배경
 // 로드 순서: utils.js 이후, 인라인 메인 이전
-// 주의: initEnvironment()는 인라인 Init 섹션에서 호출해야 함 (DOM + 다른 전역 함수 의존)
 
 // === 상수 ===
 var SEASONS = ['spring','summer','autumn','winter'];
@@ -35,7 +47,11 @@ var SEASON_PALETTE = {
 var currentSeason = SEASONS[Math.floor(Math.random() * SEASONS.length)];
 var _dayOffset = Math.random() * DAY_CYCLE_MS;
 var _lastSeasonCycle = Math.floor((Date.now() + _dayOffset) / DAY_CYCLE_MS);
-var _envEnabled = localStorage.getItem('agviz-env') === 'on';
+// village 모드 전환 후 환경 효과는 더 이상 사용하지 않음.
+// 이전 버전에서 'on'으로 저장된 잔존 키를 1회 마이그레이션으로 제거해
+// visibilitychange 재개 분기(index.html)가 인터벌을 재시작하지 않도록 강제 false 고정.
+var _envEnabled = false;
+try { localStorage.removeItem('agviz-env'); } catch(e) {}
 var _envInterval = null;
 var _seasonInterval = null;
 var _weatherInterval = null;
@@ -205,8 +221,10 @@ function seasonCycleCheck() {
     var idx = SEASONS.indexOf(currentSeason);
     currentSeason = SEASONS[(idx + 1) % SEASONS.length];
     var _sb = document.getElementById('seasonBtn');
-    _sb.textContent = SEASON_LABELS[currentSeason];
-    _sb.dataset.tip = SEASON_TITLES[currentSeason];
+    if (_sb) {
+      _sb.textContent = SEASON_LABELS[currentSeason];
+      _sb.dataset.tip = SEASON_TITLES[currentSeason];
+    }
     var ws = document.getElementById('workspace');
     if (ws) {
       ws.dataset.groundDetail = '';
@@ -306,6 +324,7 @@ function toggleEnv() {
   localStorage.setItem('agviz-env', _envEnabled ? 'on' : 'off');
   var ws = document.getElementById('workspace');
   var btn = document.getElementById('envBtn');
+  if (!btn) return; // 헤더에서 제거된 경우 noop
   if (_envEnabled) {
     btn.textContent = '🌍';
     if (ws) ws.querySelectorAll('.ws-stars').forEach(function(e) { e.remove(); });
@@ -333,8 +352,10 @@ function cycleSeason() {
   currentSeason = SEASONS[(idx + 1) % SEASONS.length];
   localStorage.setItem('agviz-season', currentSeason);
   var _sb2 = document.getElementById('seasonBtn');
-  _sb2.textContent = SEASON_LABELS[currentSeason];
-  _sb2.dataset.tip = SEASON_TITLES[currentSeason];
+  if (_sb2) {
+    _sb2.textContent = SEASON_LABELS[currentSeason];
+    _sb2.dataset.tip = SEASON_TITLES[currentSeason];
+  }
   var ws = document.getElementById('workspace');
   if (ws) {
     ws.dataset.groundDetail = '';
@@ -348,9 +369,12 @@ function cycleSeason() {
 // === 초기화 ===
 // 인라인 Init 섹션에서 호출 (DOM + toast + renderAll 등 의존성 때문)
 function initEnvironment() {
+  // 헤더에서 envBtn/seasonBtn이 제거되었을 수 있어 null-safe 처리
   var _sb3 = document.getElementById('seasonBtn');
-  _sb3.textContent = SEASON_LABELS[currentSeason];
-  _sb3.dataset.tip = SEASON_TITLES[currentSeason];
+  if (_sb3) {
+    _sb3.textContent = SEASON_LABELS[currentSeason];
+    _sb3.dataset.tip = SEASON_TITLES[currentSeason];
+  }
   if (_envEnabled) {
     updateEnvironment();
     startWeather();
@@ -358,7 +382,8 @@ function initEnvironment() {
     _envInterval = setInterval(updateEnvironment, 8000);
     _seasonInterval = setInterval(seasonCycleCheck, 3000);
   } else {
-    document.getElementById('envBtn').textContent = '✨';
+    var _envBtnEl = document.getElementById('envBtn');
+    if (_envBtnEl) _envBtnEl.textContent = '✨';
     var ws0 = document.getElementById('workspace');
     if (ws0) createSpaceBackground(ws0);
   }

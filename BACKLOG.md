@@ -5,9 +5,6 @@
 ## 🟡 SHOULD FIX
 
 ### 안정성
-- [ ] **scrubHistoryPrompts 동기 I/O 블로킹** (`server.js`)
-  - Privacy ON 시 디스크 정리가 동기 fs로 이벤트 루프 차단
-  - `setImmediate` 또는 async fs API로 변경
 - [ ] **thinking_start 없이 도착하는 이벤트 처리** (`server.js`)
   - recover 시나리오에서 tool_use/agent_start가 빈 turns 배열에 잘못 합산되거나 누락
   - 더미 turn 또는 orphan 카운터 도입
@@ -20,9 +17,6 @@
   - 100개 질문 초과 시 UI에 "100+ (이후 생략됨)" 배지 표시
 - [ ] **agent 필터 옵션 첫 무필터 응답에서만 채우기** (`index.html`)
   - 현재 캐시 누적 방식이지만 첫 로드 후엔 fix해도 됨
-- [ ] **togglePrivacy confirm UX 개선** (`index.html`)
-  - confirm 다이얼로그 ESC/외부 클릭 동작이 브라우저별로 달라 의도와 다른 결과 가능
-  - 커스텀 모달로 변경 권장
 
 ### 정확도
 - [ ] **maskSecrets — Bearer 토큰 false positive** (`server.js`)
@@ -35,11 +29,26 @@
 
 ## 🔵 NIT
 
+- [ ] **Tier 변경 시 캐릭터 위치 clamp** (`creature.js`)
+  - `_applyTierClass` 시 `invalidateWsBoxCache`만 호출 → 한동안 bounds 밖 위치에 머무를 수 있음
+  - 모든 캐릭터 x/y를 즉시 clamp하는 헬퍼 호출 검토
+- [ ] **module-level setInterval 정리 일관성** (`server.js`)
+  - `cleanHistory` (line 593), `checkSessions` (line 1620)는 `gracefulShutdown`에서 명시 clearInterval 안 됨
+  - `process.exit(0)`가 정리하므로 실질 무해하나 `_ssePingInterval`만 명시 clear하는 것과 비일관
+  - gracefulShutdown에 일괄 등록
+
 - [ ] `.gitignore` `sessions/`, `history/`, `/privacy` 표기 일관성 (anchor 통일)
 - [ ] `isNoiseUserText`에 `<bash-input>`, `<bash-output>`, `<request_metadata>` 패턴 추가
-- [ ] `saveAllTrackers()` 호출 후 `sessionTrackers = {}` 명시적 clear
 - [ ] `highlight()` HTML entity 처리 검토 (`&` 검색 시)
 - [ ] 손상된 history JSON 파일 자동 정리 또는 quarantine
+- [ ] **`updateHistMetaInfo`에 partial 응답 표시** (`public/js/history.js:51~66`)
+  - 5초 timeout으로 `partial: true` 응답 시 UI에 "부분 결과" 배지
+- [ ] **글로벌 툴팁에서 매우 긴 cwd 경로 클립보드 복사** (`public/js/utils.js`)
+  - 칩 클릭 시 전체 경로를 clipboard에 복사하는 액션 추가 검토
+- [ ] **SSE ping SIGKILL 정리 불가** (`server.js:676~682`)
+  - 비정상 종료는 OS가 정리하므로 실용상 OK. graceful 경로는 모두 커버됨
+- [ ] **light 테마일 때 우주 배경 가독성** (`village.js`, CSS)
+  - `#080812` 고정이라 light 테마에서 대비 부조화. 사용자 피드백 수집 후 결정
 
 ## 🏗️ 향후 리팩토링 (별도 PR)
 
@@ -47,6 +56,7 @@
 - [ ] **`index.html` 모듈 분리** — `js/sessions.js`, `js/timeline.js`, `js/history.js` 등으로 분할 (빌드 시스템 없이)
 - [ ] **`handleLiveEvent()` 분리** — 거대한 switch를 작은 핸들러 함수들로
 - [ ] **테스트 자동화** — 현재는 시각적 확인 + 시뮬레이터 기반. 단위 테스트 추가 검토
+- [ ] **`environment.js` dead code 정리** — village(우주) 모드 항상 활성화 후 environment 토글/계절 함수가 사용되지 않음. `_envEnabled = false` 강제 + localStorage 마이그레이션만 남기고 나머지 함수 제거 검토
 
 ## 알려진 한계
 

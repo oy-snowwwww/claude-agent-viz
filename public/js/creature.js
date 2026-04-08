@@ -44,16 +44,75 @@ function initCreature(id, el) {
     y: parseFloat(el.style.top) || 50,
     tx: 0, ty: 0,
     beh: 'stand',
-    walking: false,
     nextAction: Date.now() + 1000 + Math.random() * 3000
   };
 }
 
+// === 활동 범위 (워크스페이스 + 캐릭터 박스 기준 동적 안전 마진) ===
+// 위: 캐릭터 머리 + 말풍선이 잘리지 않을 만큼
+// 아래: 캐릭터 + 라벨 글씨가 잘리지 않을 만큼
+// 좌우: 캐릭터 절반 + 라벨 텍스트가 워크스페이스 안에 머무름
+var CREATURE_X_MIN_PCT = 4, CREATURE_X_MAX_PCT = 96;
+var CREATURE_Y_MIN_PCT = 6, CREATURE_Y_MAX_PCT = 94;
+// .ws-label: 0.55rem ~13px (line-height 포함), margin-top 4px → ~17px
+// .ws-bubble: padding+text ~14px, 캐릭터로부터 8px 위 → ~22px (working/thinking/done에서만 보임)
+var LABEL_BLOCK_PX = 17;
+var BUBBLE_BLOCK_PX = 22;
+var SAFETY_PX = 4;
+
+var _wsBoxCache = null;
+var _safeBoundsCache = null;
+function invalidateWsBoxCache() { _wsBoxCache = null; _safeBoundsCache = null; }
+window.addEventListener('resize', invalidateWsBoxCache);
+
+function getWsBox() {
+  if (_wsBoxCache) return _wsBoxCache;
+  var ws = document.querySelector('.workspace');
+  if (!ws) return null;
+  var w = ws.offsetWidth;
+  var h = ws.offsetHeight;
+  if (w < 50 || h < 50) return null;
+  var charSize = parseInt(getComputedStyle(ws).getPropertyValue('--char-size'), 10) || 48;
+  // 캐릭터 박스: 위쪽은 본체 절반 + 말풍선, 아래쪽은 본체 절반 + 라벨
+  var topReachPx = charSize / 2 + BUBBLE_BLOCK_PX + SAFETY_PX;
+  var bottomReachPx = charSize / 2 + LABEL_BLOCK_PX + SAFETY_PX;
+  var sideReachPx = charSize / 2 + SAFETY_PX;
+  _wsBoxCache = {
+    w: w, h: h,
+    topPct: (topReachPx / h) * 100,
+    bottomPct: (bottomReachPx / h) * 100,
+    sidePct: (sideReachPx / w) * 100,
+  };
+  return _wsBoxCache;
+}
+
+// 캐릭터가 머무를 수 있는 안전 경계 계산 (pickTarget + 충돌 회피 공통)
+// 캐시됨 — invalidateWsBoxCache()로 무효화 (resize, tier 변경 시)
+function getSafeBounds() {
+  if (_safeBoundsCache) return _safeBoundsCache;
+  var b = {
+    minX: CREATURE_X_MIN_PCT, maxX: CREATURE_X_MAX_PCT,
+    minY: CREATURE_Y_MIN_PCT, maxY: CREATURE_Y_MAX_PCT,
+  };
+  var box = getWsBox();
+  if (box) {
+    b.minY = Math.max(b.minY, box.topPct);
+    b.maxY = Math.min(b.maxY, 100 - box.bottomPct);
+    b.minX = Math.max(b.minX, box.sidePct);
+    b.maxX = Math.min(b.maxX, 100 - box.sidePct);
+  } else {
+    return b; // ws 없으면 캐시하지 않음 (다음 호출에서 재시도)
+  }
+  _safeBoundsCache = b;
+  return b;
+}
+
 function pickTarget(c) {
-  var tx = c.x + (Math.random() * 40 - 20);
-  var ty = c.y + (Math.random() * 30 - 15);
-  c.tx = Math.max(5, Math.min(95, tx));
-  c.ty = Math.max(60, Math.min(85, ty));
+  var b = getSafeBounds();
+  var tx = c.x + (Math.random() * 70 - 35);
+  var ty = c.y + (Math.random() * 60 - 30);
+  c.tx = Math.max(b.minX, Math.min(b.maxX, tx));
+  c.ty = Math.max(b.minY, Math.min(b.maxY, ty));
 }
 
 function isNearOther(id, nx, ny) {
@@ -109,13 +168,13 @@ function tickCreatures() {
       if (dist < 0.3) {
         if (isWorking) {
           // working: 도착하면 바로 다음 목적지
-          c.beh = 'roam'; c.walking = true;
+          c.beh = 'roam';
           pickTarget(c);
           if (isNearOther(id, c.tx, c.ty)) pickTarget(c);
         } else {
-          // idle: 도착 → 서기 또는 잠자기
-          c.beh = 'stand'; c.walking = false;
-          c.nextAction = now + 2000 + Math.random() * 4000;
+          // idle: 도착 → 서기 또는 잠자기 (다음 행동까지 더 짧게)
+          c.beh = 'stand';
+          c.nextAction = now + 1000 + Math.random() * 2200;
         }
       } else {
         // working: 빠르게, idle: 느긋하게
@@ -124,9 +183,10 @@ function tickCreatures() {
         var nx = c.x + dx * speed;
         var ny = c.y + dy * speed;
         if (isNearOther(id, nx, ny)) {
-          // 90도 방향 전환
-          c.tx = Math.max(5, Math.min(95, c.x + dy * 0.5));
-          c.ty = Math.max(60, Math.min(85, c.y - dx * 0.5));
+          // 90도 방향 전환 (동일한 동적 마진 사용)
+          var b2 = getSafeBounds();
+          c.tx = Math.max(b2.minX, Math.min(b2.maxX, c.x + dy * 0.5));
+          c.ty = Math.max(b2.minY, Math.min(b2.maxY, c.y - dx * 0.5));
         } else {
           c.x = nx; c.y = ny;
           el.style.left = c.x.toFixed(2) + '%';
@@ -135,30 +195,30 @@ function tickCreatures() {
       }
     } else if (isWorking) {
       // working/thinking: 항상 roam 유지
-      c.beh = 'roam'; c.walking = true;
+      c.beh = 'roam';
       pickTarget(c);
       if (isNearOther(id, c.tx, c.ty)) pickTarget(c);
       eyes.forEach(function(e) { e.style.background = normalEye; e.style.transform = ''; e.style.borderRadius = '0'; });
       var zzz = el.querySelector('.ws-zzz'); if (zzz) zzz.remove();
     } else if (now > c.nextAction) {
-      // idle: 행동 전환
+      // idle: 행동 전환 (roam 비중↑, stand/sleep 시간↓ → 더 활동적)
       var r = Math.random();
-      if (r < 0.45) {
+      if (r < 0.65) {
         // roam
-        c.beh = 'roam'; c.walking = true;
+        c.beh = 'roam';
         pickTarget(c);
         if (isNearOther(id, c.tx, c.ty)) pickTarget(c);
         eyes.forEach(function(e) { e.style.background = normalEye; e.style.transform = ''; e.style.borderRadius = '0'; });
         var zzz2 = el.querySelector('.ws-zzz'); if (zzz2) zzz2.remove();
-      } else if (r < 0.72) {
+      } else if (r < 0.85) {
         // stand
-        c.beh = 'stand'; c.walking = false;
+        c.beh = 'stand';
         eyes.forEach(function(e) { e.style.background = normalEye; e.style.transform = ''; e.style.borderRadius = '0'; });
         var zzz3 = el.querySelector('.ws-zzz'); if (zzz3) zzz3.remove();
-        c.nextAction = now + 2000 + Math.random() * 4000;
+        c.nextAction = now + 1200 + Math.random() * 2500;
       } else {
         // sleep
-        c.beh = 'sleep'; c.walking = false;
+        c.beh = 'sleep';
         eyes.forEach(function(e) { e.style.background = '#ffe0bd'; e.style.transform = 'scaleY(.3)'; e.style.borderRadius = '0'; });
         var zzz4 = el.querySelector('.ws-zzz');
         if (!zzz4) {
@@ -199,11 +259,9 @@ function walkLegs(pix) {
   }
 }
 
-// === 초기화 ===
-// 인라인 Init 섹션에서 호출
-function initCreatureSystem() {
-  _blinkInterval = setInterval(blinkEyes, 1500);
-  requestAnimationFrame(tickCreatures);
+// === 걷기 인터벌 (visibilitychange 재개/정지에서 재사용) ===
+function startWalkInterval() {
+  if (_walkInterval) return;
   _walkInterval = setInterval(function() {
     // working 캐릭터: 항상 걷기
     document.querySelectorAll('.ws-agent.working .pix-lg').forEach(function(pix) {
@@ -221,4 +279,31 @@ function initCreatureSystem() {
       }
     });
   }, 350);
+}
+
+function stopWalkInterval() {
+  if (_walkInterval) {
+    clearInterval(_walkInterval);
+    _walkInterval = null;
+  }
+}
+
+function startBlinkInterval() {
+  if (_blinkInterval) return;
+  _blinkInterval = setInterval(blinkEyes, 1500);
+}
+
+function stopBlinkInterval() {
+  if (_blinkInterval) {
+    clearInterval(_blinkInterval);
+    _blinkInterval = null;
+  }
+}
+
+// === 초기화 ===
+// 인라인 Init 섹션에서 호출
+function initCreatureSystem() {
+  startBlinkInterval();
+  requestAnimationFrame(tickCreatures);
+  startWalkInterval();
 }

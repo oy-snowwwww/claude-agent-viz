@@ -8,6 +8,41 @@ var _histCurrentQ = '';
 var _histFetchSeq = 0;       // 응답 순서 가드 (stale 결과 무시)
 var _histAgentCache = {};    // 에이전트 옵션 누적 캐시 (필터 전환 시 사라지지 않도록)
 
+// === cwd 경로 마스킹 정규식 (module-level 상수, 매 렌더마다 재컴파일 방지) ===
+var _RE_HOME_MAC = /^\/Users\/[^/]+/;
+var _RE_HOME_LINUX = /^\/home\/[^/]+/;
+var _RE_TMP_MAC = /^\/private\/var\/folders\/[^/]+\/[^/]+/;
+var _RE_TMP_LINUX = /^\/var\/folders\/[^/]+\/[^/]+/;
+
+// === 작업 폴더 칩 클릭 → 클립보드 복사 ===
+// data-full 속성값(마스킹된 경로)을 그대로 복사. 브라우저가 HTML 엔티티를 자동 디코드하므로
+// getAttribute 결과는 원본 문자열이다. stopPropagation으로 hist-item 확장/접힘 토글 방지.
+function copyCwd(el, event) {
+  if (event) event.stopPropagation();
+  var text = el.getAttribute('data-full') || '';
+  if (!text) return;
+  function showOk() { if (typeof toast === 'function') toast('폴더 경로 복사됨'); }
+  function showFail() { if (typeof toast === 'function') toast('복사 실패', 'err'); }
+  function fallback() {
+    try {
+      var ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      var ok = document.execCommand('copy');
+      ta.remove();
+      if (ok) showOk(); else showFail();
+    } catch(e) { showFail(); }
+  }
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(showOk, fallback);
+  } else {
+    fallback();
+  }
+}
+
 // === 모달 토글 ===
 function toggleHistory() {
   var el = document.getElementById('histOverlay');
@@ -35,14 +70,33 @@ function fetchHistory() {
   var url = API + '/api/history' + (params.toString() ? '?' + params.toString() : '');
   fetch(url).then(function(r) { return r.json(); }).then(function(resp) {
     if (mySeq !== _histFetchSeq) return; // stale 응답 무시
-    var items = Array.isArray(resp) ? resp : (resp.items || []);
-    var partial = !Array.isArray(resp) && resp.partial === true;
-    renderHistory(items, partial);
+    var items = resp.items || [];
+    renderHistory(items, resp.partial === true);
     updateAgentFilterOptions(items);
+    updateHistMetaInfo(resp);
   }).catch(function() {
     if (mySeq !== _histFetchSeq) return;
     document.getElementById('histList').innerHTML = '<div class="hist-empty">서버 연결 실패</div>';
+    updateHistMetaInfo(null);
   });
+}
+
+// 헤더 메타 정보: "N개 · 7일·10MB 보관" 또는 검색 중일 때 "N개 검색됨 / 전체 M개"
+function updateHistMetaInfo(resp) {
+  var el = document.getElementById('histMetaInfo');
+  if (!el) return;
+  if (!resp) {
+    // 실패 → 보관 정책만 표시
+    el.textContent = '7일·10MB 보관';
+    return;
+  }
+  var total = resp.totalCount != null ? resp.totalCount : 0;
+  var filtered = resp.filteredCount != null ? resp.filteredCount : 0;
+  if (resp.hasFilter) {
+    el.textContent = filtered + '개 검색됨 / 전체 ' + total + '개 · 7일·10MB 보관';
+  } else {
+    el.textContent = total + '개 · 7일·10MB 보관';
+  }
 }
 
 // === 에이전트 필터 옵션 갱신 (캐시 누적) ===
@@ -67,30 +121,69 @@ function fetchPrivacy() {
   }).catch(function() {});
 }
 
+// 토글: 다음 세션부터 prompt/summary 저장 여부만 변경 (디스크 조작 없음)
+// 디스크 정리는 별도 "전체 삭제" 버튼 또는 행 단위 ✕ 버튼으로 명확히 분리
 function togglePrivacy(on) {
-  if (on) {
-    // ON 시 디스크 정리 여부 묻기
-    var ok = confirm('프롬프트 기록을 끕니다.\n\n이미 저장된 히스토리의 프롬프트와 응답 요약도 함께 삭제할까요?\n\n[확인] 디스크 정리 + 이후 기록 안 함\n[취소] 이후 기록만 안 함 (기존 데이터 유지)');
-    fetch(API + '/api/privacy', {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({enabled: true, scrubDisk: ok})
+  fetch(API + '/api/privacy', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({enabled: !!on})
+  })
+    .then(function(r) { return r.json(); })
+    .then(function() { toast(on ? '프롬프트 기록 OFF' : '프롬프트 기록 ON'); })
+    .catch(function() { toast('변경 실패', 'err'); });
+}
+
+// 전체 히스토리 삭제 (헤더 버튼)
+function clearAllHistory() {
+  if (!confirm('저장된 모든 히스토리를 삭제합니다.\n이 작업은 되돌릴 수 없습니다.\n\n계속하시겠습니까?')) return;
+  fetch(API + '/api/history', { method: 'DELETE' })
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      toast('히스토리 ' + (d.deleted || 0) + '개 삭제');
+      fetchHistory();
     })
-      .then(function(r) { return r.json(); })
-      .then(function(d) {
-        toast('프롬프트 기록 OFF' + (d.scrubbed > 0 ? ' (' + d.scrubbed + '개 정리)' : ''));
-        if (document.getElementById('histOverlay').classList.contains('show')) fetchHistory();
+    .catch(function() { toast('삭제 실패', 'err'); });
+}
+
+// 개별 히스토리 삭제 (inline 2단계 confirm: 첫 클릭은 "❓ 정말?", 3초 내 재클릭 시 실제 삭제)
+function deleteHistoryItem(btn, filename) {
+  if (!filename) return;
+  if (btn.dataset.armed === '1') {
+    // 두 번째 클릭 → 실제 삭제
+    if (btn._armTimer) { clearTimeout(btn._armTimer); btn._armTimer = null; }
+    btn.dataset.armed = '0';
+    fetch(API + '/api/history/' + encodeURIComponent(filename), { method: 'DELETE' })
+      .then(function(r) {
+        if (!r.ok) throw new Error('http ' + r.status);
+        return r.json();
       })
-      .catch(function() { toast('변경 실패', 'err'); });
+      .then(function() {
+        // 해당 hist-item DOM만 즉시 제거 (전체 fetchHistory 재요청 안 함)
+        var item = btn.closest('.hist-item');
+        if (item) item.remove();
+        // 삭제된 btn이 글로벌 툴팁의 _lastTarget일 수 있으므로 즉시 정리
+        if (typeof window.hideGlobalTip === 'function') window.hideGlobalTip();
+        toast('삭제됨');
+      })
+      .catch(function() {
+        // 네트워크 실패 시 버튼 상태 복구 (❓ → ✕) — 복구 안 하면 다음 클릭부터 prevText='❓'로 영구 고정
+        btn.textContent = '✕';
+        btn.dataset.tip = '이 기록 삭제';
+        toast('삭제 실패', 'err');
+      });
   } else {
-    fetch(API + '/api/privacy', {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({enabled: false})
-    })
-      .then(function(r) { return r.json(); })
-      .then(function(d) { toast('프롬프트 기록 ON'); })
-      .catch(function() { toast('변경 실패', 'err'); });
+    // 첫 클릭 → 무장 상태 (3초 후 자동 해제)
+    btn.dataset.armed = '1';
+    var prevText = btn.textContent;
+    btn.textContent = '❓';
+    btn.dataset.tip = '한번 더 클릭하면 삭제됩니다 (3초 내)';
+    btn._armTimer = setTimeout(function() {
+      btn.dataset.armed = '0';
+      btn.textContent = prevText;
+      btn.dataset.tip = '이 기록 삭제';
+      btn._armTimer = null;
+    }, 3000);
   }
 }
 
@@ -109,6 +202,12 @@ function highlight(text, q) {
 // === 히스토리 렌더링 ===
 function renderHistory(list, partial) {
   var el = document.getElementById('histList');
+  // DOM 재생성 전 글로벌 툴팁 정리 (detached node에 박제된 툴팁 방지)
+  if (typeof window.hideGlobalTip === 'function') window.hideGlobalTip();
+  // 재렌더링 시 기존 hist-del 노드의 무장 timer를 모두 정리 (detached node 메모리 점유 방지)
+  el.querySelectorAll('.hist-del').forEach(function(b) {
+    if (b._armTimer) { clearTimeout(b._armTimer); b._armTimer = null; }
+  });
   if (!list || list.length === 0) {
     el.innerHTML = '<div class="hist-empty">' + (_histCurrentQ ? '검색 결과가 없습니다' : '히스토리가 없습니다<br>세션이 종료되면 여기에 기록됩니다') + '</div>';
     return;
@@ -191,13 +290,39 @@ function renderHistory(list, partial) {
       });
     }
 
+    // 작업 폴더 칩 (parent/basename 형식, hover 시 전체 경로 툴팁, 클릭 시 클립보드 복사)
+    // 툴팁: utils.js의 글로벌 data-tip 시스템 사용
+    var cwdChip = '';
+    if (s.cwd) {
+      // 윈도우 경로(\)를 /로 정규화 + 트레일링 슬래시 제거 + 빈 토큰 제거
+      var normalized = s.cwd.replace(/\\/g, '/').replace(/\/+$/, '');
+      var parts = normalized.split('/').filter(Boolean);
+      var label = parts.length >= 2 ? parts.slice(-2).join('/') : (parts[0] || normalized);
+      // 경로 단축: ~ (HOME) + macOS 임시 경로
+      var fullPath = normalized
+        .replace(_RE_HOME_MAC, '~')
+        .replace(_RE_HOME_LINUX, '~')
+        .replace(_RE_TMP_MAC, '[tmp]')
+        .replace(_RE_TMP_LINUX, '[tmp]');
+      var safeFull = esc(fullPath);
+      cwdChip = '<span class="hist-cwd" data-tip="클릭해서 복사: ' + safeFull + '" data-full="' + safeFull + '" onclick="copyCwd(this,event)">📁 <span class="hist-cwd-label">' + highlight(label, q) + '</span></span>';
+    }
+
+    // 개별 삭제 ✕ 버튼 (filename이 있을 때만)
+    var delBtn = '';
+    if (s.filename) {
+      delBtn = '<button class="hist-del" data-tip="이 기록 삭제" data-armed="0"'
+        + ' onclick="event.stopPropagation();deleteHistoryItem(this,\'' + esc(s.filename) + '\')">✕</button>';
+    }
+
     html += '<div class="hist-item" onclick="this.classList.toggle(\'expanded\')">'
       + '<div class="hist-row">'
       + '<span class="hist-name">' + highlight(s.name || 'Session', q) + '</span>'
-      + '<span class="hist-meta"><span>질문 <strong>' + (s.questions || 0) + '</strong></span>'
+      + '<span class="hist-meta">' + cwdChip + '<span>질문 <strong>' + (s.questions || 0) + '</strong></span>'
       + (s.avgResponseSec > 0 ? '<span>평균 <strong>' + (s.avgResponseSec || 0) + '</strong>초</span>' : '')
       + (duration ? '<span>세션 <strong>' + esc(duration) + '</strong></span>' : '')
       + '</span>'
+      + delBtn
       + '</div>'
       + '<div class="hist-time">' + dateStr + ' ' + timeStr + (end ? ' ~ ' + String(end.getHours()).padStart(2, '0') + ':' + String(end.getMinutes()).padStart(2, '0') : '') + '</div>'
       + (tags ? '<div class="hist-summary">' + tags + '</div>' : '')

@@ -484,6 +484,14 @@ function saveSessionHistory(pid) {
   var sess = sessions[pid];
   if (!sess || t.questions === 0) { delete sessionTrackers[pid]; return; }
 
+  // privacy ON: 디스크 저장 자체를 skip
+  // (메모리 트래커는 정리해서 누수 방지. 실시간 UI는 메모리 기반이라 영향 없음)
+  if (isPrivacyOn()) {
+    console.log('  [HISTORY] privacy ON — skipped:', sess.name || pid);
+    delete sessionTrackers[pid];
+    return;
+  }
+
   var avgSec = t.responseTimes.length > 0 ? Math.round(t.responseTimes.reduce(function(a, b) { return a + b; }, 0) / t.responseTimes.length) : 0;
   var maxSec = t.responseTimes.length > 0 ? Math.max.apply(null, t.responseTimes) : 0;
   var maxQ = maxSec > 0 ? t.responseTimes.indexOf(maxSec) + 1 : 0;
@@ -545,34 +553,6 @@ function saveSessionHistory(pid) {
   } catch(e) { console.log('  [HISTORY] save error:', e.message); }
 
   delete sessionTrackers[pid];
-}
-
-// Privacy 토글 ON 시 디스크에 저장된 history 파일의 prompt/summary를 일괄 비움
-// (사용자 신뢰: "기록 안 함"의 약속이 디스크까지 미치도록)
-function scrubHistoryPrompts() {
-  var scrubbed = 0;
-  try {
-    var files = fs.readdirSync(HISTORY_DIR).filter(function(f) { return f.endsWith('.json'); });
-    files.forEach(function(f) {
-      var fpath = path.join(HISTORY_DIR, f);
-      try {
-        var rec = JSON.parse(fs.readFileSync(fpath, 'utf8'));
-        var changed = false;
-        if (rec.turns && Array.isArray(rec.turns)) {
-          rec.turns.forEach(function(turn) {
-            if (turn.prompt) { turn.prompt = ''; changed = true; }
-            if (turn.summary) { turn.summary = ''; changed = true; }
-          });
-        }
-        if (changed) {
-          fs.writeFileSync(fpath, JSON.stringify(rec), 'utf8');
-          scrubbed++;
-        }
-      } catch(e) { /* skip corrupt */ }
-    });
-    if (scrubbed > 0) console.log('  [HISTORY] privacy scrubbed', scrubbed, 'file(s)');
-  } catch(e) { console.log('  [HISTORY] scrub error:', e.message); }
-  return scrubbed;
 }
 
 function cleanHistory() {
@@ -690,6 +670,17 @@ function broadcastEvent(eventData) {
   });
 }
 
+// SSE keep-alive ping — 30초마다 모든 클라이언트에 주석 라인 전송
+// 이벤트가 없을 때 연결이 idle timeout으로 끊기는 것을 방지
+// graceful shutdown 시 clearInterval (SIGTERM/SIGINT 핸들러에서 정리)
+var _ssePingInterval = setInterval(function() {
+  sseClients = sseClients.filter(function(client) {
+    if (client.destroyed || client.writableEnded) return false;
+    try { client.write(': ping\n\n'); return true; }
+    catch(e) { return false; }
+  });
+}, 30000);
+
 // --- HTTP Server ---
 const server = http.createServer(function(req, res) {
   // CORS
@@ -706,9 +697,11 @@ const server = http.createServer(function(req, res) {
   if (url === '/api/stream' && req.method === 'GET') {
     res.writeHead(200, {
       'Content-Type': 'text/event-stream',
-      'Cache-Control': 'no-cache',
-      'Connection': 'keep-alive'
+      'Cache-Control': 'no-cache, no-transform',
+      'Connection': 'keep-alive',
+      'X-Accel-Buffering': 'no' // 프록시 버퍼링 비활성화
     });
+    res.write('retry: 3000\n\n'); // 클라이언트에 재연결 간격 힌트 (3초)
     res.write('data: {"event":"connected"}\n\n');
     sseClients.push(res);
     req.on('close', function() {
@@ -1182,6 +1175,33 @@ const server = http.createServer(function(req, res) {
     return;
   }
 
+  // API: 통계 전체 초기화 (POST /api/stats/reset)
+  // today + history + total 모두 비우고 since를 오늘로 재설정
+  if (url === '/api/stats/reset' && req.method === 'POST') {
+    if (!isAllowedOrigin(req)) {
+      res.writeHead(403, {'Content-Type': 'application/json'});
+      res.end(JSON.stringify({ error: 'forbidden origin' }));
+      return;
+    }
+    // body 미사용 — 클라이언트가 보낸 데이터가 있어도 흘려서 socket 즉시 해제
+    req.resume();
+    var today = todayKey();
+    statsData = {
+      today: { date: today, prompts: 0, agents: {}, tools: {} },
+      history: [],
+      total: { since: today, prompts: 0, agents: {}, tools: {}, days: 0 },
+    };
+    try {
+      fs.writeFileSync(STATS_FILE, JSON.stringify(statsData), 'utf8');
+      console.log('  [STATS] reset (since=' + today + ')');
+    } catch(e) {
+      console.log('  [STATS] reset write error:', e.message);
+    }
+    res.writeHead(200, {'Content-Type': 'application/json'});
+    res.end(JSON.stringify({ ok: true, since: today }));
+    return;
+  }
+
   // API: 통계
   if (url === '/api/stats' && req.method === 'GET') {
     ensureToday();
@@ -1232,10 +1252,11 @@ const server = http.createServer(function(req, res) {
       if (err) {
         console.log('  [HISTORY] read error:', err.message);
         res.writeHead(200, {'Content-Type': 'application/json; charset=utf-8'});
-        res.end('[]');
+        res.end(JSON.stringify({ items: [], partial: false, totalCount: 0, filteredCount: 0, hasFilter: false }));
         return;
       }
       var files = allFiles.filter(function(f) { return f.endsWith('.json'); });
+      var totalCount = files.length; // 보관 중인 전체 파일 개수 (필터 무관)
       files.sort().reverse();
       // 파일명 prefilter: YYYY-MM-DD_HHmmss_name.json (로컬 타임존, saveSessionHistory의 종료 시각)
       // 본 필터(rec.endTime)와 동일 기준으로 비교 — 일관성 유지
@@ -1248,13 +1269,13 @@ const server = http.createServer(function(req, res) {
         });
       }
       // 검색/필터 없으면 50개만, 있으면 더 넓게 스캔 (200개 cap)
-      var hasFilter = !!(q || agentFilter);
+      var hasFilter = !!(q || agentFilter || daysParam > 0);
       var targets = files.slice(0, hasFilter ? 200 : 50);
       var list = [];
       var done = 0;
       if (targets.length === 0) {
         res.writeHead(200, {'Content-Type': 'application/json; charset=utf-8'});
-        res.end('[]');
+        res.end(JSON.stringify({ items: [], partial: false, totalCount: totalCount, filteredCount: 0, hasFilter: hasFilter }));
         return;
       }
       var responded = false;
@@ -1262,9 +1283,16 @@ const server = http.createServer(function(req, res) {
       function respond() {
         if (responded) return;
         responded = true;
-        var result = list.filter(Boolean).slice(0, 50);
+        var matched = list.filter(Boolean);
+        var result = matched.slice(0, 50);
         res.writeHead(200, {'Content-Type': 'application/json; charset=utf-8'});
-        res.end(JSON.stringify({ items: result, partial: partial }));
+        res.end(JSON.stringify({
+          items: result,
+          partial: partial,
+          totalCount: totalCount,        // 필터 무관 전체 보관 개수
+          filteredCount: matched.length, // 현재 필터/검색 적용 후 매칭 개수 (cap 200 안에서)
+          hasFilter: hasFilter,
+        }));
       }
       // 안전망: 5초 내 모든 read 미완료 시 부분 결과 반환
       var safetyTimer = setTimeout(function() { partial = true; respond(); }, 5000);
@@ -1286,7 +1314,10 @@ const server = http.createServer(function(req, res) {
                 if (rec.files) hay += ' ' + Object.keys(rec.files).join(' ');
                 if (hay.toLowerCase().indexOf(q) === -1) matched = false;
               }
-              if (matched) list[idx] = rec;
+              if (matched) {
+                rec.filename = f; // 클라이언트 개별 삭제용
+                list[idx] = rec;
+              }
             } catch(pe) { console.log('  [HISTORY] parse error:', f, pe.message); }
           }
           done++;
@@ -1296,6 +1327,99 @@ const server = http.createServer(function(req, res) {
           }
         });
       });
+    });
+    return;
+  }
+
+  // API: 히스토리 전체 삭제 (DELETE /api/history)
+  // 비동기 I/O — 100+ 파일 삭제 시에도 이벤트 루프 블로킹 없음
+  if (url === '/api/history' && req.method === 'DELETE') {
+    if (!isAllowedOrigin(req)) {
+      res.writeHead(403, {'Content-Type': 'application/json'});
+      res.end(JSON.stringify({ error: 'forbidden origin' }));
+      return;
+    }
+    req.resume(); // body 미사용 — socket drain
+    fs.readdir(HISTORY_DIR, function(err, files) {
+      if (err) {
+        console.log('  [HISTORY] clear-all readdir error:', err.message);
+        res.writeHead(500, {'Content-Type': 'application/json'});
+        res.end(JSON.stringify({ error: 'readdir failed' }));
+        return;
+      }
+      var jsonFiles = files.filter(function(f) { return f.endsWith('.json'); });
+      if (jsonFiles.length === 0) {
+        res.writeHead(200, {'Content-Type': 'application/json'});
+        res.end(JSON.stringify({ ok: true, deleted: 0 }));
+        return;
+      }
+      var deletedAll = 0;
+      var pending = jsonFiles.length;
+      function done() {
+        pending--;
+        if (pending === 0) {
+          console.log('  [HISTORY] cleared all:', deletedAll, 'file(s)');
+          res.writeHead(200, {'Content-Type': 'application/json'});
+          res.end(JSON.stringify({ ok: true, deleted: deletedAll }));
+        }
+      }
+      jsonFiles.forEach(function(f) {
+        var fp = safePath(HISTORY_DIR, f);
+        if (!fp) { done(); return; }
+        fs.unlink(fp, function(e) {
+          if (!e) deletedAll++;
+          done();
+        });
+      });
+    });
+    return;
+  }
+
+  // API: 히스토리 개별 삭제 (DELETE /api/history/:filename)
+  if (url.startsWith('/api/history/') && req.method === 'DELETE') {
+    if (!isAllowedOrigin(req)) {
+      res.writeHead(403, {'Content-Type': 'application/json'});
+      res.end(JSON.stringify({ error: 'forbidden origin' }));
+      return;
+    }
+    req.resume(); // body 미사용 — socket drain
+    var rawName;
+    try {
+      rawName = decodeURIComponent(url.split('/api/history/')[1] || '');
+    } catch (e) {
+      // 잘못된 URI 인코딩(URIError) 방어 — uncaught throw 방지
+      res.writeHead(400, {'Content-Type': 'application/json'});
+      res.end(JSON.stringify({ error: 'invalid encoding' }));
+      return;
+    }
+    // 화이트리스트: 저장 규칙(`[^a-zA-Z0-9가-힣_-]` → `_`)과 일치 + .json 확장자 필수
+    // path traversal/제어문자 방어 + 저장 포맷과 entropy 통일
+    if (!/^[a-zA-Z0-9_\-가-힣]+\.json$/.test(rawName)) {
+      res.writeHead(400, {'Content-Type': 'application/json'});
+      res.end(JSON.stringify({ error: 'invalid filename' }));
+      return;
+    }
+    var fpath = safePath(HISTORY_DIR, rawName);
+    if (!fpath) {
+      res.writeHead(400, {'Content-Type': 'application/json'});
+      res.end(JSON.stringify({ error: 'invalid path' }));
+      return;
+    }
+    // async 통일 (bulk DELETE와 동일 패턴). existsSync 제거 — ENOENT → 404로 매핑
+    fs.unlink(fpath, function(e) {
+      if (e) {
+        if (e.code === 'ENOENT') {
+          res.writeHead(404, {'Content-Type': 'application/json'});
+          res.end(JSON.stringify({ error: 'not found' }));
+        } else {
+          res.writeHead(500, {'Content-Type': 'application/json'});
+          res.end(JSON.stringify({ error: e.message }));
+        }
+        return;
+      }
+      console.log('  [HISTORY] deleted:', rawName);
+      res.writeHead(200, {'Content-Type': 'application/json'});
+      res.end(JSON.stringify({ ok: true }));
     });
     return;
   }
@@ -1328,22 +1452,20 @@ const server = http.createServer(function(req, res) {
       if (aborted) return;
       try {
         var data = JSON.parse(body || '{}');
-        var scrubbed = 0;
         if (data.enabled) {
           fs.writeFileSync(PRIVACY_FILE, '1', 'utf8');
-          // 1) 활성 트래커들의 메모리에 쌓인 프롬프트 즉시 비움
+          // 활성 트래커들의 메모리에 쌓인 프롬프트 즉시 비움 (다음 history save부터는 빈 값으로 저장)
+          // 디스크 정리는 하지 않음 — 사용자가 명시적으로 "삭제" 액션을 수행해야 함
           Object.values(sessionTrackers).forEach(function(t) {
             (t.turns || []).forEach(function(turn) { turn.prompt = ''; turn.summary = ''; });
           });
-          // 2) scrubDisk 옵션이 true이면 디스크 history도 일괄 정리 (기본 true)
-          if (data.scrubDisk !== false) scrubbed = scrubHistoryPrompts();
         } else {
           try {
             if (fs.existsSync(PRIVACY_FILE)) fs.unlinkSync(PRIVACY_FILE);
           } catch(e2) { /* race: 이미 삭제됨 */ }
         }
         res.writeHead(200, {'Content-Type': 'application/json'});
-        res.end(JSON.stringify({ ok: true, enabled: isPrivacyOn(), scrubbed: scrubbed }));
+        res.end(JSON.stringify({ ok: true, enabled: isPrivacyOn() }));
       } catch(e) {
         res.writeHead(400, {'Content-Type': 'application/json'});
         res.end(JSON.stringify({ error: e.message }));
@@ -1359,17 +1481,17 @@ const server = http.createServer(function(req, res) {
       res.end(JSON.stringify({ error: 'forbidden origin' }));
       return;
     }
+    req.resume(); // body 미사용 — socket drain
     console.log('\n  \x1b[33mUI에서 재시작 요청\x1b[0m\n');
-    // 응답 전에 트래커 저장 (응답 후 새 이벤트로 인한 윈도우 최소화)
-    saveAllTrackers();
     broadcastEvent({ event: 'server_restart', reason: 'user requested' });
     res.writeHead(200, {'Content-Type': 'application/json'});
     res.end(JSON.stringify({ok: true}));
+    // gracefulShutdown 내부에서 saveAllTrackers + _ssePingInterval clearInterval + SSE end 전부 처리
     setTimeout(function() {
       var spawn = require('child_process').spawn;
       var child = spawn('nohup', ['node', __filename], { detached: true, stdio: 'ignore' });
       child.unref();
-      process.exit(0);
+      gracefulShutdown();
     }, 500);
     return;
   }
@@ -1381,12 +1503,13 @@ const server = http.createServer(function(req, res) {
       res.end(JSON.stringify({ error: 'forbidden origin' }));
       return;
     }
+    req.resume(); // body 미사용 — socket drain
     console.log('\n  \x1b[33mUI에서 종료 요청 → 서버 종료\x1b[0m\n');
-    saveAllTrackers();
     broadcastEvent({ event: 'server_shutdown', reason: 'user requested' });
     res.writeHead(200, {'Content-Type': 'application/json'});
     res.end(JSON.stringify({ok: true}));
-    setTimeout(function() { process.exit(0); }, 500);
+    // gracefulShutdown 내부에서 saveAllTrackers + 정리 일원화
+    setTimeout(gracefulShutdown, 500);
     return;
   }
 
@@ -1478,10 +1601,19 @@ function saveAllTrackers() {
   if (pids.length === 0) return;
   console.log('  [HISTORY] saving ' + pids.length + ' tracker(s) before exit...');
   pids.forEach(function(pid) { saveSessionHistory(pid); });
+  // saveSessionHistory 내부에서 delete sessionTrackers[pid]가 호출되지만,
+  // 실패 경로가 늘어날 경우에도 안전하도록 명시적으로 clear
+  sessionTrackers = {};
 }
 
-process.on('SIGTERM', function() { saveAllTrackers(); process.exit(0); });
-process.on('SIGINT', function() { saveAllTrackers(); process.exit(0); });
+function gracefulShutdown() {
+  if (_ssePingInterval) { clearInterval(_ssePingInterval); _ssePingInterval = null; }
+  sseClients.forEach(function(c) { try { c.end(); } catch(e) {} });
+  saveAllTrackers();
+  process.exit(0);
+}
+process.on('SIGTERM', gracefulShutdown);
+process.on('SIGINT', gracefulShutdown);
 
 server.listen(PORT, function() {
   console.log('\n  \x1b[36m╔══════════════════════════════════════════╗\x1b[0m');

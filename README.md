@@ -7,9 +7,7 @@ Claude Code의 에이전트 활동을 실시간으로 시각화하는 로컬 대
 
 https://github.com/user-attachments/assets/b3595469-2546-4624-adf8-9a119ea00c2d
 
-| 우주 모드 (기본) | 계절 모드 |
-|:---:|:---:|
-| ![우주 모드](./screenshots/main.png) | ![계절 모드](./screenshots/season.png) |
+![우주 모드](./screenshots/main.png)
 
 ## 주요 기능
 
@@ -25,11 +23,12 @@ https://github.com/user-attachments/assets/b3595469-2546-4624-adf8-9a119ea00c2d
 - **`/rename` 자동 동기화** — Claude Code에서 `/rename` 명령 실행 시 탭 이름 실시간 갱신
 - **세션 히스토리** — 종료된 세션의 **질문 프롬프트 원문 + 응답 요약** 자동 저장, 에이전트/도구/파일 통계 포함 (7일·10MB·세션당 100질문 가드)
 - **히스토리 검색** — 프롬프트/파일명/세션명 키워드 검색 + 날짜/에이전트 필터, 매칭 하이라이트
-- **Privacy 토글** — 프롬프트 기록 on/off + 디스크 히스토리 일괄 정리 옵션
+- **히스토리 사용 안 함 토글** — ON 시 이후 종료되는 세션은 디스크에 저장하지 않음 (메모리/실시간 UI는 계속 동작)
+- **히스토리 삭제** — 모달 헤더의 "전체 삭제" 버튼 + 행 단위 ✕ 버튼 (inline 2단계 confirm)
 - **민감정보 자동 마스킹** — `sk-*`, `ghp_*`, `AKIA*`, JWT, Bearer 토큰 등 자동 치환
 - **브라우저 알림** — 탭 비활성 시 에이전트 완료, 응답 완료 알림 (on/off 토글)
-- **일일 통계** — 오늘의 질문 수, 에이전트별/도구별 사용 횟수, 주간/누적 통계
-- **환경 효과** — 낮/밤 사이클, 4계절 순환, 날씨 파티클, 우주 배경 모드
+- **일일 통계** — 오늘의 질문 수, 에이전트별/도구별 사용 횟수, 주간/누적 통계, 🔄 전체 초기화 지원
+- **마을(우주) 모드** — 우주 배경 + 별/은하수/nebula/별똥별. 워크스페이스 폭에 따라 캐릭터 크기 자동 조정 (Tier 1/2/3). 항상 활성 (이전 환경 효과 토글은 제거됨)
 - **성능 최적화** — 탭 비활성 시 애니메이션 자동 정지, renderAll 디바운스
 
 ## 요구사항
@@ -175,11 +174,11 @@ claude-agents off      # 세션 시작 시 자동 실행 OFF
 | 영역 | 설명 |
 |------|------|
 | **좌측 패널** | Master(CLAUDE.md), Agents(관리/토글), MCP 서버, Hooks |
-| **워크스페이스** | 픽셀아트 캐릭터 + 환경 효과 (계절/날씨) |
+| **워크스페이스** | 픽셀아트 캐릭터 + 우주 배경 (별/은하수/nebula/별똥별). 워크스페이스 폭에 따라 캐릭터 크기 자동 (Tier 1/2/3) |
 | **액티비티** | Master + 에이전트별 프로그레스 바 + 상태 |
 | **타임라인** | 에이전트 실행 시간 시각화 (Master는 액티비티 패널) |
 | **로그** | 실시간 이벤트 로그 |
-| **히스토리** | 🕐 버튼으로 열기 — 종료 세션의 프롬프트/응답 요약, 키워드 검색, 날짜/에이전트 필터, 🔒 Privacy 토글 |
+| **히스토리** | 🕐 버튼으로 열기 — 종료 세션의 프롬프트/응답 요약, 작업 폴더 칩(parent/basename, hover 시 전체 경로, 클릭 시 클립보드 복사), 키워드 검색, 날짜/에이전트 필터, 🔒 사용 안 함 토글, 🗑 전체 삭제 버튼, 행 단위 ✕ 삭제 (2단계 confirm) |
 
 ### 헤더 버튼
 
@@ -190,8 +189,6 @@ claude-agents off      # 세션 시작 시 자동 실행 OFF
 | ? | 도움말 |
 | ↻ | 서버 재시작 |
 | ■ | 서버 종료 |
-| ✨/🌍 | 환경 효과 on/off (우주 모드 ↔ 계절 모드) |
-| 🌸/☀️/🍂/❄️ | 계절 전환 |
 | 🌙/☀️ | 테마 전환 (Dark/Light) |
 
 ### 에이전트 토글
@@ -233,10 +230,11 @@ Claude는 이 주석을 읽고 해당 에이전트만 사용합니다. 기존 CL
 - 세션당 최대 100개 질문까지만 개별 저장 (그 이후는 통계만 누적)
 - 1시간 주기로 cleanHistory 자동 실행
 
-**Privacy 토글 (🔒)**
-- ON: 이후 세션의 프롬프트 저장 차단
-- ON + 확인 선택: 이미 저장된 디스크 히스토리의 프롬프트/요약도 일괄 제거
+**사용 안 함 토글 (🔒)** — 이후 종료되는 세션을 디스크에 저장하지 않음
+- ON: `saveSessionHistory()`가 skip되어 `history/` 에 새 파일이 생기지 않음 (실시간 UI는 메모리 기반이라 정상 동작)
+- OFF: 이후 세션부터 다시 정상 저장
 - `~/.claude/agent-viz/privacy` 파일로 상태 관리 (서버 재시작 후에도 유지)
+- 토글은 "기록 여부"만 제어 — 이미 저장된 히스토리 정리는 별도의 **🗑 전체 삭제** 버튼 또는 **행 단위 ✕ 삭제** 사용
 
 **민감정보 자동 마스킹**
 - OpenAI/Anthropic 키 (`sk-*`)
@@ -264,7 +262,7 @@ Claude Code 세션에서 `/rename <이름>` 명령을 실행하면 대시보드 
 | 훅이 동작 안 함 | `~/.claude/settings.json`의 hooks 설정 확인 + Claude Code 세션 재시작 |
 | 훅 에러 디버깅 | `bash ~/.claude/agent-viz/hook-handler.sh session_start` 수동 실행해서 에러 확인 |
 | 탭/UI가 이상함 | 브라우저 새로고침 (F5) 또는 서버 재시작 (↻ 버튼) |
-| 히스토리가 저장 안 됨 | `/exit`로 세션 종료했는지 + 🔒 Privacy 모드 해제 확인 |
+| 히스토리가 저장 안 됨 | `/exit`로 세션 종료했는지 + 히스토리 모달의 🔒 사용 안 함 토글 해제 확인 |
 | 탭 이름이 `/rename`과 다름 | 브라우저 새로고침 — SSE가 일시적으로 끊겼을 수 있음 |
 | 에이전트가 워크스페이스에 안 보임 | 좌측 에이전트 토글 확인 + `~/.claude/agents/*.md` 파일 존재 확인 |
 
@@ -296,13 +294,14 @@ CLAUDE.md
 │   ├── index.html             # UI 마크업 + 인라인 메인 스크립트
 │   ├── css/
 │   │   └── styles.css         # 전체 스타일
-│   └── js/                    # JS 모듈 (8개, <script> 순서 로딩)
-│       ├── constants.js       # 상수 (색상, 도구 목록, 픽셀맵)
-│       ├── state.js           # 전역 상태 (sessions, liveInstances 등)
-│       ├── utils.js           # 순수 헬퍼 (esc, shade, buildPix)
-│       ├── environment.js     # 환경 효과 (낮/밤·계절·날씨·우주)
+│   └── js/                    # JS 모듈 (9개, <script> 순서 로딩)
+│       ├── constants.js       # 상수 (색상, 도구 목록, 픽셀맵, Village Tier)
+│       ├── state.js           # 전역 상태 (sessions, liveInstances, currentVillageTier 등)
+│       ├── utils.js           # 순수 헬퍼 (esc, shade, buildPix) + Village Tier 감지
+│       ├── village.js         # 마을(우주) 모드 — 별/은하수/nebula/별똥별
+│       ├── environment.js     # (레거시) 환경 효과 — village 모드 전환 후 inactive
 │       ├── creature.js        # 픽셀 캐릭터 자율 행동 (roam/sleep/blink)
-│       ├── history.js         # 세션 히스토리 UI (검색·필터·Privacy)
+│       ├── history.js         # 세션 히스토리 UI (검색·필터·Privacy·cwd 칩)
 │       ├── notifications.js   # 브라우저 알림
 │       └── animations.js      # 시각 이펙트 (sparks/flyDot/celebrate)
 ├── server.js                  # Node.js HTTP 서버
@@ -329,9 +328,11 @@ CLAUDE.md
 | **워크스페이스 캐릭터** | `~/.claude/agents/*.md` + 실시간 이벤트 | 에이전트 상태 시각화 |
 | **액티비티/타임라인/로그** | Claude Code 훅 이벤트 (실시간) | SSE로 수신 |
 | **세션 히스토리** | `~/.claude/agent-viz/history/*.json` | 세션 종료 시 자동 저장, `/api/history?q=&days=&agent=`로 검색 |
+| **히스토리 삭제** | `DELETE /api/history` (전체) / `DELETE /api/history/:filename` (개별) | 모달 헤더의 "전체 삭제" 버튼 + 행 단위 ✕ 버튼 |
+| **통계 초기화** | `POST /api/stats/reset` | 헤더 📊 드롭다운 하단 "🔄 통계 초기화" 버튼 (today + history + total 모두 비움) |
 | **질문별 응답 요약** | `~/.claude/projects/<프로젝트>/<sessionId>.jsonl` | Claude Code transcript 파싱으로 자동 추출 |
 | **`/rename` 탭 동기화** | 같은 transcript의 `<command-name>/rename</command-name>` 추출 | `thinking_start` 시 최신 rename 감지 → 탭 이름 자동 갱신 |
-| **Privacy 모드** | `~/.claude/agent-viz/privacy` (파일 존재 여부) | `/api/privacy` 토글 — 프롬프트 기록 차단 + 디스크 정리 |
+| **사용 안 함 토글** | `~/.claude/agent-viz/privacy` (파일 존재 여부) | `/api/privacy` 토글 — ON 시 `saveSessionHistory()` 스킵, 다음 세션부터 디스크에 기록 안 함 (디스크 정리는 별도 "전체 삭제" 액션) |
 | **민감정보 마스킹** | `server.js`의 `maskSecrets()` | `sk-*`/`ghp_*`/`AKIA*`/JWT/Bearer 자동 치환 |
 
 ### 파일을 만들면 → 대시보드에 자동 반영
@@ -404,7 +405,7 @@ model: sonnet
 - **의존성 없음** — npm 패키지, 외부 CDN 없이 Node.js 내장 모듈만 사용
 - **정적 파일 서빙** — `public/` 하위에 클라이언트 자산 (HTML/CSS/JS) 분리, 서버가 직접 서빙
 - **SSE (Server-Sent Events)** — 실시간 이벤트 스트리밍
-- **Vanilla JavaScript** — 프레임워크 없는 순수 JS, 빌드 시스템 없음 (ES 모듈 대신 `<script>` 순서 로딩으로 8개 파일 분리)
+- **Vanilla JavaScript** — 프레임워크 없는 순수 JS, 빌드 시스템 없음 (ES 모듈 대신 `<script>` 순서 로딩으로 9개 파일 분리)
 
 ## 라이선스
 

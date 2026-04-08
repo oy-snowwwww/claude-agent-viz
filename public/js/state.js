@@ -27,3 +27,7 @@ var liveInstances = {};      // key(sp_ai) → 인스턴스 객체
 
 // === 테마 ===
 var currentTheme = localStorage.getItem('viz-theme') || 'dark';
+
+// === Village Tier (마을 크기 단계) ===
+// 1=Compact, 2=Standard, 3=Spacious. detectVillageTier()로 갱신됨.
+var currentVillageTier = 1;
