@@ -7,7 +7,7 @@ var mcpServers = [];
 
 function renderMcpList() {
   var box = document.getElementById('mcpList'); box.innerHTML = '';
-  if (mcpServers.length === 0) { box.innerHTML = '<div class="mcp-empty">MCP 서버 없음</div>'; return }
+  if (mcpServers.length === 0) { box.innerHTML = '<div class="mcp-empty">' + (_lang === 'en' ? 'No MCP servers' : 'MCP 서버 없음') + '</div>'; return }
   // MCP 서버명에서 자동 색상 생성
   function mcpColor(name) { var h = 0; for (var i = 0; i < name.length; i++) h = name.charCodeAt(i) + ((h << 5) - h); return 'hsl(' + (Math.abs(h) % 360) + ',60%,55%)' }
   mcpServers.forEach(function(mcp) {
@@ -23,7 +23,7 @@ var hooksData = [];
 
 function renderHooksList() {
   var box = document.getElementById('hooksList'); box.innerHTML = '';
-  if (hooksData.length === 0) { box.innerHTML = '<div class="mcp-empty">Hook 없음</div>'; return }
+  if (hooksData.length === 0) { box.innerHTML = '<div class="mcp-empty">' + (_lang === 'en' ? 'No hooks' : 'Hook 없음') + '</div>'; return }
   var EVENT_COLORS = { SessionStart: '#10b981', SessionEnd: '#f43f5e', UserPromptSubmit: '#fbbf24', Stop: '#fb923c', PreToolUse: '#00d4ff', PostToolUse: '#a78bfa' };
   // 이벤트별 그룹핑
   var groups = {};

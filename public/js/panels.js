@@ -19,7 +19,7 @@ function renderActivity() {
   var curS = currentSession && sessions[currentSession] ? sessions[currentSession] : null;
   var mst = curS ? curS._masterSt || 'idle' : 'idle';
   var mThinkStart = curS ? curS._thinkStart : null;
-  var mLabels = { thinking: '생각 중', done: '완료', working: '조율 중', idle: '대기' };
+  var mLabels = _lang === 'en' ? { thinking: 'Thinking', done: 'Done', working: 'Orchestrating', idle: 'Idle' } : { thinking: '생각 중', done: '완료', working: '조율 중', idle: '대기' };
   var mRow = document.createElement('div'); mRow.className = 'act-row';
   mRow.appendChild(buildPix('master', '#fbbf24', 'sm'));
   mRow.innerHTML += '<span class="act-name" style="color:#fbbf24">Master</span>';

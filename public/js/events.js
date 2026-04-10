@@ -114,9 +114,9 @@ function _handleThinkingEnd(data, sp, sn) {
   var tc = s._turnCount || 0;
   s._thinkStart = null;
   if (!anyWorking) {
-    var doneMsg = 'Q' + tc + ' 완료' + (sec > 0 ? ' (' + sec + 's)' : '');
+    var doneMsg = 'Q' + tc + ' ' + t('notif_agent_done') + (sec > 0 ? ' (' + sec + 's)' : '');
     addLog({ name: 'Master', color: '#fbbf24' }, '── ' + doneMsg + ' ──', 'ok', sp, sn);
-    sendNotif('Q' + tc + ' 응답 완료', (sn ? '[' + sn + '] ' : '') + (sec > 0 ? sec + '초 소요' : ''));
+    sendNotif('Q' + tc + ' ' + t('notif_response_done'), (sn ? '[' + sn + '] ' : '') + (sec > 0 ? sec + '초 소요' : ''));
     if (s) {
       s._masterSt = 'done'; s._masterTask = doneMsg;
       if (currentSession !== sp) {
@@ -145,7 +145,7 @@ function _handleThinkingEnd(data, sp, sn) {
       if (escEl && typeof showEmoji === 'function') showEmoji(escEl, typeof randomEmoji === 'function' ? randomEmoji(ESC_EMOJIS) : '❗');
     }
   });
-  var doneMsgEsc = 'Q' + tc + ' 완료' + (sec > 0 ? ' (' + sec + 's)' : '');
+  var doneMsgEsc = 'Q' + tc + ' ' + t('notif_agent_done') + (sec > 0 ? ' (' + sec + 's)' : '');
   addLog({ name: 'Master', color: '#fbbf24' }, '── ' + doneMsgEsc + ' (중단) ──', 'ok', sp, sn);
   if (s) { s._masterSt = 'done'; s._masterTask = doneMsgEsc }
   renderAll();
@@ -204,9 +204,9 @@ function _handleAgentDone(data, sp, sn) {
   var inst = liveInstances[key];
   if (inst) {
     var sec = Math.round((Date.now() - inst.startTime) / 1000);
-    inst.st = 'done'; inst.doneTime = Date.now(); inst.task = inst.desc + ' \u2014 \uC644\uB8CC (' + sec + 's)'; inst.prog = 100;
+    inst.st = 'done'; inst.doneTime = Date.now(); inst.task = inst.desc + ' \u2014 ' + t('notif_agent_done') + ' (' + sec + 's)'; inst.prog = 100;
     var ai = getAgentInfo(at); var doneAgentName = ai ? ai.name : at;
-    addLog({ name: doneAgentName, color: inst.color }, (sn ? '[' + sn + '] ' : '') + inst.desc + ' \uC644\uB8CC (' + sec + 's)', 'ok', sp, sn);
+    addLog({ name: doneAgentName, color: inst.color }, (sn ? '[' + sn + '] ' : '') + inst.desc + ' ' + t('notif_agent_done') + ' (' + sec + 's)', 'ok', sp, sn);
     renderAll(); setTimeout(function() {
       sparks('inst-' + key, inst.color);
       flyDot('inst-' + key, 'master');
@@ -226,11 +226,11 @@ function _handleAgentDone(data, sp, sn) {
       else if (sd) { sd._masterSt = 'idle'; sd._masterTask = '' }
       if (sd) sd._lastDoneTime = Date.now();
       renderAll(); celebrate();
-      sendNotif('모든 에이전트 완료', doneAgentName + ' 완료 (' + sec + 's) — 모든 작업이 끝났습니다');
+      sendNotif(t('notif_all_done'), doneAgentName + ' ' + t('notif_agent_done') + ' (' + sec + 's) — 모든 작업이 끝났습니다');
     } else {
-      sendNotif(doneAgentName + ' 완료 (' + sec + 's)', inst.desc);
+      sendNotif(doneAgentName + ' ' + t('notif_agent_done') + ' (' + sec + 's)', inst.desc);
     }
-  } else { addLog({ name: at, color: 'var(--accent)' }, at + ' \uC644\uB8CC', 'ok', sp, sn); renderAll() }
+  } else { addLog({ name: at, color: 'var(--accent)' }, at + ' ' + t('notif_agent_done'), 'ok', sp, sn); renderAll() }
 }
 
 // 이벤트 이름 → 핸들러 매핑. lastActivity 갱신이 필요한 이벤트는 handleLiveEvent에서 공통 처리

@@ -29,11 +29,11 @@ function fetchProjectAgents(cwd) {
 function saveProjectAgents(enabled) {
   var pid = currentSession;
   var cwd = (pid && sessions[pid]) ? sessions[pid].cwd : '';
-  if (!cwd) { toast('프로젝트 경로 없음', 'err'); return }
+  if (!cwd) { toast(_lang === 'en' ? 'No project path' : '프로젝트 경로 없음', 'err'); return }
   fetch(API + '/api/project-agents', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ cwd: cwd, enabled: enabled, hasRestriction: true }) }).then(function(r) { return r.json() }).then(function(r) {
-    if (r.ok) { projectAgents = { hasRestriction: true, enabled: enabled }; _wsBuilt = false; renderAll(); fetchMaster(cwd); toast('에이전트 설정 저장') }
-    else toast('실패', 'err');
-  }).catch(function() { toast('연결 실패', 'err') });
+    if (r.ok) { projectAgents = { hasRestriction: true, enabled: enabled }; _wsBuilt = false; renderAll(); fetchMaster(cwd); toast(_lang === 'en' ? 'Agent settings saved' : '에이전트 설정 저장') }
+    else toast(_lang === 'en' ? 'Failed' : '실패', 'err');
+  }).catch(function() { toast(t('shop_connect_fail'), 'err') });
 }
 
 function fetchMaster(cwd) {

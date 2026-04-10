@@ -53,7 +53,7 @@ function renderList() {
       var masterBusy = csMst === 'thinking' || csMst === 'working';
       var isLocked = isLive || masterBusy;
       var toggle = document.createElement('span'); toggle.className = 'ag-toggle' + (isEnabled ? ' on' : '') + (isLocked ? ' locked' : '');
-      toggle.dataset.tip = isLocked ? '작업 중 — 변경 불가' : (isEnabled ? '이 프로젝트에서 활성' : '이 프로젝트에서 비활성');
+      toggle.dataset.tip = isLocked ? (_lang === 'en' ? 'Working — cannot change' : '작업 중 — 변경 불가') : (isEnabled ? (_lang === 'en' ? 'Active in this project' : '이 프로젝트에서 활성') : (_lang === 'en' ? 'Inactive in this project' : '이 프로젝트에서 비활성'));
       (function(agId, en) {
         toggle.onclick = function(e) {
           e.stopPropagation();
@@ -61,7 +61,7 @@ function renderList() {
           var csMst2 = currentSession && sessions[currentSession] ? sessions[currentSession]._masterSt || 'idle' : 'idle';
           var busy = csMst2 === 'thinking' || csMst2 === 'working';
           var working = Object.values(liveInstances).some(function(i) { return i.agentId === agId && i.st === 'working' });
-          if (busy || working) { toast('작업 중에는 변경할 수 없습니다'); return }
+          if (busy || working) { toast(_lang === 'en' ? 'Cannot change while working' : '작업 중에는 변경할 수 없습니다'); return }
           var newEnabled;
           if (!projectAgents.hasRestriction) {
             newEnabled = agents.map(function(a) { return a.id }).filter(function(id) { return id !== agId });
@@ -72,8 +72,8 @@ function renderList() {
           }
           if (newEnabled.length >= agents.length) {
             fetch(API + '/api/project-agents', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ cwd: (currentSession && sessions[currentSession]) ? sessions[currentSession].cwd : '', enabled: [], hasRestriction: false }) }).then(function(r) { return r.json() }).then(function(r) {
-              if (r.ok) { projectAgents = { hasRestriction: false, enabled: [] }; _wsBuilt = false; renderAll(); var cwdR = (currentSession && sessions[currentSession]) ? sessions[currentSession].cwd : ''; fetchMaster(cwdR); toast('에이전트 제한 해제') }
-            }).catch(function() { toast('연결 실패', 'err') });
+              if (r.ok) { projectAgents = { hasRestriction: false, enabled: [] }; _wsBuilt = false; renderAll(); var cwdR = (currentSession && sessions[currentSession]) ? sessions[currentSession].cwd : ''; fetchMaster(cwdR); toast(_lang === 'en' ? 'Agent restrictions removed' : '에이전트 제한 해제') }
+            }).catch(function() { toast(t('shop_connect_fail'), 'err') });
           } else { saveProjectAgents(newEnabled) }
         };
       })(ag.id, isEnabled);
