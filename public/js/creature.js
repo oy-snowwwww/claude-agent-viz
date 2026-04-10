@@ -396,10 +396,10 @@ var _lastChatTime = 0;
 
 function tryAgentChat() {
   var now = Date.now();
-  if (now - _lastChatTime < 5000) return; // 5초 쿨다운
+  if (now - _lastChatTime < 2000) return; // 2초 쿨다운
   var workingEls = document.querySelectorAll('.ws-agent.working');
   if (workingEls.length === 0) return;
-  if (Math.random() > 0.08) return; // 350ms 간격 x 8% = ~4초에 1번
+  if (Math.random() > 0.25) return; // 350ms 간격 x 25% = ~1.5초에 1번
   _lastChatTime = now;
 
   if (workingEls.length === 1) {

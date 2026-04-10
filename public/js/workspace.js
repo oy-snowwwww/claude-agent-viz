@@ -239,7 +239,8 @@ function renderWorkspace() {
     stEl.textContent = statusText;
   } else if (stEl) { stEl.remove() }
 
-  // 연결선 제거됨 — 방방 뛰기 + 말풍선 + 액티비티 + 타임라인으로 충분
+  // 계보선 즉시 갱신 (빌드 직후 + 상태 변경 시)
+  if (typeof updateLineage === 'function') updateLineage();
 }
 
 var _ambientRunning = false;

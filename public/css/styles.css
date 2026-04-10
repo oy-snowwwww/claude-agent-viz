@@ -313,9 +313,9 @@
     .ws-emoji{position:absolute;top:-6px;left:50%;transform:translateX(-50%);pointer-events:none;font-size:.7rem;z-index:6;animation:emojiPop 1.2s ease-out forwards}
     @keyframes emojiPop{0%{opacity:1;transform:translateX(-50%) translateY(0) scale(.6)}30%{opacity:1;transform:translateX(-50%) translateY(-8px) scale(1.1)}100%{opacity:0;transform:translateX(-50%) translateY(-22px) scale(.8)}}
     /* 캐릭터 간 대화 */
-    .ws-chat{position:absolute;top:-20px;left:50%;transform:translateX(-50%);pointer-events:none;z-index:7;background:rgba(30,30,50,.85);border:1px solid rgba(255,255,255,.15);border-radius:8px;padding:2px 7px;font-size:.42rem;font-family:monospace;color:#e8e8f0;white-space:nowrap;animation:chatPop 2.5s ease-out forwards}
-    .ws-chat::after{content:'';position:absolute;top:100%;left:50%;transform:translateX(-50%);border:3px solid transparent;border-top-color:rgba(255,255,255,.15)}
-    @keyframes chatPop{0%{opacity:0;transform:translateX(-50%) translateY(4px) scale(.8)}8%{opacity:1;transform:translateX(-50%) translateY(0) scale(1)}75%{opacity:1}100%{opacity:0;transform:translateX(-50%) translateY(-6px)}}
+    .ws-chat{position:absolute;top:0;left:calc(100% + 4px);transform:none;pointer-events:none;z-index:7;background:rgba(30,30,50,.85);border:1px solid rgba(255,255,255,.15);border-radius:6px 6px 6px 2px;padding:2px 7px;font-size:.42rem;font-family:monospace;color:#e8e8f0;white-space:nowrap;animation:chatPop 2.5s ease-out forwards}
+    .ws-chat::after{content:'';position:absolute;top:6px;right:100%;border:3px solid transparent;border-right-color:rgba(255,255,255,.15)}
+    @keyframes chatPop{0%{opacity:0;transform:translateX(4px) scale(.8)}8%{opacity:1;transform:translateX(0) scale(1)}75%{opacity:1}100%{opacity:0;transform:translateX(4px)}}
     /* 모델별 아우라 파티클 */
     .ws-aura{position:absolute;inset:-10px;pointer-events:none;z-index:1}
     .ws-aura i{position:absolute;width:3px;height:3px;border-radius:50%;opacity:0;animation:auraFloat 2s ease-in-out infinite}
