@@ -1620,7 +1620,7 @@ const server = http.createServer(function(req, res) {
   // API: 에이전트 저장 (PUT /api/agents/:id)
   if (url.startsWith('/api/agents/') && req.method === 'PUT') {
     if (!guardMutate(req, res)) return;
-    var id = url.split('/api/agents/')[1];
+    var id = decodeURIComponent(url.split('/api/agents/')[1]);
     readBodySafe(req, 50 * 1024, function(err, body) {
       if (err) { res.writeHead(400); res.end('{}'); return; }
       try {
@@ -1678,7 +1678,7 @@ const server = http.createServer(function(req, res) {
   if (url.startsWith('/api/agents/') && req.method === 'DELETE') {
     if (!guardMutate(req, res)) return;
     req.resume();
-    var id = url.split('/api/agents/')[1];
+    var id = decodeURIComponent(url.split('/api/agents/')[1]);
     var filepath = safePath(AGENTS_DIR, id + '.md');
     if (!filepath) { res.writeHead(400, {'Content-Type': 'application/json'}); res.end(JSON.stringify({error: 'invalid id'})); return; }
     if (fs.existsSync(filepath)) {

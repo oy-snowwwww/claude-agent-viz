@@ -184,23 +184,12 @@ function computeBuffs(inventory) {
 // === 프리뷰 모드 — 가상 인벤토리 생성 ===
 // mode: 'empty' | 'mid' | 'full' | null
 // empty: 모든 해금/업그레이드 없음 (빈 우주)
-// mid: 약 1개월 진행 (해금 4개 + 주요 업그레이드 절반)
 // full: 모든 아이템 max stack 완주
 function buildPreviewInventory(mode) {
   if (mode === 'full') {
     var inv = {};
     Object.keys(ITEMS).forEach(function(id) { inv[id] = ITEMS[id].maxStack });
     return inv;
-  }
-  if (mode === 'mid') {
-    return {
-      unlock_meteor: 1, unlock_nebula: 1, unlock_galaxy: 1,
-      star_count: 5, star_twinkle: 2,
-      nebula_count: 2, nebula_size: 4,
-      galaxy_density: 4, galaxy_size: 4,
-      meteor_freq: 3, meteor_burst: 4, meteor_size: 3,
-      event_heartbeat: 1, event_booster: 1,
-    };
   }
   return {}; // empty
 }
