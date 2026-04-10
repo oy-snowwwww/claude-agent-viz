@@ -116,7 +116,7 @@ function _handleThinkingEnd(data, sp, sn) {
   if (!anyWorking) {
     var doneMsg = 'Q' + tc + ' ' + t('notif_agent_done') + (sec > 0 ? ' (' + sec + 's)' : '');
     addLog({ name: 'Master', color: '#fbbf24' }, '── ' + doneMsg + ' ──', 'ok', sp, sn);
-    sendNotif('Q' + tc + ' ' + t('notif_response_done'), (sn ? '[' + sn + '] ' : '') + (sec > 0 ? sec + '초 소요' : ''));
+    sendNotif('Q' + tc + ' ' + t('notif_response_done'), (sn ? '[' + sn + '] ' : '') + (sec > 0 ? sec + 's' : ''));
     if (s) {
       s._masterSt = 'done'; s._masterTask = doneMsg;
       if (currentSession !== sp) {
@@ -139,7 +139,7 @@ function _handleThinkingEnd(data, sp, sn) {
   // ESC 중단: 에이전트 working 중이지만 thinking_end → working 에이전트 강제 정리
   Object.keys(liveInstances).forEach(function(k) {
     if (liveInstances[k].sessionPid === sp && liveInstances[k].st === 'working') {
-      liveInstances[k].st = 'done'; liveInstances[k].task = '중단됨'; liveInstances[k].prog = 100;
+      liveInstances[k].st = 'done'; liveInstances[k].task = t('hist_interrupted'); liveInstances[k].prog = 100;
       // 중단 감정 이모지
       var escEl = document.getElementById('ws-' + liveInstances[k].agentId);
       if (escEl && typeof showEmoji === 'function') showEmoji(escEl, typeof randomEmoji === 'function' ? randomEmoji(ESC_EMOJIS) : '❗');

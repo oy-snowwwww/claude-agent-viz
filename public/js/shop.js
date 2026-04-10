@@ -62,7 +62,7 @@ function ensureShopModal() {
       '<div class="shop-tabs" id="shopTabs"></div>' +
       '<div class="shop-grid" id="shopGrid"></div>' +
       '<div class="shop-footer">' +
-        '<button class="shop-refund-btn" onclick="refundShop()" data-tip="구매한 아이템을 포인트로 환불 (누적 획득은 유지)">🔄 ' + t('shop_refund') + '</button>' +
+        '<button class="shop-refund-btn" onclick="refundShop()" data-tip="' + (_lang === 'en' ? 'Refund items to points (lifetime kept)' : '구매한 아이템을 포인트로 환불 (누적 획득은 유지)') + '">🔄 ' + t('shop_refund') + '</button>' +
       '</div>' +
     '</div>';
 

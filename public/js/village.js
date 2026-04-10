@@ -252,19 +252,19 @@ function makeGalaxy(layer, w, h, opts) {
 // 실제 별자리 모양을 정규화 좌표(0~1)로 정의. 화면에 배치 시 위치/크기 랜덤.
 // 별자리당 DOM: 별 N개(2px dot) + 선 M개(div rotate). 애니메이션 없음 — 정적 렌더.
 var CONSTELLATION_TEMPLATES = [
-  { name: '오리온',
+  { name: '오리온', name_en: 'Orion',
     stars: [[0.2,0],[0.8,0.05],[0.35,0.4],[0.5,0.42],[0.65,0.4],[0.25,0.9],[0.75,0.95]],
     lines: [[0,2],[1,4],[2,3],[3,4],[2,5],[4,6],[0,1]] },
-  { name: '북두칠성',
+  { name: '북두칠성', name_en: 'Big Dipper',
     stars: [[0,0.3],[0.15,0],[0.3,0.25],[0.15,0.55],[0.45,0.3],[0.65,0.25],[0.9,0.15]],
     lines: [[0,1],[1,2],[2,3],[3,0],[2,4],[4,5],[5,6]] },
-  { name: '카시오페이아',
+  { name: '카시오페이아', name_en: 'Cassiopeia',
     stars: [[0,0],[0.25,0.9],[0.5,0.15],[0.75,0.85],[1,0.05]],
     lines: [[0,1],[1,2],[2,3],[3,4]] },
-  { name: '백조자리',
+  { name: '백조자리', name_en: 'Cygnus',
     stars: [[0.5,0],[0.5,0.4],[0,0.35],[1,0.45],[0.5,1]],
     lines: [[0,1],[1,4],[2,1],[1,3]] },
-  { name: '쌍둥이자리',
+  { name: '쌍둥이자리', name_en: 'Gemini',
     stars: [[0.15,0],[0.85,0.05],[0.1,0.35],[0.8,0.4],[0.2,0.7],[0.75,0.75],[0.3,1],[0.7,0.95]],
     lines: [[0,2],[2,4],[4,6],[1,3],[3,5],[5,7],[0,1]] },
 ];
@@ -332,7 +332,7 @@ function _drawConstellations(layer, layoutStars, w, h, count) {
     var labelY = Math.round(pl.cy * h + sz * 0.55);
     var label = document.createElement('div');
     label.className = 'village-constellation-label';
-    label.textContent = tpl.name;
+    label.textContent = _lang === 'en' && tpl.name_en ? tpl.name_en : tpl.name;
     label.style.cssText = 'position:absolute;left:' + labelX + 'px;top:' + labelY + 'px;' +
       'transform:translateX(-50%);font-size:7px;color:rgba(200,220,255,0.25);' +
       'font-family:monospace;pointer-events:none;white-space:nowrap;';

@@ -21,8 +21,8 @@ function copyCwd(el, event) {
   if (event) event.stopPropagation();
   var text = el.getAttribute('data-full') || '';
   if (!text) return;
-  function showOk() { if (typeof toast === 'function') toast('폴더 경로 복사됨'); }
-  function showFail() { if (typeof toast === 'function') toast('복사 실패', 'err'); }
+  function showOk() { if (typeof toast === 'function') toast(t('hist_copy_path')); }
+  function showFail() { if (typeof toast === 'function') toast(t('hist_copy_fail'), 'err'); }
   function fallback() {
     try {
       var ta = document.createElement('textarea');
@@ -87,16 +87,16 @@ function updateHistMetaInfo(resp) {
   if (!el) return;
   if (!resp) {
     // 실패 → 보관 정책만 표시
-    el.textContent = '7일·10MB 보관';
+    el.textContent = t('hist_retention');
     return;
   }
   var total = resp.totalCount != null ? resp.totalCount : 0;
   var filtered = resp.filteredCount != null ? resp.filteredCount : 0;
-  var partialSuffix = resp.partial ? ' ⚠ 부분 결과' : '';
+  var partialSuffix = resp.partial ? (_lang === 'en' ? ' ⚠ partial' : ' ⚠ 부분 결과') : '';
   if (resp.hasFilter) {
-    el.textContent = filtered + '개 검색됨 / 전체 ' + total + '개 · 7일·10MB 보관' + partialSuffix;
+    el.textContent = (_lang === 'en' ? filtered + ' found / ' + total + ' total · ' : filtered + '개 검색됨 / 전체 ' + total + '개 · ') + t('hist_retention') + partialSuffix;
   } else {
-    el.textContent = total + '개 · 7일·10MB 보관' + partialSuffix;
+    el.textContent = total + (_lang === 'en' ? ' · ' : '개 · ') + t('hist_retention') + partialSuffix;
   }
 }
 
@@ -112,7 +112,7 @@ function updateAgentFilterOptions(list) {
   var sel = document.getElementById('histSearchAgent');
   var current = sel.value;
   var names = Object.keys(_histAgentCache).sort();
-  var html = '<option value="">모든 에이전트</option>';
+  var html = '<option value="">' + t('hist_all_agents') + '</option>';
   names.forEach(function(n) {
     html += '<option value="' + esc(n) + '"' + (n === current ? ' selected' : '') + '>' + esc(n) + '</option>';
   });
@@ -137,8 +137,8 @@ function togglePrivacy(on) {
     body: JSON.stringify({enabled: !!on})
   })
     .then(function(r) { return r.json(); })
-    .then(function() { toast(on ? '프롬프트 기록 OFF' : '프롬프트 기록 ON'); })
-    .catch(function() { toast('변경 실패', 'err'); });
+    .then(function() { toast(on ? t('hist_privacy_on') : t('hist_privacy_off')); })
+    .catch(function() { toast(t('hist_change_fail'), 'err'); });
 }
 
 // 전체 히스토리 삭제 (헤더 버튼)
@@ -150,7 +150,7 @@ function clearAllHistory() {
       toast(t('hist_clear_done'));
       fetchHistory();
     })
-    .catch(function() { toast('삭제 실패', 'err'); });
+    .catch(function() { toast(t('hist_delete_fail'), 'err'); });
 }
 
 // 개별 히스토리 삭제 (inline 2단계 confirm: 첫 클릭은 "❓ 정말?", 3초 내 재클릭 시 실제 삭제)
@@ -171,24 +171,24 @@ function deleteHistoryItem(btn, filename) {
         if (item) item.remove();
         // 삭제된 btn이 글로벌 툴팁의 _lastTarget일 수 있으므로 즉시 정리
         if (typeof window.hideGlobalTip === 'function') window.hideGlobalTip();
-        toast('삭제됨');
+        toast(t('hist_deleted'));
       })
       .catch(function() {
         // 네트워크 실패 시 버튼 상태 복구 (❓ → ✕) — 복구 안 하면 다음 클릭부터 prevText='❓'로 영구 고정
         btn.textContent = '✕';
-        btn.dataset.tip = '이 기록 삭제';
-        toast('삭제 실패', 'err');
+        btn.dataset.tip = t('hist_delete_this');
+        toast(t('hist_delete_fail'), 'err');
       });
   } else {
     // 첫 클릭 → 무장 상태 (3초 후 자동 해제)
     btn.dataset.armed = '1';
     var prevText = btn.textContent;
     btn.textContent = '❓';
-    btn.dataset.tip = '한번 더 클릭하면 삭제됩니다 (3초 내)';
+    btn.dataset.tip = t('hist_delete_confirm');
     btn._armTimer = setTimeout(function() {
       btn.dataset.armed = '0';
       btn.textContent = prevText;
-      btn.dataset.tip = '이 기록 삭제';
+      btn.dataset.tip = t('hist_delete_this');
       btn._armTimer = null;
     }, 3000);
   }
@@ -217,7 +217,7 @@ function renderHistory(list, partial) {
     if (b._armTimer) { clearTimeout(b._armTimer); b._armTimer = null; }
   });
   if (!list || list.length === 0) {
-    el.innerHTML = '<div class="hist-empty">' + (_histCurrentQ ? t('hist_no_result') : t('hist_empty') + '<br>세션이 종료되면 여기에 기록됩니다') + '</div>';
+    el.innerHTML = '<div class="hist-empty">' + (_histCurrentQ ? t('hist_no_result') : t('hist_empty') + '<br>' + t('hist_session_end_note')) + '</div>';
     return;
   }
   var q = _histCurrentQ;
@@ -230,9 +230,15 @@ function renderHistory(list, partial) {
     var duration = '';
     if (start && end) {
       var sec = Math.round((end - start) / 1000);
-      if (sec >= 3600) duration = Math.floor(sec / 3600) + '시간 ' + Math.floor((sec % 3600) / 60) + '분';
-      else if (sec >= 60) duration = Math.floor(sec / 60) + '분 ' + (sec % 60) + '초';
-      else duration = sec + '초';
+      if (_lang === 'en') {
+        if (sec >= 3600) duration = Math.floor(sec / 3600) + 'h ' + Math.floor((sec % 3600) / 60) + 'm';
+        else if (sec >= 60) duration = Math.floor(sec / 60) + 'm ' + (sec % 60) + 's';
+        else duration = sec + 's';
+      } else {
+        if (sec >= 3600) duration = Math.floor(sec / 3600) + '시간 ' + Math.floor((sec % 3600) / 60) + '분';
+        else if (sec >= 60) duration = Math.floor(sec / 60) + '분 ' + (sec % 60) + '초';
+        else duration = sec + '초';
+      }
     }
     var timeStr = start ? String(start.getHours()).padStart(2, '0') + ':' + String(start.getMinutes()).padStart(2, '0') : '';
     var dateStr = start ? (start.getMonth() + 1) + '/' + start.getDate() : '';
