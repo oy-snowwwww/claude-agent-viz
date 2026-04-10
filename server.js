@@ -110,6 +110,7 @@ function buildFrontmatter(meta, body) {
     }
   }
   if (meta.model) lines.push('model: ' + meta.model);
+  if (meta.order != null) lines.push('order: ' + meta.order);
   lines.push('---');
   lines.push('');
   lines.push(body);
@@ -132,10 +133,12 @@ function readAgents() {
       description: parsed.meta.description || '',
       tools: parsed.meta.tools || [],
       model: parsed.meta.model || 'sonnet',
+      order: parsed.meta.order != null ? Number(parsed.meta.order) : 999,
       body: parsed.body,
       raw: content
     });
   });
+  agents.sort(function(a, b) { return a.order - b.order; });
   return agents;
 }
 
@@ -1635,12 +1638,39 @@ const server = http.createServer(function(req, res) {
           name: data.name || id,
           description: data.description || '',
           tools: data.tools || [],
-          model: data.model || 'sonnet'
+          model: data.model || 'sonnet',
+          order: data.order != null ? data.order : undefined
         };
         var content = buildFrontmatter(meta, data.body || '');
         var filepath = safePath(AGENTS_DIR, id + '.md');
         if (!filepath) { res.writeHead(400); res.end(JSON.stringify({error: 'invalid id'})); return; }
         fs.writeFileSync(filepath, content, 'utf8');
+        res.writeHead(200, {'Content-Type': 'application/json'});
+        res.end(JSON.stringify({ok: true}));
+      } catch(e) {
+        res.writeHead(400, {'Content-Type': 'application/json'});
+        res.end(JSON.stringify({error: e.message}));
+      }
+    });
+    return;
+  }
+
+  // API: 에이전트 순서 변경 (PUT /api/agents-order)
+  if (url === '/api/agents-order' && req.method === 'PUT') {
+    if (!guardMutate(req, res)) return;
+    readBodySafe(req, 10 * 1024, function(err, body) {
+      if (err) { res.writeHead(400); res.end('{}'); return; }
+      try {
+        var order = JSON.parse(body).order; // ["coder","reviewer","qa",...]
+        if (!Array.isArray(order)) throw new Error('order must be array');
+        order.forEach(function(id, i) {
+          var filepath = safePath(AGENTS_DIR, id + '.md');
+          if (!filepath || !fs.existsSync(filepath)) return;
+          var content = fs.readFileSync(filepath, 'utf8');
+          var parsed = parseFrontmatter(content);
+          parsed.meta.order = i + 1;
+          fs.writeFileSync(filepath, buildFrontmatter(parsed.meta, parsed.body), 'utf8');
+        });
         res.writeHead(200, {'Content-Type': 'application/json'});
         res.end(JSON.stringify({ok: true}));
       } catch(e) {

@@ -43,6 +43,7 @@ function renderList() {
   agents.forEach(function(ag) {
     var isEnabled = !projectAgents.hasRestriction || projectAgents.enabled.indexOf(ag.id) >= 0;
     var card = document.createElement('div'); card.className = 'ag on' + (isEnabled ? '' : ' disabled');
+    card.draggable = true; card.dataset.agentId = ag.id;
     card.onclick = function() { openEdit(ag.id) };
     // 어딘가에서 working 중이면 라이브 dot
     var isLive = Object.values(liveInstances).some(function(inst) { return inst.agentId === ag.id && inst.st === 'working' });
@@ -85,9 +86,29 @@ function renderList() {
     var meta = document.createElement('div'); meta.className = 'ag-meta'; meta.innerHTML = '<span class="ag-tag model-' + esc(ag.model) + '">' + esc(ag.model) + '</span>';
     (ag.tools || []).forEach(function(t) { meta.innerHTML += '<span class="ag-tag">' + esc(t) + '</span>' });
     card.appendChild(meta);
+    // 드래그앤드롭 순서 변경
+    (function(agId) {
+      card.ondragstart = function(e) { e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', agId); card.classList.add('dragging'); };
+      card.ondragend = function() { card.classList.remove('dragging'); box.querySelectorAll('.ag').forEach(function(c) { c.classList.remove('drop-top', 'drop-bottom'); }); };
+      card.ondragover = function(e) { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; var rect = card.getBoundingClientRect(); var isTop = e.clientY < rect.top + rect.height / 2; card.classList.toggle('drop-top', isTop); card.classList.toggle('drop-bottom', !isTop); };
+      card.ondragleave = function() { card.classList.remove('drop-top', 'drop-bottom'); };
+      card.ondrop = function(e) { e.preventDefault(); var srcId = e.dataTransfer.getData('text/plain'); if (!srcId || srcId === agId) return; var rect = card.getBoundingClientRect(); var isTop = e.clientY < rect.top + rect.height / 2; reorderAgent(srcId, agId, isTop); };
+    })(ag.id);
     box.appendChild(card);
   });
   if (left) left.scrollTop = scrollPos;
+}
+
+function reorderAgent(srcId, targetId, before) {
+  var order = agents.map(function(a) { return a.id; });
+  order = order.filter(function(id) { return id !== srcId; });
+  var targetIdx = order.indexOf(targetId);
+  if (targetIdx === -1) return;
+  order.splice(before ? targetIdx : targetIdx + 1, 0, srcId);
+  // 서버에 순서 저장
+  fetch(API + '/api/agents-order', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ order: order }) }).then(function(r) { return r.json(); }).then(function(r) {
+    if (r.ok) { fetchAgents(); toast(_lang === 'en' ? 'Order saved' : '순서 저장됨'); }
+  }).catch(function() { toast(_lang === 'en' ? 'Failed' : '실패', 'err'); });
 }
 
 var _wsBuilt = false;
