@@ -99,16 +99,34 @@ function updatePointsFromEvent(ev) {
     if (typeof toast === 'function') toast('🎰 보너스 드롭! +' + ev.drop + 'P');
   }
 
-  // 성취 달성 토스트
+  // 레벨 정보 동기화
+  if (typeof ev.level === 'number') {
+    pointsData.level = ev.level;
+    pointsData.levelTitle = ev.levelTitle || '';
+    pointsData.levelXp = ev.levelXp || null;
+  }
+  // 레벨업 토스트
+  if (ev.levelUp) {
+    var lu = ev.levelUp;
+    var titleChanged = lu.title !== lu.prevTitle;
+    var msg = '🎉 Lv.' + lu.level + ' 달성! +' + lu.bonus + 'P';
+    if (titleChanged) msg += ' — ' + lu.title;
+    if (typeof toast === 'function') toast(msg);
+  }
+
+  // 성취 달성 토스트 + 신규 뱃지 카운트
   if (ev.achievements && ev.achievements.length > 0) {
     ev.achievements.forEach(function(a) {
       if (typeof toast === 'function') toast('🏆 ' + a.name + ' 달성! +' + a.reward + 'P');
     });
-    // 로컬 achievements도 갱신
     if (!pointsData.achievements) pointsData.achievements = {};
     ev.achievements.forEach(function(a) {
       pointsData.achievements[a.id] = new Date().toISOString();
     });
+    // 신규 성취 뱃지 카운트 + ID 기록
+    ev.achievements.forEach(function(a) { _newAchIds.push(a.id); });
+    _unseen += ev.achievements.length;
+    _updateAchBadge();
   }
 
   renderPointsBadge();
@@ -137,8 +155,17 @@ function renderPointsBadge() {
     el.dataset.tip = '프리뷰 모드 — 실제 포인트 저장 안 됨 (?preview=' + esc(preview) + ')';
     return;
   }
-  el.innerHTML = '<span class="points-icon">⭐</span> <strong>' + total + '</strong>';
-  el.dataset.tip = '포인트 ' + total + ' · 누적 ' + lifetime + ' · 클릭: 상점';
+  var lv = pointsData.level || 1;
+  var title = pointsData.levelTitle || '';
+  var xp = pointsData.levelXp;
+  var xpPct = 0;
+  if (xp && xp.max > xp.min) {
+    xpPct = Math.min(100, Math.round(((xp.current - xp.min) / (xp.max - xp.min)) * 100));
+  }
+  el.innerHTML = '<span class="points-icon">⭐</span> <strong>' + total + '</strong>' +
+    ' <span class="points-level">Lv.' + lv + '</span>' +
+    '<div class="points-xp-bar"><div class="points-xp-fill" style="width:' + xpPct + '%"></div></div>';
+  el.dataset.tip = 'Lv.' + lv + ' ' + esc(title) + ' · ' + total + 'P · 누적 ' + lifetime + 'P · 클릭: 상점';
 }
 
 // "+3" 같은 획득 플로팅 애니메이션 (배지 옆에서 위로 fade out)
@@ -152,7 +179,28 @@ function showPointsFloat(text) {
   setTimeout(function() { float.remove() }, 1400);
 }
 
-// === 포인트 히스토리 + 성취 모달 (lazy 생성) ===
+// === 신규 성취 뱃지 ===
+var _unseen = 0;
+var _newAchIds = [];  // 아직 모달에서 안 본 성취 ID 목록
+function _updateAchBadge() {
+  var btn = document.querySelector('[onclick="openPointsChart()"]');
+  if (!btn) return;
+  var dot = btn.querySelector('.ach-dot');
+  if (_unseen > 0) {
+    if (!dot) {
+      dot = document.createElement('span');
+      dot.className = 'ach-dot';
+      btn.style.position = 'relative';
+      btn.appendChild(dot);
+    }
+    dot.textContent = _unseen > 9 ? '9+' : _unseen;
+    dot.style.display = '';
+  } else if (dot) {
+    dot.style.display = 'none';
+  }
+}
+
+// === 성취 모달 (lazy 생성) ===
 var _chartModalBuilt = false;
 
 // 성취 데이터 캐시 (모달 열 때 1회 fetch, 탭 전환은 캐시 사용)
@@ -179,12 +227,15 @@ function openPointsChart() {
   }
   document.getElementById('chartOverlay').classList.add('show');
   _achData = null;
+  _unseen = 0;
+  _updateAchBadge();
   _fetchAndRenderAch();
 }
 
 function closePointsChart() {
   var overlay = document.getElementById('chartOverlay');
   if (overlay) overlay.classList.remove('show');
+  _newAchIds = [];
 }
 
 function _fetchAndRenderAch() {
@@ -216,7 +267,8 @@ function _fetchAndRenderAch() {
         var catItems = defs.filter(function(a) { return a.cat === c; });
         var catDone = catItems.filter(function(a) { return a.unlocked; }).length;
         var btn = document.createElement('button');
-        btn.className = 'ach-tab' + (c === (_achCurrentCat || catOrder[0]) ? ' active' : '');
+        var hasNew = catItems.some(function(a) { return _newAchIds.indexOf(a.id) >= 0; });
+        btn.className = 'ach-tab' + (c === (_achCurrentCat || catOrder[0]) ? ' active' : '') + (hasNew ? ' has-new' : '');
         btn.textContent = emoji;
         btn.dataset.cat = c;
         btn.dataset.tip = label + ' ' + catDone + '/' + catItems.length;
@@ -251,11 +303,21 @@ function _renderAchTab(cat) {
   var html = '<div class="ach-section-header">' + esc(label) + ' <span class="ach-section-count">' + catDone + '/' + items.length + '</span></div>';
   html += '<div class="ach-grid">';
   items.forEach(function(a) {
-    html += '<div class="ach-card' + (a.unlocked ? ' unlocked' : '') + '">' +
-      '<div class="ach-icon">' + (a.unlocked ? '✓' : '·') + '</div>' +
+    var progressHtml = '';
+    if (!a.unlocked && a.progress && a.progress.target > 0) {
+      var pct = Math.min(100, Math.round((a.progress.current / a.progress.target) * 100));
+      progressHtml = '<div class="ach-progress">' +
+        '<div class="ach-progress-bar" style="width:' + pct + '%"></div>' +
+        '<span class="ach-progress-text">' + a.progress.current + '/' + a.progress.target + '</span>' +
+      '</div>';
+    }
+    var isNew = _newAchIds.indexOf(a.id) >= 0;
+    html += '<div class="ach-card' + (a.unlocked ? ' unlocked' : '') + (isNew ? ' new' : '') + '">' +
+      '<div class="ach-icon">' + (isNew ? 'NEW' : (a.unlocked ? '✓' : '·')) + '</div>' +
       '<div class="ach-info">' +
         '<div class="ach-name">' + esc(a.name) + '</div>' +
         '<div class="ach-desc">' + esc(a.desc) + '</div>' +
+        progressHtml +
         '<div class="ach-reward">+' + esc(String(a.reward)) + 'P</div>' +
       '</div>' +
     '</div>';

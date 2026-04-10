@@ -327,6 +327,16 @@ function _drawConstellations(layer, layoutStars, w, h, count) {
         'pointer-events:none;';
       layer.appendChild(line);
     });
+    // 별자리 이름 라벨 — 중심 좌표 기준
+    var labelX = Math.round(pl.cx * w);
+    var labelY = Math.round(pl.cy * h + sz * 0.55);
+    var label = document.createElement('div');
+    label.className = 'village-constellation-label';
+    label.textContent = tpl.name;
+    label.style.cssText = 'position:absolute;left:' + labelX + 'px;top:' + labelY + 'px;' +
+      'transform:translateX(-50%);font-size:7px;color:rgba(200,220,255,0.25);' +
+      'font-family:monospace;pointer-events:none;white-space:nowrap;';
+    layer.appendChild(label);
   }
 }
 

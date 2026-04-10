@@ -673,7 +673,7 @@ function ensureToday() {
       if (!statsData.history) statsData.history = [];
       statsData.history.push(statsData.today);
       // 최근 90일만 보관
-      if (statsData.history.length > 90) statsData.history = statsData.history.slice(-90);
+      // 전체 보관 (일별 ~200바이트, 1년 ~70KB — 무제한 보관해도 부담 없음)
     }
     statsData.today = { date: today, prompts: 0, agents: {}, tools: {} };
   }
@@ -829,69 +829,128 @@ var ACH_CATEGORIES = {
   master:   '⭐ 마스터',
 };
 
+// 성취 헬퍼 — counter >= target 패턴 (대부분의 성취가 이 구조)
+function _ach(cat, name, desc, reward, field, target) {
+  return {
+    cat: cat, name: name, desc: desc, reward: reward,
+    check: function() { return (pointsData[field] || 0) >= target; },
+    progress: function() { return { current: Math.min(pointsData[field] || 0, target), target: target }; },
+  };
+}
+// 성취 헬퍼 — 인벤토리 종류 수 >= target
+function _achInv(cat, name, desc, reward, target) {
+  return {
+    cat: cat, name: name, desc: desc, reward: reward,
+    check: function() { return Object.keys(pointsData.inventory || {}).length >= target; },
+    progress: function() { return { current: Math.min(Object.keys(pointsData.inventory || {}).length, target), target: target }; },
+  };
+}
+
 var ACHIEVEMENTS = {
   // ── 🎯 질문 ──
-  prompt_10:     { cat: 'prompt', name: '첫 발걸음',     desc: '질문 10회',               reward: 30,   check: function() { return (pointsData.promptCount || 0) >= 10; } },
-  prompt_50:     { cat: 'prompt', name: '호기심',        desc: '질문 50회',               reward: 80,   check: function() { return (pointsData.promptCount || 0) >= 50; } },
-  prompt_100:    { cat: 'prompt', name: '탐구자',        desc: '질문 100회',              reward: 150,  check: function() { return (pointsData.promptCount || 0) >= 100; } },
-  prompt_300:    { cat: 'prompt', name: '연구자',        desc: '질문 300회',              reward: 300,  check: function() { return (pointsData.promptCount || 0) >= 300; } },
-  prompt_500:    { cat: 'prompt', name: '학자',          desc: '질문 500회',              reward: 500,  check: function() { return (pointsData.promptCount || 0) >= 500; } },
-  prompt_1000:   { cat: 'prompt', name: '현자',          desc: '질문 1,000회',            reward: 1000, check: function() { return (pointsData.promptCount || 0) >= 1000; } },
-  prompt_5000:   { cat: 'prompt', name: '대현자',        desc: '질문 5,000회',            reward: 3000, check: function() { return (pointsData.promptCount || 0) >= 5000; } },
+  prompt_10:     _ach('prompt', '첫 발걸음',  '질문 10회',      30,   'promptCount', 10),
+  prompt_50:     _ach('prompt', '호기심',     '질문 50회',      80,   'promptCount', 50),
+  prompt_100:    _ach('prompt', '탐구자',     '질문 100회',     150,  'promptCount', 100),
+  prompt_300:    _ach('prompt', '연구자',     '질문 300회',     300,  'promptCount', 300),
+  prompt_500:    _ach('prompt', '학자',       '질문 500회',     500,  'promptCount', 500),
+  prompt_1000:   _ach('prompt', '현자',       '질문 1,000회',   1000, 'promptCount', 1000),
+  prompt_5000:   _ach('prompt', '대현자',     '질문 5,000회',   3000, 'promptCount', 5000),
   // ── 🔧 도구 ──
-  tool_50:       { cat: 'tool', name: '견습생',        desc: '도구 50회 사용',          reward: 30,   check: function() { return (pointsData.toolCount || 0) >= 50; } },
-  tool_200:      { cat: 'tool', name: '기능공',        desc: '도구 200회 사용',         reward: 80,   check: function() { return (pointsData.toolCount || 0) >= 200; } },
-  tool_500:      { cat: 'tool', name: '장인',          desc: '도구 500회 사용',         reward: 200,  check: function() { return (pointsData.toolCount || 0) >= 500; } },
-  tool_1000:     { cat: 'tool', name: '명장',          desc: '도구 1,000회 사용',       reward: 500,  check: function() { return (pointsData.toolCount || 0) >= 1000; } },
-  tool_3000:     { cat: 'tool', name: '달인',          desc: '도구 3,000회 사용',       reward: 1000, check: function() { return (pointsData.toolCount || 0) >= 3000; } },
-  tool_5000:     { cat: 'tool', name: '마스터',        desc: '도구 5,000회 사용',       reward: 2000, check: function() { return (pointsData.toolCount || 0) >= 5000; } },
+  tool_50:       _ach('tool', '견습생',   '도구 50회 사용',    30,   'toolCount', 50),
+  tool_200:      _ach('tool', '기능공',   '도구 200회 사용',   80,   'toolCount', 200),
+  tool_500:      _ach('tool', '장인',     '도구 500회 사용',   200,  'toolCount', 500),
+  tool_1000:     _ach('tool', '명장',     '도구 1,000회 사용', 500,  'toolCount', 1000),
+  tool_3000:     _ach('tool', '달인',     '도구 3,000회 사용', 1000, 'toolCount', 3000),
+  tool_5000:     _ach('tool', '마스터',   '도구 5,000회 사용', 2000, 'toolCount', 5000),
   // ── 🤖 에이전트 ──
-  agent_5:       { cat: 'agent', name: '팀 빌딩',       desc: '에이전트 5회 완료',       reward: 30,   check: function() { return (pointsData.agentCount || 0) >= 5; } },
-  agent_20:      { cat: 'agent', name: '팀 리더',       desc: '에이전트 20회 완료',      reward: 100,  check: function() { return (pointsData.agentCount || 0) >= 20; } },
-  agent_50:      { cat: 'agent', name: '지휘관',        desc: '에이전트 50회 완료',      reward: 300,  check: function() { return (pointsData.agentCount || 0) >= 50; } },
-  agent_100:     { cat: 'agent', name: '사령관',        desc: '에이전트 100회 완료',     reward: 800,  check: function() { return (pointsData.agentCount || 0) >= 100; } },
-  agent_500:     { cat: 'agent', name: '총사령관',      desc: '에이전트 500회 완료',     reward: 2000, check: function() { return (pointsData.agentCount || 0) >= 500; } },
+  agent_5:       _ach('agent', '팀 빌딩',   '에이전트 5회 완료',   30,   'agentCount', 5),
+  agent_20:      _ach('agent', '팀 리더',   '에이전트 20회 완료',  100,  'agentCount', 20),
+  agent_50:      _ach('agent', '지휘관',    '에이전트 50회 완료',  300,  'agentCount', 50),
+  agent_100:     _ach('agent', '사령관',    '에이전트 100회 완료', 800,  'agentCount', 100),
+  agent_500:     _ach('agent', '총사령관',  '에이전트 500회 완료', 2000, 'agentCount', 500),
   // ── 🔥 연속 활동 ──
-  streak_3:      { cat: 'streak', name: '시동',          desc: '3일 연속 활동',           reward: 50,   check: function() { return (pointsData.streak || 0) >= 3; } },
-  streak_7:      { cat: 'streak', name: '주간 챔피언',   desc: '7일 연속 활동',           reward: 200,  check: function() { return (pointsData.streak || 0) >= 7; } },
-  streak_14:     { cat: 'streak', name: '2주 마라톤',    desc: '14일 연속 활동',          reward: 500,  check: function() { return (pointsData.streak || 0) >= 14; } },
-  streak_30:     { cat: 'streak', name: '한 달의 기적',  desc: '30일 연속 활동',          reward: 1500, check: function() { return (pointsData.streak || 0) >= 30; } },
-  streak_60:     { cat: 'streak', name: '철인',          desc: '60일 연속 활동',          reward: 3000, check: function() { return (pointsData.streak || 0) >= 60; } },
-  streak_100:    { cat: 'streak', name: '전설',          desc: '100일 연속 활동',         reward: 5000, check: function() { return (pointsData.streak || 0) >= 100; } },
+  streak_3:      _ach('streak', '시동',         '3일 연속 활동',   50,   'streak', 3),
+  streak_7:      _ach('streak', '주간 챔피언',  '7일 연속 활동',   200,  'streak', 7),
+  streak_14:     _ach('streak', '2주 마라톤',   '14일 연속 활동',  500,  'streak', 14),
+  streak_30:     _ach('streak', '한 달의 기적', '30일 연속 활동',  1500, 'streak', 30),
+  streak_60:     _ach('streak', '철인',         '60일 연속 활동',  3000, 'streak', 60),
+  streak_100:    _ach('streak', '전설',         '100일 연속 활동', 5000, 'streak', 100),
   // ── 🕐 시간대 ──
-  night_owl:     { cat: 'time', name: '올빼미',         desc: '새벽 1~5시 활동 10회',    reward: 100,  check: function() { return (pointsData.nightCount || 0) >= 10; } },
-  night_owl_50:  { cat: 'time', name: '야행성',         desc: '새벽 1~5시 활동 50회',    reward: 500,  check: function() { return (pointsData.nightCount || 0) >= 50; } },
-  early_bird:    { cat: 'time', name: '얼리버드',       desc: '오전 6~8시 활동 10회',    reward: 100,  check: function() { return (pointsData.earlyCount || 0) >= 10; } },
-  early_bird_50: { cat: 'time', name: '아침형 인간',    desc: '오전 6~8시 활동 50회',    reward: 500,  check: function() { return (pointsData.earlyCount || 0) >= 50; } },
+  night_owl:     _ach('time', '올빼미',       '새벽 1~5시 활동 10회', 100,  'nightCount', 10),
+  night_owl_50:  _ach('time', '야행성',       '새벽 1~5시 활동 50회', 500,  'nightCount', 50),
+  early_bird:    _ach('time', '얼리버드',     '오전 6~8시 활동 10회', 100,  'earlyCount', 10),
+  early_bird_50: _ach('time', '아침형 인간',  '오전 6~8시 활동 50회', 500,  'earlyCount', 50),
   // ── 🛒 상점 ──
-  first_buy:     { cat: 'shop', name: '첫 구매',        desc: '상점에서 첫 아이템 구매', reward: 30,   check: function() { return Object.keys(pointsData.inventory || {}).length >= 1; } },
-  collector_5:   { cat: 'shop', name: '초보 수집가',    desc: '아이템 5종 보유',         reward: 100,  check: function() { return Object.keys(pointsData.inventory || {}).length >= 5; } },
-  collector_10:  { cat: 'shop', name: '수집가',         desc: '아이템 10종 보유',        reward: 300,  check: function() { return Object.keys(pointsData.inventory || {}).length >= 10; } },
-  collector_20:  { cat: 'shop', name: '컬렉터',         desc: '아이템 20종 보유',        reward: 800,  check: function() { return Object.keys(pointsData.inventory || {}).length >= 20; } },
-  collector_30:  { cat: 'shop', name: '박물관장',       desc: '아이템 30종 보유',        reward: 1500, check: function() { return Object.keys(pointsData.inventory || {}).length >= 30; } },
-  all_unlock:    { cat: 'shop', name: '완전 해금',      desc: '모든 해금 아이템 구매',   reward: 300,  check: function() { var inv = pointsData.inventory || {}; return !!(inv.unlock_pulse && inv.unlock_nebula && inv.unlock_galaxy && inv.unlock_meteor && inv.unlock_rainbow); } },
-  full_celestial:{ cat: 'shop', name: '천문학자',       desc: '천체 아이템 전종 보유',   reward: 500,  check: function() { var inv = pointsData.inventory || {}; return !!(inv.celestial_moon && inv.celestial_planet && inv.celestial_pulsar && inv.celestial_binary && inv.celestial_station); } },
+  first_buy:     _achInv('shop', '첫 구매',       '상점에서 첫 아이템 구매', 30,   1),
+  collector_5:   _achInv('shop', '초보 수집가',   '아이템 5종 보유',         100,  5),
+  collector_10:  _achInv('shop', '수집가',        '아이템 10종 보유',        300,  10),
+  collector_20:  _achInv('shop', '컬렉터',        '아이템 20종 보유',        800,  20),
+  collector_30:  _achInv('shop', '박물관장',      '아이템 30종 보유',        1500, 30),
+  all_unlock:    { cat: 'shop', name: '완전 해금',  desc: '모든 해금 아이템 구매',   reward: 300,
+    check: function() { var inv = pointsData.inventory || {}; return !!(inv.unlock_pulse && inv.unlock_nebula && inv.unlock_galaxy && inv.unlock_meteor && inv.unlock_rainbow); },
+    progress: function() { var inv = pointsData.inventory || {}; var keys = ['unlock_pulse','unlock_nebula','unlock_galaxy','unlock_meteor','unlock_rainbow']; var c = keys.filter(function(k) { return !!inv[k]; }).length; return { current: c, target: 5 }; } },
+  full_celestial:{ cat: 'shop', name: '천문학자', desc: '천체 아이템 전종 보유', reward: 500,
+    check: function() { var inv = pointsData.inventory || {}; return !!(inv.celestial_moon && inv.celestial_planet && inv.celestial_pulsar && inv.celestial_binary && inv.celestial_station); },
+    progress: function() { var inv = pointsData.inventory || {}; var keys = ['celestial_moon','celestial_planet','celestial_pulsar','celestial_binary','celestial_station']; var c = keys.filter(function(k) { return !!inv[k]; }).length; return { current: c, target: 5 }; } },
   // ── 💰 포인트 ──
-  lifetime_500:  { cat: 'points', name: '500P',          desc: '누적 500P 획득',          reward: 50,   check: function() { return (pointsData.lifetime || 0) >= 500; } },
-  lifetime_1k:   { cat: 'points', name: '1,000P',        desc: '누적 1,000P 획득',        reward: 100,  check: function() { return (pointsData.lifetime || 0) >= 1000; } },
-  lifetime_5k:   { cat: 'points', name: '5,000P',        desc: '누적 5,000P 획득',        reward: 200,  check: function() { return (pointsData.lifetime || 0) >= 5000; } },
-  lifetime_10k:  { cat: 'points', name: '10,000P',       desc: '누적 10,000P 획득',       reward: 400,  check: function() { return (pointsData.lifetime || 0) >= 10000; } },
-  lifetime_30k:  { cat: 'points', name: '30,000P',       desc: '누적 30,000P 획득',       reward: 800,  check: function() { return (pointsData.lifetime || 0) >= 30000; } },
-  lifetime_100k: { cat: 'points', name: '100,000P',      desc: '누적 100,000P 획득',      reward: 2000, check: function() { return (pointsData.lifetime || 0) >= 100000; } },
+  lifetime_500:  _ach('points', '500P',     '누적 500P 획득',     50,   'lifetime', 500),
+  lifetime_1k:   _ach('points', '1,000P',   '누적 1,000P 획득',   100,  'lifetime', 1000),
+  lifetime_5k:   _ach('points', '5,000P',   '누적 5,000P 획득',   200,  'lifetime', 5000),
+  lifetime_10k:  _ach('points', '10,000P',  '누적 10,000P 획득',  400,  'lifetime', 10000),
+  lifetime_30k:  _ach('points', '30,000P',  '누적 30,000P 획득',  800,  'lifetime', 30000),
+  lifetime_100k: _ach('points', '100,000P', '누적 100,000P 획득', 2000, 'lifetime', 100000),
   // ── 💸 소비 ──
-  spend_1k:      { cat: 'spend', name: '소비자',         desc: '누적 1,000P 사용',        reward: 50,   check: function() { return _totalSpent() >= 1000; } },
-  spend_5k:      { cat: 'spend', name: '큰 손',          desc: '누적 5,000P 사용',        reward: 200,  check: function() { return _totalSpent() >= 5000; } },
-  spend_20k:     { cat: 'spend', name: '고래',           desc: '누적 20,000P 사용',       reward: 800,  check: function() { return _totalSpent() >= 20000; } },
-  spend_50k:     { cat: 'spend', name: '재벌',           desc: '누적 50,000P 사용',       reward: 2000, check: function() { return _totalSpent() >= 50000; } },
+  spend_1k:  { cat: 'spend', name: '소비자', desc: '누적 1,000P 사용', reward: 50,
+    check: function() { return _totalSpent() >= 1000; }, progress: function() { return { current: Math.min(_totalSpent(), 1000), target: 1000 }; } },
+  spend_5k:  { cat: 'spend', name: '큰 손',  desc: '누적 5,000P 사용', reward: 200,
+    check: function() { return _totalSpent() >= 5000; }, progress: function() { return { current: Math.min(_totalSpent(), 5000), target: 5000 }; } },
+  spend_20k: { cat: 'spend', name: '고래',   desc: '누적 20,000P 사용', reward: 800,
+    check: function() { return _totalSpent() >= 20000; }, progress: function() { return { current: Math.min(_totalSpent(), 20000), target: 20000 }; } },
+  spend_50k: { cat: 'spend', name: '재벌',   desc: '누적 50,000P 사용', reward: 2000,
+    check: function() { return _totalSpent() >= 50000; }, progress: function() { return { current: Math.min(_totalSpent(), 50000), target: 50000 }; } },
   // ── 🎰 행운 ──
-  lucky_drop:    { cat: 'luck', name: '행운의 시작',    desc: '보너스 드롭 첫 획득',     reward: 50,   check: function() { return (pointsData.dropCount || 0) >= 1; } },
-  lucky_3:       { cat: 'luck', name: '행운아',         desc: '보너스 드롭 3회',         reward: 150,  check: function() { return (pointsData.dropCount || 0) >= 3; } },
-  lucky_10:      { cat: 'luck', name: '대박',           desc: '보너스 드롭 10회',        reward: 500,  check: function() { return (pointsData.dropCount || 0) >= 10; } },
+  lucky_drop:  _ach('luck', '행운의 시작', '보너스 드롭 첫 획득', 50,  'dropCount', 1),
+  lucky_3:     _ach('luck', '행운아',      '보너스 드롭 3회',     150, 'dropCount', 3),
+  lucky_10:    _ach('luck', '대박',        '보너스 드롭 10회',    500, 'dropCount', 10),
   // ── ⭐ 마스터 ──
-  master_galaxy: { cat: 'master', name: '은하계 정복',    desc: '은하수 4개 + 행성 3개 보유', reward: 2000, check: function() { var inv = pointsData.inventory || {}; return (inv.galaxy_extra || 0) >= 3 && (inv.celestial_planet || 0) >= 3; } },
-  master_legend: { cat: 'master', name: '전설의 시작',    desc: 'Legendary 아이템 보유',    reward: 1000, check: function() { var inv = pointsData.inventory || {}; return !!(inv.legendary_supernova || inv.legendary_cosmicrain || inv.legendary_twinmoon); } },
-  master_all_leg:{ cat: 'master', name: '신화',           desc: 'Legendary 전종 보유',     reward: 5000, check: function() { var inv = pointsData.inventory || {}; return !!(inv.legendary_supernova && inv.legendary_cosmicrain && inv.legendary_twinmoon); } },
+  master_galaxy: { cat: 'master', name: '은하계 정복', desc: '은하수 4개 + 행성 3개 보유', reward: 2000,
+    check: function() { var inv = pointsData.inventory || {}; return (inv.galaxy_extra || 0) >= 3 && (inv.celestial_planet || 0) >= 3; },
+    progress: function() { var inv = pointsData.inventory || {}; var c = Math.min(inv.galaxy_extra || 0, 3) + Math.min(inv.celestial_planet || 0, 3); return { current: c, target: 6 }; } },
+  master_legend: { cat: 'master', name: '전설의 시작', desc: 'Legendary 아이템 보유', reward: 1000,
+    check: function() { var inv = pointsData.inventory || {}; return !!(inv.legendary_supernova || inv.legendary_cosmicrain || inv.legendary_twinmoon); },
+    progress: function() { var inv = pointsData.inventory || {}; var c = (inv.legendary_supernova ? 1 : 0) + (inv.legendary_cosmicrain ? 1 : 0) + (inv.legendary_twinmoon ? 1 : 0); return { current: Math.min(c, 1), target: 1 }; } },
+  master_all_leg:{ cat: 'master', name: '신화', desc: 'Legendary 전종 보유', reward: 5000,
+    check: function() { var inv = pointsData.inventory || {}; return !!(inv.legendary_supernova && inv.legendary_cosmicrain && inv.legendary_twinmoon); },
+    progress: function() { var inv = pointsData.inventory || {}; var c = (inv.legendary_supernova ? 1 : 0) + (inv.legendary_cosmicrain ? 1 : 0) + (inv.legendary_twinmoon ? 1 : 0); return { current: c, target: 3 }; } },
 };
+
+// === 레벨 시스템 ===
+// 레벨 N 도달에 필요한 누적 lifetime: Lv² × 20
+// Lv1=0, Lv2=80, Lv5=500, Lv10=2000, Lv20=8000, Lv50=50000, Lv100=200000
+var LEVEL_TITLES = [
+  [1,  '초보 관측자'], [5,  '별지기'],     [10, '항해사'],
+  [15, '천문학자'],    [20, '우주 탐험가'], [30, '성운 조각가'],
+  [40, '은하 건축가'], [50, '우주의 현자'], [70, '차원 여행자'],
+  [90, '코스믹 마스터'],[100,'우주의 지배자'],
+];
+
+function calcLevel(lifetime) {
+  var lv = 1;
+  while (lv < 100 && lifetime >= (lv + 1) * (lv + 1) * 20) lv++;
+  return lv;
+}
+
+function levelXpRange(lv) {
+  return { current: lv * lv * 20, next: (lv + 1) * (lv + 1) * 20 };
+}
+
+function levelTitle(lv) {
+  var title = LEVEL_TITLES[0][1];
+  for (var i = 0; i < LEVEL_TITLES.length; i++) {
+    if (lv >= LEVEL_TITLES[i][0]) title = LEVEL_TITLES[i][1];
+  }
+  return title;
+}
 
 // 누적 사용 금액 — pointsHistory의 spent 합산 (환불 시에도 정확)
 function _totalSpent() {
@@ -992,6 +1051,20 @@ function recordPoints(event) {
   // 성취 체크
   var newAch = checkAchievements();
 
+  // 레벨업 체크
+  var prevLv = pointsData._lastLevel || calcLevel((pointsData.lifetime || 0) - delta);
+  var newLv = calcLevel(pointsData.lifetime || 0);
+  var levelUp = null;
+  if (newLv > prevLv) {
+    // 레벨업 보상: 매 레벨 Lv×5P, 10의 배수면 Lv×10P
+    var lvBonus = (newLv % 10 === 0) ? newLv * 10 : newLv * 5;
+    pointsData.total += lvBonus;
+    pointsData.lifetime += lvBonus;
+    _recordHistory('earn', lvBonus);
+    levelUp = { level: newLv, title: levelTitle(newLv), bonus: lvBonus, prevTitle: levelTitle(prevLv) };
+  }
+  pointsData._lastLevel = newLv;
+
   savePoints();
   var sseData = {
     event: 'points_updated',
@@ -1004,6 +1077,12 @@ function recordPoints(event) {
   };
   if (dropBonus > 0) sseData.drop = dropBonus;
   if (newAch.length > 0) sseData.achievements = newAch;
+  if (levelUp) sseData.levelUp = levelUp;
+  // 항상 레벨 정보 포함
+  sseData.level = newLv;
+  sseData.levelTitle = levelTitle(newLv);
+  var xpRange = levelXpRange(newLv);
+  sseData.levelXp = { current: pointsData.lifetime, min: xpRange.current, max: xpRange.next };
   broadcastEvent(sseData);
 }
 
@@ -1702,6 +1781,24 @@ const server = http.createServer(function(req, res) {
     return;
   }
 
+
+
+  // GET /api/stats/activity — 일별 활동량 (잔디 데이터, 전체 보관)
+  if (url === '/api/stats/activity' && req.method === 'GET') {
+    ensureToday();
+    var activityMap = {};
+    // stats history에서 일별 prompts 집계
+    (statsData.history || []).forEach(function(h) {
+      if (h.date) activityMap[h.date] = (h.prompts || 0);
+    });
+    // 오늘 데이터 추가
+    var tk = todayKey();
+    activityMap[tk] = (activityMap[tk] || 0) + (statsData.today.prompts || 0);
+    res.writeHead(200, {'Content-Type': 'application/json; charset=utf-8'});
+    res.end(JSON.stringify({ activity: activityMap }));
+    return;
+  }
+
   // === 게임화: 포인트 API ===
 
   // GET /api/points — 현재 상태 조회
@@ -1717,6 +1814,9 @@ const server = http.createServer(function(req, res) {
       streak: pointsData.streak || 0,
       lastStreakDay: pointsData.lastStreakDay || null,
       achievements: pointsData.achievements || {},
+      level: calcLevel(pointsData.lifetime || 0),
+      levelTitle: levelTitle(calcLevel(pointsData.lifetime || 0)),
+      levelXp: (function() { var lv = calcLevel(pointsData.lifetime || 0); var r = levelXpRange(lv); return { current: pointsData.lifetime || 0, min: r.current, max: r.next }; })(),
       createdAt: pointsData.createdAt || null,
       lastEarnedAt: pointsData.lastEarnedAt || null,
     }));
@@ -1737,6 +1837,7 @@ const server = http.createServer(function(req, res) {
           reward: ACHIEVEMENTS[id].reward,
           unlocked: !!(pointsData.achievements || {})[id],
           unlockedAt: (pointsData.achievements || {})[id] || null,
+          progress: typeof ACHIEVEMENTS[id].progress === 'function' ? ACHIEVEMENTS[id].progress() : null,
         };
       }),
     }));

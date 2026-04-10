@@ -92,6 +92,20 @@ fetchMaster(); fetchSessions(); fetchMcpServers(); fetchHooks(); fetchDailyStats
 // inactive 상태 주기적 갱신 (60초마다 세션 탭 re-render)
 setInterval(function() { if (Object.keys(sessions).length > 0) renderSessionTabs() }, 60000);
 
+// === 세션 타이머 (현재 세션 경과 시간) ===
+setInterval(function() {
+  var el = document.getElementById('sessionTimer');
+  if (!el) return;
+  var s = currentSession && sessions[currentSession] ? sessions[currentSession] : null;
+  if (!s || !s.startTime) { el.textContent = '--:--'; return; }
+  var sec = Math.floor((Date.now() - new Date(s.startTime).getTime()) / 1000);
+  if (sec < 0) sec = 0;
+  var h = Math.floor(sec / 3600);
+  var m = Math.floor((sec % 3600) / 60);
+  var ss = sec % 60;
+  el.textContent = (h > 0 ? h + ':' : '') + String(m).padStart(2, '0') + ':' + String(ss).padStart(2, '0');
+}, 1000);
+
 // fetchAgents 완료 후 SSE 연결 (에이전트 목록 없이 이벤트 수신 시 캐릭터 누락 방지)
 fetch(API + '/api/agents').then(function(r) { return r.json() }).then(function(data) {
   agents = data.map(function(a, i) { a.color = agColor(a.id, i); a.active = true; return a });
@@ -102,6 +116,24 @@ fetch(API + '/api/agents').then(function(r) { return r.json() }).then(function(d
   if (typeof renderVillage === 'function') renderVillage();
 }).catch(function() { setConn(false) }).finally(function() { connectSSE() });
 
+// === ESC 키로 모달 닫기 ===
+document.addEventListener('keydown', function(e) {
+  if (e.key !== 'Escape') return;
+  // 우선순위: 상점 > 잔디 > 성취 > 히스토리 > 도움말 > 에이전트 모달
+  var shopOv = document.getElementById('shopOverlay');
+  if (shopOv && shopOv.classList.contains('show')) { closeShop(); return; }
+  var grassOv = document.getElementById('grassOverlay');
+  if (grassOv && grassOv.classList.contains('show')) { closeGrassModal(); return; }
+  var chartOv = document.getElementById('chartOverlay');
+  if (chartOv && chartOv.classList.contains('show')) { if (typeof closePointsChart === 'function') closePointsChart(); return; }
+  var histOv = document.getElementById('histOverlay');
+  if (histOv && histOv.classList.contains('show')) { toggleHistory(); return; }
+  var helpOv = document.getElementById('helpOverlay');
+  if (helpOv && helpOv.classList.contains('show')) { toggleHelp(); return; }
+  var modalOv = document.getElementById('modalOverlay');
+  if (modalOv && modalOv.style.display !== 'none') { closeModal(); return; }
+});
+
 // === Page Visibility: 탭 비활성 시 애니메이션 일시정지 ===
 document.addEventListener('visibilitychange', function() {
   if (document.hidden) {
@@ -110,6 +142,7 @@ document.addEventListener('visibilitychange', function() {
     stopWalkInterval();
     if (typeof stopShootingStars === 'function') stopShootingStars();
     if (typeof stopEventTicks === 'function') stopEventTicks();
+    if (typeof stopThinkTimer === 'function') stopThinkTimer();
   } else {
     // 탭 활성: 재개
     startBlinkInterval();

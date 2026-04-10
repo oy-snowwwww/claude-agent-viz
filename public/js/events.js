@@ -140,6 +140,9 @@ function _handleThinkingEnd(data, sp, sn) {
   Object.keys(liveInstances).forEach(function(k) {
     if (liveInstances[k].sessionPid === sp && liveInstances[k].st === 'working') {
       liveInstances[k].st = 'done'; liveInstances[k].task = '중단됨'; liveInstances[k].prog = 100;
+      // 중단 감정 이모지
+      var escEl = document.getElementById('ws-' + liveInstances[k].agentId);
+      if (escEl && typeof showEmoji === 'function') showEmoji(escEl, typeof randomEmoji === 'function' ? randomEmoji(ESC_EMOJIS) : '❗');
     }
   });
   var doneMsgEsc = 'Q' + tc + ' 완료' + (sec > 0 ? ' (' + sec + 's)' : '');
@@ -212,6 +215,9 @@ function _handleAgentDone(data, sp, sn) {
       if ((window.gameBuffs || {}).charFanfare > 0 && typeof charFanfare === 'function') {
         charFanfare(inst.agentId, inst.color);
       }
+      // 완료 감정 이모지
+      var doneEl = document.getElementById('ws-' + inst.agentId);
+      if (doneEl && typeof showEmoji === 'function') showEmoji(doneEl, typeof randomEmoji === 'function' ? randomEmoji(DONE_EMOJIS) : '✨');
     }, 50);
     if (!Object.values(liveInstances).some(function(i) { return i.sessionPid === sp && i.st === 'working' })) {
       // 아직 응답 작성 중이면 thinking으로 복귀, 아니면 idle

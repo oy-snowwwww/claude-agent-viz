@@ -13,12 +13,14 @@
       <div>
         <h1>CLAUDE AGENTS</h1>
         <small id="connStatus"></small>
+        <span class="session-timer" id="sessionTimer" data-tip="현재 세션 경과 시간"></span>
       </div>
       <div class="header-right">
         <div class="header-stat" id="headerStat"></div>
         <div class="points-badge" id="pointsBadge" onclick="openShop()" data-tip="포인트 · 클릭: 상점"></div>
         <div class="streak-badge" id="streakBadge" data-tip="연속 활동 일수" style="display:none"></div>
         <button class="help-btn" onclick="openPointsChart()" data-tip="포인트 히스토리 & 성취">&#127942;</button>
+        <button class="help-btn" onclick="openGrassModal()" data-tip="활동 잔디">&#127793;</button>
         <div class="daily-stat" id="dailyStat"></div>
         <button class="notif-btn" onclick="toggleNotif()" id="notifBtn" data-tip="알림">&#128276;</button>
         <button class="help-btn" onclick="toggleHistory()" data-tip="히스토리">&#128337;</button>

@@ -288,12 +288,16 @@ function startWalkInterval() {
     var b = (typeof window !== 'undefined' && window.gameBuffs) || {};
     var hasJump = (b.charJump || 0) > 0;
     var hasTrail = (b.charTrail || 0) > 0;
-    // working 캐릭터: 항상 걷기
+    // 캐릭터 간 대화
+    tryAgentChat();
+    // working 캐릭터: 항상 걷기 + 감정 이모지
     document.querySelectorAll('.ws-agent.working .pix-lg').forEach(function(pix) {
       if (Math.random() > 0.6) return;
       walkLegs(pix);
       if (hasJump && Math.random() < 0.05) doJump(pix.parentElement);
       if (hasTrail && Math.random() < 0.4) addTrail(pix.parentElement);
+      var wsAgent = pix.closest('.ws-agent');
+      if (wsAgent && Math.random() < 0.03) showEmoji(wsAgent, randomEmoji(WORK_EMOJIS));
     });
     // idle + roam 캐릭터: 배회 중일 때만 걷기
     document.querySelectorAll('.ws-agent.idle .pix-lg').forEach(function(pix) {
@@ -355,6 +359,69 @@ function stopBlinkInterval() {
     clearInterval(_blinkInterval);
     _blinkInterval = null;
   }
+}
+
+// === 감정 이모지 팝업 ===
+var WORK_EMOJIS = ['💦', '🔥', '⚡', '💪', '🛠️'];
+var DONE_EMOJIS = ['✨', '🎉', '❤️', '💫', '🌟'];
+var ESC_EMOJIS  = ['❗', '😵', '💨'];
+
+function showEmoji(el, emoji) {
+  if (!el) return;
+  // 동시 이모지 2개 제한
+  if (el.querySelectorAll('.ws-emoji').length >= 2) return;
+  var em = document.createElement('span');
+  em.className = 'ws-emoji';
+  em.textContent = emoji;
+  // 좌우 약간 랜덤 오프셋
+  em.style.left = (40 + Math.random() * 20) + '%';
+  el.appendChild(em);
+  setTimeout(function() { em.remove(); }, 1200);
+}
+
+function randomEmoji(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+
+// === 캐릭터 간 대화 ===
+var CHAT_SOLO = ['흠...', '이거 복잡하네', '거의 다 됐다', '하나만 더...', '집중!', '좋아좋아', '오 이거 되네'];
+var CHAT_PAIR = [
+  ['도와줄까?', '괜찮아 거의 끝나'],
+  ['여기 봐봐', '오 좋은데?'],
+  ['이건 어때?', '그거 좋다!'],
+  ['힘들어...', '파이팅!'],
+  ['버그 찾았다', '어디어디?'],
+  ['다 했다!', '나도 거의!'],
+  ['리뷰 부탁해', '잠깐만~'],
+];
+var _lastChatTime = 0;
+
+function tryAgentChat() {
+  var now = Date.now();
+  if (now - _lastChatTime < 5000) return; // 5초 쿨다운
+  var workingEls = document.querySelectorAll('.ws-agent.working');
+  if (workingEls.length === 0) return;
+  if (Math.random() > 0.08) return; // 350ms 간격 x 8% = ~4초에 1번
+  _lastChatTime = now;
+
+  if (workingEls.length === 1) {
+    // 혼자 작업 → 독백
+    showChat(workingEls[0], CHAT_SOLO[Math.floor(Math.random() * CHAT_SOLO.length)]);
+  } else {
+    // 2명 이상 → 대화 쌍
+    var pair = CHAT_PAIR[Math.floor(Math.random() * CHAT_PAIR.length)];
+    var idx = Math.floor(Math.random() * workingEls.length);
+    var other = (idx + 1) % workingEls.length;
+    showChat(workingEls[idx], pair[0]);
+    setTimeout(function() { showChat(workingEls[other], pair[1]); }, 800);
+  }
+}
+
+function showChat(el, text) {
+  if (!el || el.querySelectorAll('.ws-chat').length >= 1) return;
+  var ch = document.createElement('div');
+  ch.className = 'ws-chat';
+  ch.textContent = text;
+  el.appendChild(ch);
+  setTimeout(function() { ch.remove(); }, 2500);
 }
 
 // === Drag & Drop (캐릭터 재배치) ===

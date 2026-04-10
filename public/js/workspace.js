@@ -7,6 +7,23 @@
 //       creature.js(creatureLife) — hoisting
 //       api.js, modal.js 등은 event callback 안에서만 참조 → hoisting OK
 
+// === Thinking 타이머 — thought bubble 안에 경과 시간 표시 ===
+var _thinkTimerInterval = null;
+function startThinkTimer() {
+  if (_thinkTimerInterval) return;
+  _thinkTimerInterval = setInterval(_updateThinkTimers, 1000);
+}
+function stopThinkTimer() {
+  if (_thinkTimerInterval) { clearInterval(_thinkTimerInterval); _thinkTimerInterval = null; }
+}
+function _updateThinkTimers() {
+  var cs = currentSession && sessions[currentSession];
+  if (!cs || !cs._thinkStart) { stopThinkTimer(); return; }
+  var sec = Math.round((Date.now() - cs._thinkStart) / 1000);
+  var timerEl = document.querySelector('.thought-timer');
+  if (timerEl) timerEl.textContent = sec + 's';
+}
+
 function renderMasterCard() {
   var box = document.getElementById('masterCard');
   var card = document.createElement('div'); card.className = 'master-card'; card.onclick = function() { openMaster() };
@@ -160,7 +177,7 @@ function renderWorkspace() {
       else lbl.innerHTML = esc(nd.name) + '<span class="ws-badge model-' + esc(nd.model || 'sonnet') + '">' + esc((nd.model || '').toUpperCase()) + '</span>';
       el.appendChild(lbl);
       var bub = document.createElement('div'); var isThk = nd._st === 'thinking'; bub.className = 'ws-bubble' + (isThk ? ' thought' : '');
-      if (isThk) { bub.innerHTML = '<span class="thought-dots"><span>\u00b7</span><span>\u00b7</span><span>\u00b7</span></span>'; bub.style.display = '' }
+      if (isThk) { bub.innerHTML = '<span class="thought-dots"><span>\u00b7</span><span>\u00b7</span><span>\u00b7</span></span><span class="thought-timer"></span>'; bub.style.display = ''; startThinkTimer() }
       else { bub.textContent = nd._task || ''; if (!nd._task) bub.style.display = 'none' }
       el.appendChild(bub);
       ws.appendChild(el);
@@ -178,8 +195,8 @@ function renderWorkspace() {
       if (bub) {
         var isThk = nd._st === 'thinking';
         bub.className = 'ws-bubble' + (isThk ? ' thought' : '');
-        if (isThk) { bub.innerHTML = '<span class="thought-dots"><span>\u00b7</span><span>\u00b7</span><span>\u00b7</span></span>'; bub.style.display = '' }
-        else { bub.textContent = nd._task || ''; bub.style.display = nd._task ? '' : 'none' }
+        if (isThk) { bub.innerHTML = '<span class="thought-dots"><span>\u00b7</span><span>\u00b7</span><span>\u00b7</span></span><span class="thought-timer"></span>'; bub.style.display = ''; startThinkTimer() }
+        else { bub.textContent = nd._task || ''; bub.style.display = nd._task ? '' : 'none'; stopThinkTimer() }
       }
     });
   }
