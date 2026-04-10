@@ -13,41 +13,41 @@ function renderDailyStat() {
   var d = dailyStatsData;
   var summary = '💬<strong>' + d.prompts + '</strong> 🤖<strong>' + d.totalAgents + '</strong> 🔧<strong>' + d.totalTools + '</strong>';
 
-  var dd = '<div class="daily-dropdown"><div class="daily-title daily-title-head">📊 오늘<button class="daily-reset" onclick="event.stopPropagation();resetStats()" data-tip="모든 통계(오늘/주간/전체) 초기화">🔄</button></div>';
+  var dd = '<div class="daily-dropdown"><div class="daily-title daily-title-head">📊 ' + t('stat_today') + '<button class="daily-reset" onclick="event.stopPropagation();resetStats()" data-tip="🔄">🔄</button></div>';
 
-  dd += '<div class="daily-section">질문 ' + d.prompts + '회</div>';
+  dd += '<div class="daily-section">' + t('stat_question') + ' ' + d.prompts + '</div>';
 
   // 오늘 에이전트
   var agentKeys = Object.keys(d.agents || {}).sort(function(a, b) { return d.agents[b] - d.agents[a] });
-  dd += '<div class="daily-section">에이전트 ' + d.totalAgents + '회</div>';
-  if (agentKeys.length === 0) { dd += '<div class="daily-row"><span>없음</span><span>-</span></div>' }
+  dd += '<div class="daily-section">' + t('stat_agent') + ' ' + d.totalAgents + '</div>';
+  if (agentKeys.length === 0) { dd += '<div class="daily-row"><span>-</span><span>-</span></div>' }
   agentKeys.forEach(function(k, i) { dd += '<div class="daily-row sub' + (i === agentKeys.length - 1 ? ' last' : '') + '"><span>' + k + '</span><span>' + d.agents[k] + '</span></div>' });
 
-  // 오늘 도구 (기본 접힘 - 항목이 많아 화면 차지를 줄임)
+  // 오늘 도구 (기본 접힘)
   var toolKeys = Object.keys(d.tools || {}).sort(function(a, b) { return d.tools[b] - d.tools[a] });
-  dd += '<details class="daily-collapse"><summary class="daily-section">도구 ' + d.totalTools + '회</summary>';
+  dd += '<details class="daily-collapse"><summary class="daily-section">' + t('stat_tool') + ' ' + d.totalTools + '</summary>';
   var showTools = toolKeys.slice(0, 8);
   showTools.forEach(function(k, i) { dd += '<div class="daily-row sub' + (i === showTools.length - 1 ? ' last' : '') + '"><span>' + k + '</span><span>' + d.tools[k] + '</span></div>' });
-  if (toolKeys.length > 8) { dd += '<div class="daily-row sub last"><span>외 ' + (toolKeys.length - 8) + '개</span><span></span></div>' }
+  if (toolKeys.length > 8) { dd += '<div class="daily-row sub last"><span>+' + (toolKeys.length - 8) + '</span><span></span></div>' }
   dd += '</details>';
 
   // 주간 통계
   var w = d.weekly || {};
   var wAgents = 0; Object.keys(w.agents || {}).forEach(function(k) { wAgents += w.agents[k] });
   var wTools = 0; Object.keys(w.tools || {}).forEach(function(k) { wTools += w.tools[k] });
-  dd += '<div class="daily-title" style="margin-top:10px;border-top:1px solid var(--border);padding-top:8px">📅 주간 (7일)</div>';
-  dd += '<div class="daily-row"><span>질문</span><span>' + (w.prompts || 0) + '</span></div>';
-  dd += '<div class="daily-row"><span>에이전트</span><span>' + wAgents + '</span></div>';
-  dd += '<div class="daily-row"><span>도구</span><span>' + wTools + '</span></div>';
+  dd += '<div class="daily-title" style="margin-top:10px;border-top:1px solid var(--border);padding-top:8px">📅 ' + t('stat_weekly') + '</div>';
+  dd += '<div class="daily-row"><span>' + t('stat_question') + '</span><span>' + (w.prompts || 0) + '</span></div>';
+  dd += '<div class="daily-row"><span>' + t('stat_agent') + '</span><span>' + wAgents + '</span></div>';
+  dd += '<div class="daily-row"><span>' + t('stat_tool') + '</span><span>' + wTools + '</span></div>';
 
   // 전체 통계
-  var t = d.total || {};
-  var tAgents = 0; Object.keys(t.agents || {}).forEach(function(k) { tAgents += t.agents[k] });
-  var tTools = 0; Object.keys(t.tools || {}).forEach(function(k) { tTools += t.tools[k] });
-  dd += '<div class="daily-title" style="margin-top:10px;border-top:1px solid var(--border);padding-top:8px">🏆 전체' + (t.since ? ' (' + t.since + '~)' : '') + '</div>';
-  dd += '<div class="daily-row"><span>질문</span><span>' + (t.prompts || 0) + '</span></div>';
-  dd += '<div class="daily-row"><span>에이전트</span><span>' + tAgents + '</span></div>';
-  dd += '<div class="daily-row"><span>도구</span><span>' + tTools + '</span></div>';
+  var tt = d.total || {};
+  var tAgents = 0; Object.keys(tt.agents || {}).forEach(function(k) { tAgents += tt.agents[k] });
+  var tTools = 0; Object.keys(tt.tools || {}).forEach(function(k) { tTools += tt.tools[k] });
+  dd += '<div class="daily-title" style="margin-top:10px;border-top:1px solid var(--border);padding-top:8px">🏆 ' + t('stat_total') + (tt.since ? ' (' + tt.since + '~)' : '') + '</div>';
+  dd += '<div class="daily-row"><span>' + t('stat_question') + '</span><span>' + (tt.prompts || 0) + '</span></div>';
+  dd += '<div class="daily-row"><span>' + t('stat_agent') + '</span><span>' + tAgents + '</span></div>';
+  dd += '<div class="daily-row"><span>' + t('stat_tool') + '</span><span>' + tTools + '</span></div>';
 
   dd += '</div>';
   el.innerHTML = summary + dd;
@@ -66,7 +66,7 @@ function openGrassModal() {
     overlay.innerHTML =
       '<div class="grass-modal">' +
         '<div class="grass-header">' +
-          '<h2>🌱 활동 잔디</h2>' +
+          '<h2>🌱 ' + t('grass_title') + '</h2>' +
           '<div class="grass-year-nav" id="grassYearNav"></div>' +
           '<button class="grass-close" onclick="closeGrassModal()">&times;</button>' +
         '</div>' +
@@ -142,7 +142,7 @@ function _loadGrassData() {
     });
 
     if (summary) {
-      summary.innerHTML = year + '년: <strong>' + activeDays + '</strong>일 활동 · 총 <strong>' + totalCount + '</strong>회 질문';
+      summary.innerHTML = year + ': <strong>' + activeDays + '</strong> ' + t('grass_days_active') + ' · ' + t('grass_total_prefix') + ' <strong>' + totalCount + '</strong> ' + t('grass_total_suffix');
       summary.style.cssText = 'font-size:.6rem;color:var(--text-secondary);margin-bottom:8px';
     }
 
@@ -160,7 +160,7 @@ function _loadGrassData() {
     // 요일 라벨 (왼쪽)
     var dayLabels = document.createElement('div');
     dayLabels.className = 'grass-day-labels';
-    ['일','월','화','수','목','금','토'].forEach(function(d, i) {
+    t('grass_dow').forEach(function(d, i) {
       var lbl = document.createElement('div');
       lbl.className = 'grass-day-label';
       lbl.textContent = (i % 2 === 1) ? d : ''; // 월,수,금만 표시 (GitHub처럼)
@@ -184,7 +184,7 @@ function _loadGrassData() {
       mlbl.style.width = '17px'; // 14px cell + 3px gap
       if (firstInCol) {
         var m = parseInt(firstInCol.date.slice(5, 7));
-        if (m !== lastMonth) { mlbl.textContent = m + '월'; lastMonth = m; }
+        if (m !== lastMonth) { mlbl.textContent = _lang === 'ko' ? m + '월' : ['','Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][m] || m; lastMonth = m; }
       }
       monthRow.appendChild(mlbl);
     }
@@ -202,7 +202,7 @@ function _loadGrassData() {
       } else {
         var level = d.count === 0 ? 0 : Math.min(4, Math.ceil((d.count / maxCount) * 4));
         cell.className = 'grass-cell grass-' + level;
-        cell.dataset.tip = d.date + ' (' + ['일','월','화','수','목','금','토'][d.dow] + ') ' + d.count + '회';
+        cell.dataset.tip = d.date + ' (' + t('grass_dow')[d.dow] + ') ' + d.count;
       }
       gridEl.appendChild(cell);
     });
@@ -212,31 +212,31 @@ function _loadGrassData() {
 
     // 범례
     if (legend) {
-      legend.innerHTML = '<span style="font-size:.55rem;color:var(--text-secondary)">적음</span>' +
+      legend.innerHTML = '<span style="font-size:.55rem;color:var(--text-secondary)">' + t('grass_less') + '</span>' +
         '<div class="grass-cell grass-0" style="width:14px;height:14px"></div>' +
         '<div class="grass-cell grass-1" style="width:14px;height:14px"></div>' +
         '<div class="grass-cell grass-2" style="width:14px;height:14px"></div>' +
         '<div class="grass-cell grass-3" style="width:14px;height:14px"></div>' +
         '<div class="grass-cell grass-4" style="width:14px;height:14px"></div>' +
-        '<span style="font-size:.55rem;color:var(--text-secondary)">많음</span>';
+        '<span style="font-size:.55rem;color:var(--text-secondary)">' + t('grass_more') + '</span>';
       legend.style.cssText = 'display:flex;gap:4px;align-items:center;margin-top:10px;justify-content:flex-end';
     }
   }).catch(function() {
-    grid.innerHTML = '<div style="font-size:.7rem;color:var(--text-secondary)">로드 실패</div>';
+    grid.innerHTML = '<div style="font-size:.7rem;color:var(--text-secondary)">' + t('grass_load_fail') + '</div>';
   });
 }
 
 
 function resetStats() {
-  if (!confirm('모든 통계(오늘/주간/전체)를 초기화합니다.\n이 작업은 되돌릴 수 없습니다.\n\n계속하시겠습니까?')) return;
+  if (!confirm(t('stat_reset'))) return;
   fetch(API + '/api/stats/reset', { method: 'POST' }).then(function(r) { return r.json() }).then(function(d) {
     if (d && d.ok) {
       // 메모리 캐시도 비우고 즉시 갱신
       dailyStatsData = { prompts: 0, totalAgents: 0, totalTools: 0, agents: {}, tools: {}, weekly: { prompts: 0, agents: {}, tools: {} }, total: { since: d.since, prompts: 0, agents: {}, tools: {} } };
       renderDailyStat();
-      toast('통계 초기화됨');
-    } else { toast('초기화 실패', 'err') }
-  }).catch(function() { toast('초기화 실패', 'err') });
+      toast(t('stat_reset_done'));
+    } else { toast(t('stat_reset_fail'), 'err') }
+  }).catch(function() { toast(t('stat_reset_fail'), 'err') });
 }
 
 // SSE 이벤트 수신 시 실시간 업데이트

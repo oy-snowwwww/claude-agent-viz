@@ -14,7 +14,7 @@ function restartServer() {
   if (btn.classList.contains('confirm')) {
     clearTimeout(restartConfirmTimer);
     btn.classList.remove('confirm'); btn.innerHTML = '&#8635;';
-    toast('\uC7AC\uC2DC\uC791 \uC911...');
+    toast(t('srv_restart_confirm'));
     fetch(API + '/api/restart', { method: 'POST' }).then(function() {
       // 서버 종료 후 재시작 대기 → 연결 확인 후 reload
       var attempts = 0;
@@ -37,7 +37,7 @@ function shutdownServer() {
   if (btn.classList.contains('confirm')) {
     clearTimeout(stopConfirmTimer);
     btn.classList.remove('confirm'); btn.innerHTML = '&#9632;';
-    fetch(API + '/api/shutdown', { method: 'POST' }).then(function() { toast('\uC11C\uBC84 \uC885\uB8CC\uB428'); setConn(false) }).catch(function() { toast('\uC774\uBBF8 \uC885\uB8CC\uB428', 'err') });
+    fetch(API + '/api/shutdown', { method: 'POST' }).then(function() { toast(t('srv_shutdown_confirm')); setConn(false) }).catch(function() { toast('\uC774\uBBF8 \uC885\uB8CC\uB428', 'err') });
   } else {
     btn.classList.add('confirm'); btn.textContent = '\uC885\uB8CC?';
     stopConfirmTimer = setTimeout(function() { btn.classList.remove('confirm'); btn.innerHTML = '&#9632;' }, 3000);

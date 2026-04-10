@@ -16,9 +16,9 @@ function enableNotif() {
   _notifEnabled = true;
   localStorage.setItem('agviz-notif', 'on');
   initNotifBtn();
-  toast('알림 ON');
+  toast(t('notif_on'));
   new Notification('Claude Agent Viz', {
-    body: '알림이 활성화되었습니다. 탭을 벗어나면 작업 완료 시 알림을 받습니다.'
+    body: t('notif_enabled')
   });
 }
 
@@ -26,7 +26,7 @@ function enableNotif() {
 function toggleNotif() {
   if (!_notifEnabled) {
     if (!('Notification' in window)) {
-      toast('이 브라우저는 알림을 지원하지 않습니다', 'err');
+      toast(t('notif_no_support'), 'err');
       return;
     }
     if (Notification.permission === 'granted') {
@@ -38,14 +38,14 @@ function toggleNotif() {
       if (p === 'granted') {
         enableNotif();
       } else {
-        toast('알림 권한이 필요합니다. 주소창 왼쪽 아이콘 > 알림 > 허용', 'err');
+        toast(t('notif_permission'), 'err');
       }
     });
   } else {
     _notifEnabled = false;
     localStorage.setItem('agviz-notif', 'off');
     initNotifBtn();
-    toast('알림 OFF');
+    toast(t('notif_off'));
   }
 }
 

@@ -382,22 +382,14 @@ function showEmoji(el, emoji) {
 function randomEmoji(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
 
 // === 캐릭터 간 대화 ===
-var CHAT_SOLO = ['흠...', '이거 복잡하네', '거의 다 됐다', '하나만 더...', '집중!', '좋아좋아', '오 이거 되네'];
-var CHAT_PAIR = [
-  ['도와줄까?', '괜찮아 거의 끝나'],
-  ['여기 봐봐', '오 좋은데?'],
-  ['이건 어때?', '그거 좋다!'],
-  ['힘들어...', '파이팅!'],
-  ['버그 찾았다', '어디어디?'],
-  ['다 했다!', '나도 거의!'],
-  ['리뷰 부탁해', '잠깐만~'],
-];
+var CHAT_SOLO = t('chat_solo');
+var CHAT_PAIR = t('chat_pair');
 var _lastChatTime = 0;
 
 function tryAgentChat() {
   var now = Date.now();
   if (now - _lastChatTime < 2000) return; // 2초 쿨다운
-  var workingEls = document.querySelectorAll('.ws-agent.working');
+  var workingEls = document.querySelectorAll('.ws-agent.working, .ws-agent.thinking');
   if (workingEls.length === 0) return;
   if (Math.random() > 0.25) return; // 350ms 간격 x 25% = ~1.5초에 1번
   _lastChatTime = now;

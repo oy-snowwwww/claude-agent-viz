@@ -96,7 +96,7 @@ function updatePointsFromEvent(ev) {
 
   // 드롭 보너스 토스트
   if (typeof ev.drop === 'number' && ev.drop > 0) {
-    if (typeof toast === 'function') toast('🎰 보너스 드롭! +' + ev.drop + 'P');
+    if (typeof toast === 'function') toast('🎰 ' + t('points_drop') + ' +' + ev.drop + 'P');
   }
 
   // 레벨 정보 동기화
@@ -109,7 +109,7 @@ function updatePointsFromEvent(ev) {
   if (ev.levelUp) {
     var lu = ev.levelUp;
     var titleChanged = lu.title !== lu.prevTitle;
-    var msg = '🎉 Lv.' + lu.level + ' 달성! +' + lu.bonus + 'P';
+    var msg = '🎉 Lv.' + lu.level + ' ' + t('points_levelup') + ' +' + lu.bonus + 'P';
     if (titleChanged) msg += ' — ' + lu.title;
     if (typeof toast === 'function') toast(msg);
   }
@@ -117,7 +117,7 @@ function updatePointsFromEvent(ev) {
   // 성취 달성 토스트 + 신규 뱃지 카운트
   if (ev.achievements && ev.achievements.length > 0) {
     ev.achievements.forEach(function(a) {
-      if (typeof toast === 'function') toast('🏆 ' + a.name + ' 달성! +' + a.reward + 'P');
+      if (typeof toast === 'function') toast('🏆 ' + a.name + ' ' + t('points_ach_done') + ' +' + a.reward + 'P');
     });
     if (!pointsData.achievements) pointsData.achievements = {};
     ev.achievements.forEach(function(a) {
@@ -152,7 +152,7 @@ function renderPointsBadge() {
   var preview = window.gamePreviewMode;
   if (preview) {
     el.innerHTML = '<span class="points-icon">⭐</span> <strong>PREVIEW</strong> <span class="points-preview-tag">' + esc(preview) + '</span>';
-    el.dataset.tip = '프리뷰 모드 — 실제 포인트 저장 안 됨 (?preview=' + esc(preview) + ')';
+    el.dataset.tip = 'Preview mode (?preview=' + esc(preview) + ')';
     return;
   }
   var lv = pointsData.level || 1;
@@ -165,7 +165,7 @@ function renderPointsBadge() {
   el.innerHTML = '<span class="points-icon">⭐</span> <strong>' + total + '</strong>' +
     ' <span class="points-level">Lv.' + lv + '</span>' +
     '<div class="points-xp-bar"><div class="points-xp-fill" style="width:' + xpPct + '%"></div></div>';
-  el.dataset.tip = 'Lv.' + lv + ' ' + esc(title) + ' · ' + total + 'P · 누적 ' + lifetime + 'P · 클릭: 상점';
+  el.dataset.tip = 'Lv.' + lv + ' ' + esc(title) + ' · ' + total + 'P · ' + t('points_tip_lifetime') + ' ' + lifetime + 'P · ' + t('points_tip_shop');
 }
 
 // "+3" 같은 획득 플로팅 애니메이션 (배지 옆에서 위로 fade out)
@@ -241,7 +241,7 @@ function closePointsChart() {
 function _fetchAndRenderAch() {
   var body = document.getElementById('chartBody');
   if (!body) return;
-  body.innerHTML = '<div class="chart-loading">로딩 중...</div>';
+  body.innerHTML = '<div class="chart-loading">' + t('ach_loading') + '</div>';
   fetch(API + '/api/points/achievements').then(function(r) { return r.json(); }).then(function(data) {
     _achData = data;
     var defs = data.achievementDefs || [];
@@ -250,7 +250,7 @@ function _fetchAndRenderAch() {
     var total = defs.length;
     var unlocked = defs.filter(function(a) { return a.unlocked; }).length;
     var summaryEl = document.getElementById('achSummary');
-    if (summaryEl) summaryEl.textContent = unlocked + ' / ' + total + ' 달성';
+    if (summaryEl) summaryEl.textContent = unlocked + ' / ' + total + ' ' + t('ach_achieved');
     // 카테고리 순서 보존
     var catOrder = [];
     defs.forEach(function(a) {
@@ -280,7 +280,7 @@ function _fetchAndRenderAch() {
     if (!_achCurrentCat || catOrder.indexOf(_achCurrentCat) < 0) _achCurrentCat = catOrder[0];
     _renderAchTab(_achCurrentCat);
   }).catch(function() {
-    body.innerHTML = '<div class="chart-empty">서버 연결 실패</div>';
+    body.innerHTML = '<div class="chart-empty">' + t('ach_connect_fail') + '</div>';
   });
 }
 
