@@ -156,7 +156,7 @@ function renderSessionTabs() {
   // 구조 변경 → 전체 재구축
   _tabsBuilt = structKey;
   box.innerHTML = '';
-  if (pids.length === 0) { var h = document.createElement('span'); h.className = 'empty-sessions'; h.textContent = 'Claude Code \uC138\uC158 \uB300\uAE30 \uC911...'; box.appendChild(h); return }
+  if (pids.length === 0) { var h = document.createElement('span'); h.className = 'empty-sessions'; h.textContent = t('sessions_waiting'); box.appendChild(h); return }
   // 세션이 있는데 현재 선택이 없거나 삭제된 세션이면 첫 번째 세션 자동 선택
   if (!currentSession || !sessions[currentSession]) { currentSession = pids[0] }
   var nameGroups = {}; pids.forEach(function(p) { var n = sessions[p].name; if (!nameGroups[n]) nameGroups[n] = []; nameGroups[n].push(p) });

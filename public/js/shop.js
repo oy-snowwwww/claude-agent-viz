@@ -55,14 +55,14 @@ function ensureShopModal() {
   overlay.innerHTML =
     '<div class="shop-modal">' +
       '<div class="shop-header">' +
-        '<h2>🛒 우주 상점</h2>' +
+        '<h2>🛒 ' + t('shop_title') + '</h2>' +
         '<div class="shop-wallet" id="shopWallet"></div>' +
         '<button class="shop-close" onclick="closeShop()">&times;</button>' +
       '</div>' +
       '<div class="shop-tabs" id="shopTabs"></div>' +
       '<div class="shop-grid" id="shopGrid"></div>' +
       '<div class="shop-footer">' +
-        '<button class="shop-refund-btn" onclick="refundShop()" data-tip="구매한 아이템을 포인트로 환불 (누적 획득은 유지)">🔄 환불 초기화</button>' +
+        '<button class="shop-refund-btn" onclick="refundShop()" data-tip="구매한 아이템을 포인트로 환불 (누적 획득은 유지)">🔄 ' + t('shop_refund') + '</button>' +
       '</div>' +
     '</div>';
 
@@ -116,12 +116,12 @@ function updateShopWallet() {
   var el = document.getElementById('shopWallet');
   if (!el) return;
   if (window.gamePreviewMode) {
-    el.innerHTML = '<span class="shop-preview-warning">⚠ 프리뷰 모드 — 구매 불가 (' + esc(window.gamePreviewMode) + ')</span>';
+    el.innerHTML = '<span class="shop-preview-warning">⚠ ' + t('shop_wallet_preview') + ' (' + esc(window.gamePreviewMode) + ')</span>';
     return;
   }
   var total = pointsData.total || 0;
   var lifetime = pointsData.lifetime || 0;
-  el.innerHTML = '💰 <strong>' + total + '</strong> P <span class="shop-lifetime">누적 ' + lifetime + ' P</span>';
+  el.innerHTML = '💰 <strong>' + total + '</strong> P <span class="shop-lifetime">' + t('shop_lifetime') + ' ' + lifetime + ' P</span>';
 }
 
 // 카테고리가 해금되었는지 체크
@@ -149,14 +149,14 @@ function renderShopGrid(category) {
   if (categoryLocked) {
     var banner = document.createElement('div');
     banner.className = 'shop-category-locked';
-    banner.innerHTML = '🔒 이 카테고리는 <strong>' + esc(unlockItemName) + '</strong>을(를) 먼저 구매해야 사용할 수 있습니다. (🔓 해금 탭)';
+    banner.innerHTML = '🔒 ' + t('shop_locked') + ' <strong>' + esc(unlockItemName) + '</strong>' + t('shop_locked_suffix') + ' (🔓 ' + t('shop_locked_tab') + ')';
     gridEl.appendChild(banner);
   }
 
   if (items.length === 0) {
     var empty = document.createElement('div');
     empty.className = 'shop-empty';
-    empty.textContent = '아이템 없음';
+    empty.textContent = t('shop_empty');
     gridEl.appendChild(empty);
     return;
   }
@@ -189,7 +189,7 @@ function renderShopGrid(category) {
     var stackEl = document.createElement('div');
     stackEl.className = 'shop-item-stack';
     if (def.maxStack === 1) {
-      stackEl.textContent = currentStack > 0 ? '✓ 보유 중' : '미보유';
+      stackEl.textContent = currentStack > 0 ? '✓ ' + t('shop_owned') : t('shop_not_owned');
     } else {
       stackEl.textContent = currentStack + ' / ' + def.maxStack;
     }
@@ -199,7 +199,7 @@ function renderShopGrid(category) {
     var buyBtn = document.createElement('button');
     buyBtn.className = 'shop-buy-btn';
     if (maxedOut) {
-      buyBtn.textContent = def.maxStack === 1 ? '✓' : 'MAX';
+      buyBtn.textContent = def.maxStack === 1 ? '✓' : t('shop_max');
       buyBtn.disabled = true;
     } else if (insufficientPoints && !categoryLocked) {
       buyBtn.textContent = def.price + ' P';
@@ -226,7 +226,7 @@ function renderShopGrid(category) {
 
 // 아이템 구매 — Epic/Legendary는 2단계 확인
 function buyItem(itemId, needConfirm) {
-  if (window.gamePreviewMode) { toast('프리뷰 모드에서는 구매 불가', 'err'); return; }
+  if (window.gamePreviewMode) { toast(t('shop_wallet_preview'), 'err'); return; }
   var def = ITEMS[itemId];
   if (!def) return;
 
@@ -237,7 +237,7 @@ function buyItem(itemId, needConfirm) {
     btns.forEach(function(b) {
       if (b.textContent === def.price + ' P' && b.parentElement.querySelector('.shop-item-name').textContent === def.name) {
         b.classList.add('confirming');
-        b.textContent = '정말?';
+        b.textContent = t('shop_confirm');
       }
     });
     _shopConfirmTimers[itemId] = setTimeout(function() {
@@ -259,24 +259,24 @@ function buyItem(itemId, needConfirm) {
     body: JSON.stringify({ itemId: itemId }),
   }).then(function(r) { return r.json() }).then(function(res) {
     if (res.ok) {
-      toast(def.name + ' 구매 완료');
+      toast(def.name + ' ' + t('shop_buy_ok'));
       // SSE 'points_updated'가 자동으로 pointsData 갱신 + renderPointsBadge 호출
       // 상점 그리드도 재렌더 (즉시 반영)
       renderShopGrid(_shopCurrentCategory);
       updateShopWallet();
     } else {
-      var msg = res.error || '구매 실패';
+      var msg = res.error || t('shop_buy_fail');
       if (res.required) msg += ' (필요 ' + res.required + 'P, 보유 ' + Math.floor(res.have || 0) + 'P)';
       toast(msg, 'err');
     }
-  }).catch(function() { toast('연결 실패', 'err') });
+  }).catch(function() { toast(t('shop_connect_fail'), 'err') });
 }
 
 // 환불 초기화 — 아이템 → 포인트 복원, lifetime 유지
 function refundShop() {
-  if (window.gamePreviewMode) { toast('프리뷰 모드에서는 초기화 불가', 'err'); return; }
+  if (window.gamePreviewMode) { toast(t('shop_wallet_preview'), 'err'); return; }
   var inventoryCount = Object.keys(pointsData.inventory || {}).length;
-  if (inventoryCount === 0) { toast('환불할 아이템이 없습니다', 'err'); return; }
+  if (inventoryCount === 0) { toast(t('shop_no_items'), 'err'); return; }
 
   var btn = document.querySelector('.shop-refund-btn');
   if (!btn) return;
@@ -285,29 +285,29 @@ function refundShop() {
     clearTimeout(_shopResetConfirm.refund);
     _shopResetConfirm.refund = null;
     btn.classList.remove('confirming');
-    btn.innerHTML = '🔄 환불 초기화';
+    btn.innerHTML = '🔄 ' + t('shop_refund');
     fetch(API + '/api/points/reset', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ mode: 'refund' }),
     }).then(function(r) { return r.json() }).then(function(res) {
       if (res.ok) {
-        toast('🔄 ' + inventoryCount + '종 환불 → +' + res.refunded + ' P 복원');
+        toast('🔄 ' + inventoryCount + '종 ' + t('shop_refund_ok') + ' +' + res.refunded + ' ' + t('shop_refund_restore'));
         renderShopGrid(_shopCurrentCategory);
         updateShopWallet();
       } else {
-        toast(res.error || '환불 실패', 'err');
+        toast(res.error || t('shop_buy_fail'), 'err');
       }
-    }).catch(function() { toast('연결 실패', 'err') });
+    }).catch(function() { toast(t('shop_connect_fail'), 'err') });
     return;
   }
   // 1차 클릭
   btn.classList.add('confirming');
-  btn.innerHTML = '⚠ 정말 환불?';
+  btn.innerHTML = '⚠ ' + t('shop_refund_confirm');
   _shopResetConfirm.refund = setTimeout(function() {
     _shopResetConfirm.refund = null;
     btn.classList.remove('confirming');
-    btn.innerHTML = '🔄 환불 초기화';
+    btn.innerHTML = '🔄 ' + t('shop_refund');
   }, 3000);
 }
 

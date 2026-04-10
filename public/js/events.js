@@ -94,7 +94,7 @@ function _handleThinkingStart(data, sp, sn) {
   }
   if (sp && sessions[sp]) {
     sessions[sp]._turnCount = (sessions[sp]._turnCount || 0) + 1;
-    sessions[sp]._masterSt = 'thinking'; sessions[sp]._masterTask = '생각 중...';
+    sessions[sp]._masterSt = 'thinking'; sessions[sp]._masterTask = t('ws_thinking');
     sessions[sp]._thinkStart = Date.now();
     delete sessions[sp]._completed;
   }
@@ -222,7 +222,7 @@ function _handleAgentDone(data, sp, sn) {
     if (!Object.values(liveInstances).some(function(i) { return i.sessionPid === sp && i.st === 'working' })) {
       // 아직 응답 작성 중이면 thinking으로 복귀, 아니면 idle
       var sd = sp && sessions[sp] ? sessions[sp] : null;
-      if (sd && sd._thinkStart) { sd._masterSt = 'thinking'; sd._masterTask = '생각 중...' }
+      if (sd && sd._thinkStart) { sd._masterSt = 'thinking'; sd._masterTask = t('ws_thinking') }
       else if (sd) { sd._masterSt = 'idle'; sd._masterTask = '' }
       if (sd) sd._lastDoneTime = Date.now();
       renderAll(); celebrate();

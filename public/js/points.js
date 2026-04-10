@@ -49,7 +49,7 @@ function fetchPoints() {
     renderPointsBadge();
     return;
   }
-  fetch(API + '/api/points').then(function(r) { return r.json() }).then(function(data) {
+  fetch(API + '/api/points?lang=' + (typeof getLang === 'function' ? getLang() : 'ko')).then(function(r) { return r.json() }).then(function(data) {
     pointsData = data;
     window.gameBuffs = data.buffs || {};
     renderPointsBadge();
@@ -242,7 +242,7 @@ function _fetchAndRenderAch() {
   var body = document.getElementById('chartBody');
   if (!body) return;
   body.innerHTML = '<div class="chart-loading">' + t('ach_loading') + '</div>';
-  fetch(API + '/api/points/achievements').then(function(r) { return r.json(); }).then(function(data) {
+  fetch(API + '/api/points/achievements?lang=' + (typeof getLang === 'function' ? getLang() : 'ko')).then(function(r) { return r.json(); }).then(function(data) {
     _achData = data;
     var defs = data.achievementDefs || [];
     var cats = data.categories || {};

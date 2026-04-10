@@ -143,11 +143,11 @@ function togglePrivacy(on) {
 
 // 전체 히스토리 삭제 (헤더 버튼)
 function clearAllHistory() {
-  if (!confirm('저장된 모든 히스토리를 삭제합니다.\n이 작업은 되돌릴 수 없습니다.\n\n계속하시겠습니까?')) return;
+  if (!confirm(t('hist_confirm_clear'))) return;
   fetch(API + '/api/history', { method: 'DELETE' })
     .then(function(r) { return r.json(); })
     .then(function(d) {
-      toast('히스토리 ' + (d.deleted || 0) + '개 삭제');
+      toast(t('hist_clear_done'));
       fetchHistory();
     })
     .catch(function() { toast('삭제 실패', 'err'); });
@@ -217,7 +217,7 @@ function renderHistory(list, partial) {
     if (b._armTimer) { clearTimeout(b._armTimer); b._armTimer = null; }
   });
   if (!list || list.length === 0) {
-    el.innerHTML = '<div class="hist-empty">' + (_histCurrentQ ? '검색 결과가 없습니다' : '히스토리가 없습니다<br>세션이 종료되면 여기에 기록됩니다') + '</div>';
+    el.innerHTML = '<div class="hist-empty">' + (_histCurrentQ ? t('hist_no_result') : t('hist_empty') + '<br>세션이 종료되면 여기에 기록됩니다') + '</div>';
     return;
   }
   var q = _histCurrentQ;
