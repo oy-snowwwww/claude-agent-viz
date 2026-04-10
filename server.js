@@ -32,6 +32,9 @@ function isValidCwd(cwd) {
   var resolved = path.resolve(cwd);
   // .. 포함 여부 (path traversal 방지)
   if (resolved !== cwd && cwd.indexOf('..') !== -1) return false;
+  // 홈 디렉토리 하위만 허용 (/etc, /usr 등 시스템 경로 차단)
+  var home = process.env.HOME || '';
+  if (!home || !resolved.startsWith(home + path.sep)) return false;
   // 실존 디렉토리인지 확인
   try { return fs.statSync(resolved).isDirectory(); } catch(e) { return false; }
 }
