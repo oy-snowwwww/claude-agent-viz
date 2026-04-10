@@ -5,7 +5,7 @@ Claude Code의 에이전트 활동을 실시간으로 시각화하는 로컬 대
 
 > 💡 **설치가 귀찮다면?** 이 README를 Claude Code에게 보여주고 "설치해줘"라고 하면 됩니다.
 
-https://github.com/user-attachments/assets/b3595469-2546-4624-adf8-9a119ea00c2d
+https://github.com/user-attachments/assets/30cf8a5c-3e5a-4264-904e-31a7310a8cb2
 
 <img src="./screenshots/main.png" alt="메인 대시보드 — 에이전트 working + 계보선" width="800">
 
