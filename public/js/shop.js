@@ -21,7 +21,10 @@ var SHOP_CATEGORIES = [
   { id: 'galaxy',    label: '🌌 은하수' },
   { id: 'nebula',    label: '☁️ 성운' },
   { id: 'meteor',    label: '🌠 유성' },
+  { id: 'celestial', label: '🌙 천체' },
+  { id: 'character', label: '👤 캐릭터' },
   { id: 'event',     label: '🎆 이벤트' },
+  { id: 'meta',      label: '📈 메타' },
   { id: 'legendary', label: '👑 Legendary' },
 ];
 

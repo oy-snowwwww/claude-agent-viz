@@ -23,9 +23,9 @@ var EVENT_SPECS = [
   { key: 'eventRainbowWave',  interval: 60000,  fire: fireRainbowWave },
   { key: 'eventColorStorm',   interval: 60000,  fire: fireColorStorm },
   { key: 'eventPulseChain',   interval: 60000,  fire: firePulseChain },
+  { key: 'celestialStation',  interval: 300000, fire: fireStation },
   { key: 'legendarySupernova',  interval: 600000,  fire: fireSupernova },
   { key: 'legendaryCosmicRain', interval: 3600000, fire: fireCosmicRain },
-  { key: 'legendaryVoidPulse',  interval: 300000,  fire: fireVoidPulse },
 ];
 
 // 상시 표시형 legendary (이벤트가 아닌 정적 오버레이) — startEventTicks 시 + renderVillage 시 setup 호출
@@ -40,6 +40,13 @@ function _evBf(key) {
 
 function startEventTicks() {
   if (_eventTickInterval) return;
+  // 페이지 로드 시점을 기준 시간으로 초기화 — 새로고침 시 모든 이벤트가 즉시 발동되는 것 방지
+  // (이전: _eventLastFired 초기값 0 → 첫 틱에서 now - 0 >= interval 항상 참 → 전부 즉시 발동)
+  // 이제는 각 이벤트가 자기 interval을 기다려야 처음 발동됨
+  var startTs = Date.now();
+  EVENT_SPECS.forEach(function(spec) {
+    if (!_eventLastFired[spec.key]) _eventLastFired[spec.key] = startTs;
+  });
   // 1초 주기 마스터 틱
   _eventTickInterval = setInterval(function() {
     var now = Date.now();
@@ -68,12 +75,12 @@ function stopEventTicks() {
   _eventPartTimers.forEach(function(id) { clearTimeout(id); });
   _eventPartTimers = [];
   // 진행 중 이벤트 DOM 노드 정리
-  document.querySelectorAll('.event-particle, .event-overlay').forEach(function(el) { el.remove(); });
+  document.querySelectorAll('.event-particle, .event-overlay, .village-station').forEach(function(el) { el.remove(); });
 }
 
 // 이벤트 발동 시 DOM 상한 가드
 function _particleGuard(layer) {
-  return layer.querySelectorAll('.event-particle, .village-shooting-star, .ambient').length < 200;
+  return layer.querySelectorAll('.event-particle, .village-shooting-star, .ambient, .village-station').length < 200;
 }
 
 // === 이벤트 1: 우주의 숨결 (15초, 0.5초 fade) ===
@@ -149,6 +156,41 @@ function firePulseChain(layer) {
   });
 }
 
+// === 천체: 우주 정거장 (5분 주기, 매번 다양한 각도) ===
+// 4개 각도 중 랜덤 선택 → 빛점 + 트레일이 화면 한 변에서 반대 변으로 이동 (30초 지속)
+function fireStation(layer) {
+  var w = layer.offsetWidth;
+  var h = layer.offsetHeight;
+  // 시작/종료 좌표 — 4가지 경로 중 랜덤
+  var paths = [
+    // 좌→우 (상단 가까이)
+    { sx: -80, sy: h * (0.10 + Math.random() * 0.25), ex: w + 80, ey: h * (0.10 + Math.random() * 0.25) },
+    // 우→좌 (상단 가까이)
+    { sx: w + 80, sy: h * (0.10 + Math.random() * 0.25), ex: -80, ey: h * (0.10 + Math.random() * 0.25) },
+    // 좌상 → 우하 대각선
+    { sx: -80, sy: h * 0.10, ex: w + 80, ey: h * 0.75 },
+    // 우상 → 좌하 대각선
+    { sx: w + 80, sy: h * 0.10, ex: -80, ey: h * 0.75 },
+  ];
+  var path = paths[Math.floor(Math.random() * paths.length)];
+  // 진행 방향 각도 (꼬리가 올바른 방향을 가리키게)
+  var angleDeg = Math.atan2(path.ey - path.sy, path.ex - path.sx) * 180 / Math.PI;
+  var station = document.createElement('div');
+  station.className = 'village-station';
+  station.style.left = '0';
+  station.style.top = '0';
+  station.style.setProperty('--st-sx', path.sx.toFixed(0) + 'px');
+  station.style.setProperty('--st-sy', path.sy.toFixed(0) + 'px');
+  station.style.setProperty('--st-ex', path.ex.toFixed(0) + 'px');
+  station.style.setProperty('--st-ey', path.ey.toFixed(0) + 'px');
+  station.style.setProperty('--st-angle', angleDeg.toFixed(1) + 'deg');
+  layer.appendChild(station);
+  // layer가 renderVillage()로 재생성되면 station도 같이 사라짐 → el.parentNode 체크로 안전 제거
+  _eventPartTimers.push(setTimeout(function() {
+    if (station && station.parentNode) station.parentNode.removeChild(station);
+  }, 31000));
+}
+
 // === Legendary 1: Supernova (10분, 화면 중앙 폭발) ===
 function fireSupernova(layer) {
   var w = layer.offsetWidth;
@@ -178,7 +220,7 @@ function fireSupernova(layer) {
   }
 }
 
-// === Legendary 2: Cosmic Rain (1시간, 20초 유성우 폭풍) ===
+// === Legendary 2: Cosmic Rain (1시간, 10초 유성우 폭풍) ===
 function fireCosmicRain() {
   var elapsed = 0;
   var iv = setInterval(function() {
@@ -198,9 +240,9 @@ function fireCosmicRain() {
       });
     }
     elapsed += 500;
-    if (elapsed >= 20000) clearInterval(iv);
+    if (elapsed >= 10000) clearInterval(iv);
   }, 500);
-  _eventPartTimers.push(setTimeout(function() { clearInterval(iv); }, 20500));
+  _eventPartTimers.push(setTimeout(function() { clearInterval(iv); }, 10500));
 }
 
 // === Legendary 3: Twin Moons (상시 표시 — 좌우 끝에 행성 2개, 천천히 회전) ===
@@ -219,85 +261,3 @@ function setupTwinMoon() {
   });
 }
 
-// === Legendary 4: Void Pulse — 빅뱅 (5분마다, 4초) ===
-// 1) 큰 elements (성운/은하수/twin moon) 임시 fade-out — scale 시 사각형 잔상 방지
-// 2) layer 전체에 transform: scale 변환 → 작은 별들이 중앙 한 점으로 수축 (1.4s)
-// 3) 한 점 응축 후 폭발 burst + supernova 50 파티클 + workspace shake (1.5s 시점)
-// 4) layer scale 4배로 확장 → overshoot 후 자기 자리로 정착 (~4s)
-// 5) 큰 elements fade-in 복원
-// 핵심: village-stars-layer는 별/성운/은하수만 있는 레이어 → transform 걸어도 캐릭터/UI 영향 없음
-function fireVoidPulse(layer) {
-  var w = layer.offsetWidth;
-  var h = layer.offsetHeight;
-
-  // 1) 큰 elements 숨김 — !important로 inline animation 우선 override
-  // 성운(blur 22px)과 wrapper들은 scale 시 사각형으로 보이는 주범
-  var bigElements = layer.querySelectorAll('.village-nebula, .village-galaxy-wrapper, .evt-twinmoon');
-  bigElements.forEach(function(el) {
-    el.style.setProperty('transition', 'opacity .4s ease-in', 'important');
-    el.style.setProperty('opacity', '0', 'important');
-  });
-
-  // overflow:hidden이 layer 박스 boundary 사각형으로 보이게 하는 주범
-  // 빅뱅 동안 visible로 일시 해제 → 4초 후 hidden 복원
-  layer.style.overflow = 'visible';
-
-  layer.classList.add('evt-bigbang');
-
-  // workspace 참조 — burst/파티클을 layer 밖에 추가해야 layer scale 변환 영향 안 받음
-  var ws = document.querySelector('.workspace');
-
-  // 2) 폭발 시점 (1.7s 후, keyframes 28~48% opacity 0 구간 중간)
-  // burst flash + 파티클은 workspace 직접 추가 — layer scale에 영향 없이 정확한 폭발
-  _eventPartTimers.push(setTimeout(function() {
-    if (!ws) return;
-    // 중앙 큰 burst flash — workspace 좌표계 사용 (layer는 inset:0이라 동일)
-    var burst = document.createElement('div');
-    burst.className = 'event-overlay evt-voidpulse-burst';
-    burst.style.left = (w / 2) + 'px';
-    burst.style.top = (h / 2) + 'px';
-    burst.style.zIndex = '30';  // stars-layer(z-index 14) 위에 표시
-    ws.appendChild(burst);
-    _eventPartTimers.push(setTimeout(function() { burst.remove(); }, 2000));
-
-    // supernova 파티클 50개 방사 — workspace에 직접 추가
-    var colors = ['#ffffff', '#fbbf24', '#ff6b6b', '#a78bfa', '#00ffc8'];
-    for (var i = 0; i < 50; i++) {
-      var angle = (i / 50) * Math.PI * 2;
-      var dist = 150 + Math.random() * 250;
-      var dx = Math.cos(angle) * dist;
-      var dy = Math.sin(angle) * dist;
-      var p = document.createElement('div');
-      p.className = 'event-particle evt-supernova-particle';
-      p.style.left = (w / 2) + 'px';
-      p.style.top = (h / 2) + 'px';
-      p.style.zIndex = '30';
-      p.style.setProperty('--sx', dx + 'px');
-      p.style.setProperty('--sy', dy + 'px');
-      p.style.background = colors[i % colors.length];
-      ws.appendChild(p);
-      (function(el) { _eventPartTimers.push(setTimeout(function() { el.remove(); }, 2600)); })(p);
-    }
-
-    // 워크스페이스 미세 shake (0.5초)
-    ws.classList.add('evt-bigbang-shake');
-    _eventPartTimers.push(setTimeout(function() { ws.classList.remove('evt-bigbang-shake'); }, 500));
-  }, 1700));
-
-  // 3) 빅뱅 종료 시점 (4s) — 클래스 제거 + 큰 elements 복원 (3.2s부터 미리 fade-in)
-  _eventPartTimers.push(setTimeout(function() {
-    bigElements.forEach(function(el) {
-      el.style.setProperty('transition', 'opacity .8s ease-out', 'important');
-      el.style.removeProperty('opacity');
-    });
-  }, 3200));
-  _eventPartTimers.push(setTimeout(function() {
-    layer.classList.remove('evt-bigbang');
-    // overflow 복원 (별이 화면 밖으로 나가는 것 방지)
-    layer.style.overflow = 'hidden';
-    // transition 정리 (다음 빅뱅 때 깨끗한 상태)
-    bigElements.forEach(function(el) {
-      el.style.removeProperty('transition');
-    });
-  }, 4100));
-}

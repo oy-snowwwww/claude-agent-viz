@@ -54,7 +54,7 @@ var PMAPS = {
 // === 게임화 아이템 카탈로그 (v5) ===
 // 각 아이템: { name, desc, category, rarity, price, maxStack, effect: { key, delta } }
 // buffs 계산: inventory[id] * effect.delta → buffs[effect.key]에 누적
-// category: unlock | stars | pulse | rainbow | blue | orange | galaxy | nebula | meteor | event | legendary
+// category: unlock | stars | pulse | rainbow | blue | orange | galaxy | nebula | meteor | celestial | character | event | meta | legendary
 // rarity: common | rare | epic | legendary
 //
 // ⚠ 키 변경 시 village.js / workspace.js / event-ticks.js에서 참조하는 buffs 키도 함께 수정
@@ -102,13 +102,15 @@ var ITEMS = {
   galaxy_size:     { name: '은하수 팽창',         desc: '크기 +5%',                            category: 'galaxy', rarity: 'common', price: 120,  maxStack: 10, effect: { key: 'galaxySizeMul',   delta: 0.05 } },
   galaxy_blue:     { name: '푸른 은하수',         desc: '색조 파랑 선호',                       category: 'galaxy', rarity: 'epic',   price: 500, maxStack: 1,  effect: { key: 'galaxyBlueTint',  delta: 1    } },
   galaxy_orange:   { name: '주황 은하수',         desc: '색조 주황 선호',                       category: 'galaxy', rarity: 'epic',   price: 500, maxStack: 1,  effect: { key: 'galaxyOrangeTint',delta: 1    } },
-  galaxy_rotation: { name: '은하수 회전',         desc: '60초에 한 바퀴 천천히 회전',           category: 'galaxy', rarity: 'epic',   price: 700, maxStack: 1,  effect: { key: 'galaxyRotation',  delta: 1    } },
+  galaxy_rotation: { name: '은하수 회전',         desc: '180초에 한 바퀴 매우 천천히 회전',     category: 'galaxy', rarity: 'epic',   price: 700, maxStack: 1,  effect: { key: 'galaxyRotation',  delta: 1    } },
+  galaxy_arms:     { name: '나선팔',              desc: '은하수 나선팔 강조 (밀도 +20%/팔)',    category: 'galaxy', rarity: 'rare',   price: 400, maxStack: 2,  effect: { key: 'galaxyArmsAdd',   delta: 1    } },
 
   // ─── ☁️ 성운 (해금 후) ───
   nebula_count:    { name: '성운 확장',           desc: '성운 +1개 (기본 1 + 최대 2 = 3개)',   category: 'nebula', rarity: 'common', price: 160,  maxStack: 2,  effect: { key: 'nebulaCountAdd',  delta: 1    } },
   nebula_size:     { name: '성운 팽창',           desc: '크기 +3%',                            category: 'nebula', rarity: 'common', price: 50,  maxStack: 10, effect: { key: 'nebulaSizeMul',   delta: 0.03 } },
   nebula_pulse:    { name: '성운 맥동',           desc: '숨쉬듯 밝아집니다 (진폭 +6%)',        category: 'nebula', rarity: 'common', price: 80,  maxStack: 5,  effect: { key: 'nebulaPulseAdd',  delta: 0.06 } },
   nebula_purple:   { name: '보라 성운',           desc: '추가 보라 성운 +1개 (기본과 별개)',    category: 'nebula', rarity: 'rare',   price: 200, maxStack: 1,  effect: { key: 'nebulaPurpleAdd', delta: 1    } },
+  nebula_lightning:{ name: '성운 번개',           desc: '성운 속에 가끔 번개 (전자기 폭풍)',    category: 'nebula', rarity: 'epic',   price: 600, maxStack: 1,  effect: { key: 'nebulaLightning', delta: 1    } },
 
   // ─── 🌠 별똥별 (해금 후) ───
   meteor_freq:     { name: '유성 빈도',           desc: '발생 간격 -10%',                      category: 'meteor', rarity: 'common', price: 60,  maxStack: 8,  effect: { key: 'meteorFreqMul',   delta: 0.10 } },
@@ -118,6 +120,20 @@ var ITEMS = {
   meteor_size:     { name: '유성 확대',           desc: '별똥별 크기 +10%',                    category: 'meteor', rarity: 'common', price: 70,  maxStack: 5,  effect: { key: 'meteorSizeMul',   delta: 0.10 } },
   meteor_direction:{ name: '다방향 유성',         desc: '4방향에서 떨어집니다',                 category: 'meteor', rarity: 'rare',   price: 300, maxStack: 1,  effect: { key: 'meteorDirection', delta: 1    } },
   meteor_rainbow:  { name: '무지개 꼬리',         desc: '꼬리가 무지개색으로 순환',             category: 'meteor', rarity: 'epic',   price: 400, maxStack: 1,  effect: { key: 'meteorRainbow',   delta: 1    } },
+  meteor_explode:  { name: '유성 착지 폭발',      desc: '별똥별이 사라질 때 작은 폭발',         category: 'meteor', rarity: 'epic',   price: 500, maxStack: 1,  effect: { key: 'meteorExplode',   delta: 1    } },
+
+  // ─── 🌙 천체 (Celestial) — 상시 표시 구조물 ───
+  celestial_moon:    { name: '달',                 desc: '큰 달이 화면 한쪽에 상시 표시',        category: 'celestial', rarity: 'epic',   price: 1000, maxStack: 1, effect: { key: 'celestialMoon',      delta: 1 } },
+  celestial_planet:  { name: '떠도는 행성',        desc: '행성 +1 (최대 3, 매우 천천히 공전)',   category: 'celestial', rarity: 'rare',   price: 500,  maxStack: 3, effect: { key: 'celestialPlanetAdd', delta: 1 } },
+  celestial_pulsar:  { name: '펄사',               desc: '매우 빠른 점멸 별 +1 (최대 2)',       category: 'celestial', rarity: 'rare',   price: 400,  maxStack: 2, effect: { key: 'celestialPulsarAdd', delta: 1 } },
+  celestial_binary:  { name: '쌍성',               desc: '큰 별 2개가 서로 공전',                category: 'celestial', rarity: 'epic',   price: 800,  maxStack: 1, effect: { key: 'celestialBinary',    delta: 1 } },
+  celestial_station: { name: '우주 정거장',        desc: '5분마다 다양한 각도에서 빛 트레일이 화면을 가로지름', category: 'celestial', rarity: 'epic',   price: 900,  maxStack: 1, effect: { key: 'celestialStation',   delta: 1 } },
+
+  // ─── 👤 캐릭터 (Character) — 에이전트 시각 강화 ───
+  char_halo:    { name: '후광',          desc: 'working 중 캐릭터 주위 빛 파티클', category: 'character', rarity: 'common', price: 200, maxStack: 1, effect: { key: 'charHalo',    delta: 1 } },
+  char_trail:   { name: '잔상',          desc: '캐릭터 이동 시 사라지는 trail',     category: 'character', rarity: 'common', price: 150, maxStack: 1, effect: { key: 'charTrail',   delta: 1 } },
+  char_jump:    { name: '점프',          desc: '가끔 점프 모션 (랜덤 쿨다운)',     category: 'character', rarity: 'common', price: 200, maxStack: 1, effect: { key: 'charJump',    delta: 1 } },
+  char_fanfare: { name: '완료 팡파르',   desc: 'agent_done 시 별이 위로 튀어오름', category: 'character', rarity: 'epic',   price: 600, maxStack: 1, effect: { key: 'charFanfare', delta: 1 } },
 
   // ─── 🎆 이벤트 아이템 (1회 구매, 주기적 발동) ───
   event_heartbeat:    { name: '우주의 숨결',       desc: '15초마다 전체 별 fade 한 번 (0.5s)',   category: 'event', rarity: 'common', price: 500,  maxStack: 1, effect: { key: 'eventHeartbeat',   delta: 1 } },
@@ -128,11 +144,13 @@ var ITEMS = {
   event_color_storm:  { name: '컬러 스톰',         desc: '1분마다 모든 별이 1초간 색상 회전 (1s)', category: 'event', rarity: 'epic',  price: 1200,  maxStack: 1, effect: { key: 'eventColorStorm',  delta: 1 } },
   event_pulse_chain:  { name: '맥동 연쇄',         desc: '1분마다 큰 별들이 차례로 강하게 맥동 (3s)', category: 'event', rarity: 'rare', price: 1000, maxStack: 1, effect: { key: 'eventPulseChain', delta: 1 } },
 
+  // ─── 📈 메타 (Meta) — 진척/리워드 ───
+  meta_streak: { name: '연속 스트릭',  desc: '헤더에 🔥 N일 연속 활동 배지 표시',   category: 'meta', rarity: 'common', price: 200, maxStack: 1, effect: { key: 'metaStreak', delta: 1 } },
+
   // ─── 🎊 Legendary (1회 구매) ───
   legendary_supernova: { name: 'Supernova',          desc: '10분마다 화면 중앙 폭발 flash',       category: 'legendary', rarity: 'legendary', price: 3000, maxStack: 1, effect: { key: 'legendarySupernova', delta: 1 } },
-  legendary_cosmicrain:{ name: 'Cosmic Rain',        desc: '1시간마다 30초 유성우 폭풍',           category: 'legendary', rarity: 'legendary', price: 6000, maxStack: 1, effect: { key: 'legendaryCosmicRain',delta: 1 } },
-  legendary_twinmoon:  { name: 'Twin Moons',         desc: '양쪽 끝에 행성 2개 상시 (천천히 회전)', category: 'legendary', rarity: 'legendary', price: 5000, maxStack: 1, effect: { key: 'legendaryTwinMoon',  delta: 1 } },
-  legendary_voidpulse: { name: 'Void Pulse',         desc: '5분마다 우주 fade → 한 점에서 재탄생 (5s)', category: 'legendary', rarity: 'legendary', price: 5600, maxStack: 1, effect: { key: 'legendaryVoidPulse', delta: 1 } },
+  legendary_cosmicrain:{ name: 'Cosmic Rain',        desc: '1시간마다 10초 유성우 폭풍',           category: 'legendary', rarity: 'legendary', price: 6000, maxStack: 1, effect: { key: 'legendaryCosmicRain',delta: 1 } },
+  legendary_twinmoon:  { name: 'Binary Worlds',      desc: '좌측 달 + 우측 가스 행성 (자전)',      category: 'legendary', rarity: 'legendary', price: 5000, maxStack: 1, effect: { key: 'legendaryTwinMoon',  delta: 1 } },
 };
 
 // 점수 체계 v3 (소수점 누적, UI는 반올림)

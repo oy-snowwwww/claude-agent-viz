@@ -729,9 +729,183 @@
       100%{transform:translate(calc(-50% + var(--sx)),calc(-50% + var(--sy)));opacity:0}
     }
 
-    /* === galaxy_rotation 아이템 — 은하수 wrapper만 60초 1회전 (별/성운은 회전하지 않음) === */
+    /* === 🌙 천체 (Celestial) === */
+    /* 달 — 큰 원형 + 표면 디테일 + 글로우 */
+    .village-moon{
+      pointer-events:none;
+      border-radius:50%;
+      background:
+        radial-gradient(circle at 60% 65%,rgba(60,40,20,.35) 5%,transparent 9%),
+        radial-gradient(circle at 30% 70%,rgba(60,40,20,.30) 4%,transparent 8%),
+        radial-gradient(circle at 70% 35%,rgba(60,40,20,.25) 4%,transparent 7%),
+        radial-gradient(circle at 35% 35%,#fff8e8 0%,#e8d8b8 60%,#c8b890 100%);
+      box-shadow:0 0 25px rgba(255,240,200,.5),0 0 50px rgba(255,240,200,.25),inset -10px -10px 14px rgba(60,40,20,.45);
+      will-change:transform;
+      animation:villageMoonFloat 12s ease-in-out infinite;
+    }
+    @keyframes villageMoonFloat{
+      0%,100%{transform:translateY(0)}
+      50%{transform:translateY(8px)}
+    }
+
+    /* 떠도는 행성 — orbit wrapper가 회전, 행성은 wrapper 안에서 정적 위치
+       .village-planet/.village-binary-star 자체 시각 속성은 inline style에 있음 (여기엔 공통 애니메이션만) */
+    .village-planet-orbit{
+      border-radius:50%;
+    }
+    @keyframes villagePlanetOrbit{
+      from{transform:rotate(0deg)}
+      to{transform:rotate(360deg)}
+    }
+
+    /* 펄사 — 매우 빠른 점멸 */
+    .village-pulsar{
+      will-change:opacity,transform;
+    }
+    @keyframes villagePulsar{
+      0%,100%{opacity:.2;transform:scale(.6)}
+      50%{opacity:1;transform:scale(1.2)}
+    }
+
+    /* 쌍성 — wrapper 회전으로 두 별이 서로 공전 */
+    .village-binary-wrapper{
+      transform-origin:center;
+    }
+    @keyframes villageBinaryRotate{
+      from{transform:rotate(0deg)}
+      to{transform:rotate(360deg)}
+    }
+
+    /* 우주 정거장 — event-ticks.js fireStation()이 5분마다 새 div spawn
+       매번 4가지 경로 중 랜덤 (좌↔우 수평 + 좌상↔우하/우상↔좌하 대각선)
+       빛점 + 진행 방향 트레일 + 30초 지속 (매우 느린 순항 느낌) */
+    .village-station{
+      position:absolute;
+      width:3px;height:3px;
+      background:#ffffff;
+      border-radius:50%;
+      box-shadow:0 0 6px #ffffff,0 0 12px #a8c8ff;
+      pointer-events:none;
+      will-change:transform,opacity;
+      animation:villageStationCross 30s linear forwards;
+    }
+    .village-station::before{
+      content:'';
+      position:absolute;
+      right:2px;top:1px;
+      width:70px;height:1px;
+      background:linear-gradient(to right,transparent 0%,rgba(168,200,255,.4) 50%,rgba(255,255,255,.9) 100%);
+      transform-origin:right center;
+      transform:rotate(var(--st-angle,0deg));
+    }
+    @keyframes villageStationCross{
+      0%   {transform:translate(var(--st-sx,-80px),var(--st-sy,0)); opacity:0}
+      5%   {opacity:1}
+      95%  {opacity:1}
+      100% {transform:translate(var(--st-ex,100vw),var(--st-ey,0)); opacity:0}
+    }
+
+    /* === 👤 캐릭터 효과 (char_*) === */
+    /* char_halo: working 중인 캐릭터 주변 후광 — ::after 사용 (::before는 기존 그림자) */
+    .workspace[data-char-halo="1"] .ws-agent.working::after{
+      content:'';
+      position:absolute;
+      left:50%;top:50%;
+      width:140%;height:140%;
+      transform:translate(-50%,-50%);
+      border-radius:50%;
+      background:radial-gradient(circle,rgba(255,240,150,.35) 0%,rgba(255,200,100,.15) 30%,transparent 65%);
+      pointer-events:none;
+      animation:charHaloPulse 2s ease-in-out infinite;
+      z-index:-1;
+    }
+    @keyframes charHaloPulse{
+      0%,100%{opacity:.6;transform:translate(-50%,-50%) scale(1)}
+      50%{opacity:1;transform:translate(-50%,-50%) scale(1.1)}
+    }
+
+    /* char_jump: 잠깐 위로 점프 — transform 대신 margin-top 변경으로
+       master 캐릭터의 `transform: translate(-50%, -50%)` 중심 정렬과 충돌 방지 */
+    .ws-agent.char-jumping{
+      animation:charJump .5s ease-out;
+    }
+    @keyframes charJump{
+      0%,100%{margin-top:0}
+      50%{margin-top:-12px}
+    }
+
+    /* char_trail: ghost 잔상 (fade-out) */
+    .char-trail-ghost{
+      position:absolute;
+      pointer-events:none;
+      background:rgba(255,255,255,.18);
+      filter:blur(3px);
+      border-radius:6px;
+      animation:charTrailFade .7s ease-out forwards;
+      z-index:1;
+    }
+    @keyframes charTrailFade{
+      0%{opacity:.5}
+      100%{opacity:0;transform:scale(.85)}
+    }
+
+    /* char_fanfare: 별 12개가 위로 튀어오름 */
+    .char-fanfare-particle{
+      position:absolute;
+      width:6px;height:6px;border-radius:50%;
+      pointer-events:none;
+      box-shadow:0 0 8px currentColor;
+      animation:charFanfare 1.5s cubic-bezier(.2,.6,.3,1) forwards;
+      z-index:25;
+      --fan-dx:0px;--fan-dy:-60px;
+    }
+    @keyframes charFanfare{
+      0%{transform:translate(0,0) scale(.5);opacity:0}
+      15%{transform:translate(0,0) scale(1.4);opacity:1}
+      100%{transform:translate(var(--fan-dx),var(--fan-dy)) scale(.6);opacity:0}
+    }
+
+    /* === 성운 번개 (nebula_lightning) — 성운 안에 가끔 flash === */
+    .village-nebula.lightning{
+      animation:village-nebula-drift var(--drift-dur,60s) ease-in-out 0s infinite,
+                villageNebulaLightning 7s linear infinite;
+    }
+    @keyframes villageNebulaLightning{
+      0%,89%{filter:blur(var(--neb-blur,16px)) brightness(1)}
+      90%,91%{filter:blur(var(--neb-blur,16px)) brightness(2.5)}
+      92%,100%{filter:blur(var(--neb-blur,16px)) brightness(1)}
+    }
+
+    /* === 유성 착지 폭발 (meteor_explode) === */
+    .village-meteor-explode{
+      width:4px;height:4px;border-radius:50%;
+      pointer-events:none;
+      box-shadow:0 0 12px currentColor,0 0 24px currentColor;
+      transform:translate(-50%,-50%) scale(0);
+      animation:villageMeteorExplode .7s ease-out forwards;
+    }
+    @keyframes villageMeteorExplode{
+      0%{transform:translate(-50%,-50%) scale(0);opacity:0}
+      30%{transform:translate(-50%,-50%) scale(2.5);opacity:1}
+      100%{transform:translate(-50%,-50%) scale(6);opacity:0}
+    }
+
+    /* === 헤더 스트릭 배지 (meta_streak) === */
+    .streak-badge{
+      display:inline-flex;align-items:center;
+      padding:3px 9px;
+      background:linear-gradient(135deg,rgba(251,146,60,.2),rgba(239,68,68,.15));
+      border:1px solid rgba(251,146,60,.5);
+      border-radius:12px;
+      font-size:.55rem;font-family:monospace;
+      color:#fb923c;font-weight:700;
+      cursor:default;
+      user-select:none;
+    }
+
+    /* === galaxy_rotation 아이템 — 은하수 wrapper만 180초 1회전 (별/성운은 회전하지 않음) === */
     .village-galaxy-wrapper.rotating{
-      animation:villageGalaxyRotate 60s linear infinite;
+      animation:villageGalaxyRotate 180s linear infinite;
       transform-origin:50% 50%;
       will-change:transform;
     }
@@ -758,119 +932,92 @@
       50%{transform:scale(2.2);opacity:1;filter:brightness(1.8)}
     }
 
-    /* === Legendary: Twin Moons — 좌우 끝에 행성 2개 상시 ===
-       회전(자기 중심) + floating motion (위아래 드리프트) 동시 적용
-       multi radial-gradient로 crater 패턴 표현 → 회전이 시각화됨 */
+    /* === Legendary: Twin Moons — 서로 다른 두 행성 (바위 + 가스) ===
+       좌: 달 크레이터 바위 행성 (48px, 베이지, 느린 자전)
+       우: 가스 행성 stripe (34px, 주황/갈색, 빠른 자전, 대적점)
+       크기·색·패턴·자전 속도 모두 차이 → 시각적으로 확실히 구분 */
     .evt-twinmoon{
       position:absolute;
-      width:46px;height:46px;
       border-radius:50%;
+      overflow:hidden;
       pointer-events:none;
-      mix-blend-mode:screen;
       will-change:transform;
     }
+    /* inner 표면 — width 200%로 두고 translateX로 왼쪽으로 흘려보내면 자전 느낌 */
+    .evt-twinmoon::before{
+      content:'';
+      position:absolute;
+      top:0;left:0;
+      width:200%;height:100%;
+      will-change:transform;
+    }
+    /* 표면 위에 전체 구체 음영 (고정) — 3D 구 느낌 */
+    .evt-twinmoon::after{
+      content:'';
+      position:absolute;
+      inset:0;
+      border-radius:50%;
+      pointer-events:none;
+      background:radial-gradient(circle at 35% 35%,rgba(255,255,255,.3) 0%,transparent 40%),
+                 radial-gradient(circle at 70% 70%,rgba(0,0,0,.55) 0%,transparent 70%);
+    }
+
+    /* === 좌: 바위 행성 (달 크레이터, 48px) === */
     .evt-twinmoon-left{
       left:30px;top:30%;
-      background:
-        radial-gradient(circle at 60% 65%,rgba(60,40,20,.45) 4%,transparent 9%),
-        radial-gradient(circle at 30% 70%,rgba(60,40,20,.35) 3%,transparent 7%),
-        radial-gradient(circle at 70% 35%,rgba(60,40,20,.30) 3%,transparent 6%),
-        radial-gradient(circle at 35% 35%,rgba(255,240,220,.85) 0%,rgba(220,200,180,.4) 60%,transparent 100%);
-      box-shadow:0 0 20px rgba(255,240,220,.4),inset -8px -8px 12px rgba(60,40,20,.5);
-      animation:
-        evtTwinMoonRotate 30s linear infinite,
-        evtTwinMoonFloatLeft 7s ease-in-out infinite;
+      width:48px;height:48px;
+      box-shadow:0 0 24px rgba(255,240,220,.45);
+      mix-blend-mode:screen;
     }
+    .evt-twinmoon-left::before{
+      background:
+        radial-gradient(circle at 12% 35%,rgba(60,40,20,.60) 3.5%,transparent 7%),
+        radial-gradient(circle at 28% 65%,rgba(60,40,20,.50) 2.5%,transparent 6%),
+        radial-gradient(circle at 45% 25%,rgba(60,40,20,.55) 3%,transparent 6%),
+        radial-gradient(circle at 58% 70%,rgba(60,40,20,.45) 2%,transparent 5%),
+        radial-gradient(circle at 75% 40%,rgba(60,40,20,.55) 3%,transparent 6.5%),
+        radial-gradient(circle at 88% 60%,rgba(60,40,20,.40) 2%,transparent 5%),
+        linear-gradient(90deg,
+          #e8d8b8 0%,#f2e4c4 25%,#e0d0ac 50%,#f2e4c4 75%,#e8d8b8 100%);
+      animation:evtMoonSurface 80s linear infinite;
+    }
+
+    /* === 우: 가스 행성 (stripe + 대적점, 34px) === */
     .evt-twinmoon-right{
       right:30px;top:55%;
+      width:34px;height:34px;
+      box-shadow:0 0 22px rgba(255,180,120,.45);
+      mix-blend-mode:screen;
+    }
+    .evt-twinmoon-right::before{
       background:
-        radial-gradient(circle at 30% 60%,rgba(20,30,60,.45) 4%,transparent 9%),
-        radial-gradient(circle at 65% 35%,rgba(20,30,60,.35) 3%,transparent 7%),
-        radial-gradient(circle at 55% 70%,rgba(20,30,60,.30) 3%,transparent 6%),
-        radial-gradient(circle at 35% 35%,rgba(180,200,255,.85) 0%,rgba(140,160,220,.4) 60%,transparent 100%);
-      box-shadow:0 0 20px rgba(180,200,255,.4),inset -8px -8px 12px rgba(20,30,60,.5);
-      animation:
-        evtTwinMoonRotate 35s linear infinite reverse,
-        evtTwinMoonFloatRight 9s ease-in-out infinite;
-    }
-    @keyframes evtTwinMoonRotate{
-      from{transform:rotate(0deg)}
-      to{transform:rotate(360deg)}
-    }
-    /* floating은 wrapper transform 충돌 피하려고 left/top 변경 (transform과 분리) */
-    @keyframes evtTwinMoonFloatLeft{
-      0%,100%{margin-top:0px}
-      50%{margin-top:18px}
-    }
-    @keyframes evtTwinMoonFloatRight{
-      0%,100%{margin-top:0px}
-      50%{margin-top:-15px}
+        /* 대적점 (목성 Great Red Spot 컨셉) */
+        radial-gradient(ellipse 8% 5% at 30% 55%,rgba(200,60,40,.75) 40%,rgba(180,80,50,.45) 70%,transparent 100%),
+        radial-gradient(ellipse 8% 5% at 80% 55%,rgba(200,60,40,.75) 40%,rgba(180,80,50,.45) 70%,transparent 100%),
+        /* 가로 stripe (가스 행성 특유의 대기 띠) */
+        linear-gradient(180deg,
+          #d08848 0%,
+          #e8a868 12%,
+          #b06820 22%,
+          #d89858 35%,
+          #c07830 48%,
+          #e8b070 60%,
+          #a85818 72%,
+          #d89858 85%,
+          #c07830 100%);
+      animation:evtGasSurface 25s linear infinite;
     }
 
-    /* === Legendary: Void Pulse — 빅뱅 (수축 → 폭발 → 정착, 총 4초) ===
-       layer 자체에 transform: scale 변환 → 모든 별이 함께 중앙으로 빨려들어감 → 폭발 → 자리 복귀
-       성운/은하수/twin moon은 fireVoidPulse() JS에서 임시로 opacity:0 처리 (사각형 잔상 방지)
-       각 키프레임에 animation-timing-function 지정 — 구간별 easing이 달라야 자연스러움
-       - 수축(0~35%): 강한 ease-in 가속 (별이 천천히 끌려가다 끝에서 폭발적으로 압축)
-       - 응축→폭발(38~46%): ease-out (한 점에서 explosive)
-       - 반동→정착: 감쇠 */
-    .village-stars-layer.evt-bigbang{
-      animation:evtBigBang 4s linear forwards;
-      transform-origin:50% 50%;
-      will-change:transform,opacity,filter;
+    /* 표면이 왼쪽에서 오른쪽으로 계속 흘러감 → 자전 느낌 */
+    @keyframes evtMoonSurface{
+      from{transform:translateX(0)}
+      to{transform:translateX(-50%)}
     }
-    @keyframes evtBigBang{
-      /* 0~20%: 수축 시작 — 강한 ease-in (천천히 시작 → 가속) */
-      0%   {transform:scale(1)   rotate(0deg);   opacity:1;    filter:brightness(1);    animation-timing-function:cubic-bezier(.85,0,.95,.2)}
-      /* 20%: 빠르게 opacity fade 시작 — 사각형 잔상 인지 차단 */
-      20%  {transform:scale(.4)  rotate(4deg);   opacity:.4;   filter:brightness(.85);  animation-timing-function:cubic-bezier(.6,0,.95,.3)}
-      /* 28%: 완전 어둠 (한 점 응축) */
-      28%  {transform:scale(.05) rotate(10deg);  opacity:0;    filter:brightness(.6);   animation-timing-function:linear}
-      /* 28~48%: 어둠 유지 (1.12s ~ 1.92s) — burst flash + 파티클 폭발 시점 */
-      48%  {transform:scale(.05) rotate(10deg);  opacity:0;    filter:brightness(.6);   animation-timing-function:cubic-bezier(.2,.7,.3,1)}
-      /* 48~60%: 폭발 — opacity 회복 + scale overshoot */
-      60%  {transform:scale(4)   rotate(0deg);   opacity:1;    filter:brightness(1.6);  animation-timing-function:ease-out}
-      /* 반동 → 정착 */
-      75%  {transform:scale(.85) rotate(0deg);   opacity:1;    filter:brightness(1.1);  animation-timing-function:ease-out}
-      88%  {transform:scale(1.05) rotate(0deg);  opacity:1;    filter:brightness(1.05)}
-      100% {transform:scale(1)   rotate(0deg);   opacity:1;    filter:brightness(1)}
+    @keyframes evtGasSurface{
+      from{transform:translateX(0)}
+      to{transform:translateX(-50%)}
     }
 
-    /* burst flash — 폭발 시점 중앙에서 점진적 확산 (작게 시작 → 점차 커짐)
-       이전 버전은 burst 자체와 box-shadow가 너무 커서(반경 200px+) 한 번에 거대한 빛이 등장 →
-       그 빛이 workspace 박스 boundary에 잘려 사각형 모양으로 보였음.
-       해결: 시작 크기/box-shadow 절반 이하 + scale 곡선을 부드럽게 */
-    .evt-voidpulse-burst{
-      position:absolute;
-      width:5px;height:5px;border-radius:50%;
-      transform:translate(-50%,-50%) scale(0);
-      background:radial-gradient(circle,#fff 0%,#fbe7c4 25%,#fbbf24 55%,rgba(167,139,250,.5) 80%,transparent 100%);
-      box-shadow:0 0 20px #fff,0 0 40px #fbbf24,0 0 70px rgba(167,139,250,.35);
-      pointer-events:none;
-      animation:evtVoidPulseBurst 2.2s cubic-bezier(.15,.55,.3,1) forwards;
-    }
-    @keyframes evtVoidPulseBurst{
-      0%   {transform:translate(-50%,-50%) scale(0);    opacity:0}
-      5%   {transform:translate(-50%,-50%) scale(.3);   opacity:.4}
-      12%  {transform:translate(-50%,-50%) scale(1);    opacity:.85}
-      25%  {transform:translate(-50%,-50%) scale(3);    opacity:1}
-      50%  {transform:translate(-50%,-50%) scale(10);   opacity:.7}
-      100% {transform:translate(-50%,-50%) scale(35);   opacity:0}
-    }
-
-    /* 빅뱅 직후 워크스페이스 미세 shake (0.5초) */
-    .workspace.evt-bigbang-shake{
-      animation:evtBigBangShake .5s ease-out;
-    }
-    @keyframes evtBigBangShake{
-      0%,100%{transform:translate(0,0)}
-      15%{transform:translate(-3px,2px)}
-      30%{transform:translate(4px,-2px)}
-      45%{transform:translate(-3px,-2px)}
-      60%{transform:translate(2px,3px)}
-      75%{transform:translate(-2px,1px)}
-      90%{transform:translate(1px,-1px)}
-    }
 
     /* Activity Panel */
     .activity{flex:0 0 auto;border-top:1px solid var(--border);background:var(--surface);max-height:180px;overflow-y:auto;scrollbar-width:thin}

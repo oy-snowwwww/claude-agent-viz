@@ -22,6 +22,27 @@ var pointsData = {
 var _pointsFloatQueue = [];
 
 // 서버에서 포인트 상태 조회 → 로컬 반영 + 배지 렌더
+// 캐릭터 효과 (char_halo 등) workspace data attribute 동기화
+// CSS에서 [data-char-halo="1"] selector로 효과 적용
+function syncCharBuffs() {
+  var ws = document.querySelector('.workspace');
+  if (!ws) return;
+  var b = window.gameBuffs || {};
+  ws.dataset.charHalo = (b.charHalo > 0) ? '1' : '0';
+  ws.dataset.charTrail = (b.charTrail > 0) ? '1' : '0';
+  ws.dataset.charJump = (b.charJump > 0) ? '1' : '0';
+  // 메타 스트릭 배지 업데이트
+  var badge = document.getElementById('streakBadge');
+  if (badge) {
+    if (b.metaStreak > 0 && pointsData.streak > 0) {
+      badge.style.display = '';
+      badge.textContent = '🔥 ' + pointsData.streak;
+    } else {
+      badge.style.display = 'none';
+    }
+  }
+}
+
 function fetchPoints() {
   // 프리뷰 모드면 서버 상태 무시 (main.js가 이미 window.gameBuffs를 가상 인벤토리로 설정함)
   if (window.gamePreviewMode) {
@@ -32,6 +53,7 @@ function fetchPoints() {
     pointsData = data;
     window.gameBuffs = data.buffs || {};
     renderPointsBadge();
+    syncCharBuffs();
     // village/workspace 재렌더 (버프 적용된 상태로)
     if (typeof renderVillage === 'function') renderVillage();
     if (typeof restartAmbient === 'function') restartAmbient();
@@ -55,6 +77,9 @@ function updatePointsFromEvent(ev) {
   if (typeof ev.lifetime === 'number') {
     pointsData.lifetime = Math.floor(ev.lifetime);
   }
+  if (typeof ev.streak === 'number') {
+    pointsData.streak = ev.streak;
+  }
   if (ev.inventory) {
     pointsData.inventory = ev.inventory;
     // 인벤토리 변경 → buffs 재계산
@@ -70,6 +95,7 @@ function updatePointsFromEvent(ev) {
   }
 
   renderPointsBadge();
+  syncCharBuffs();
 
   // 인벤토리 변경이 있으면 village 재렌더 (구매/초기화 반영)
   if (ev.inventory || ev.purchasedItem || ev.fullReset || typeof ev.refunded === 'number') {

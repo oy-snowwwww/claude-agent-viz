@@ -30,9 +30,40 @@ function _ensureLayout(w, h) {
       rainbows: [],      // { xRatio, yRatio, baseSize(5~7), dur, delay }
       nebulae: [],       // { xRatio, yRatio, sizeRatio, driftDur, driftDelay, pulseDur, pulseDelay }
       nebulaColorOrder: NEBULA_COLORS.slice().sort(function() { return Math.random() - 0.5; }),
+      // celestial — 위치는 화면 한 번 결정 후 고정
+      moonCorner: Math.floor(Math.random() * 4),  // 0: 좌상, 1: 우상, 2: 좌하, 3: 우하
+      planets: [],       // { orbitRadiusRatio, orbitDur, startAngle, sizePx, color }
+      pulsars: [],       // { xRatio, yRatio, sizePx, color, blinkDur }
     };
   }
   return _layoutCache;
+}
+
+// 떠도는 행성 색상 팔레트 — 함수 밖 상수로 추출 (hot path 미세 최적화)
+var PLANET_COLORS = ['#a8c8ff', '#ffd0a0', '#c8a8ff', '#a0e8c8'];
+
+function _ensurePlanetsCount(arr, count) {
+  while (arr.length < count) {
+    arr.push({
+      orbitRadiusRatio: 0.30 + Math.random() * 0.15,  // 화면 30~45% 반경
+      orbitDur: 90 + Math.floor(Math.random() * 60),   // 90~150초 1바퀴
+      startAngle: Math.floor(Math.random() * 360),
+      sizePx: 6 + Math.floor(Math.random() * 4),      // 6~9px
+      color: PLANET_COLORS[arr.length % PLANET_COLORS.length],
+    });
+  }
+}
+
+function _ensurePulsarsCount(arr, count) {
+  while (arr.length < count) {
+    arr.push({
+      xRatio: 0.15 + Math.random() * 0.7,
+      yRatio: 0.10 + Math.random() * 0.5,
+      sizePx: 4 + Math.floor(Math.random() * 2),
+      color: ['#ffffff', '#a8c8ff', '#ffd0a0'][Math.floor(Math.random() * 3)],
+      blinkDur: (0.25 + Math.random() * 0.25).toFixed(2),  // 0.25~0.5초 매우 빠른 점멸
+    });
+  }
 }
 
 // === Lazy generators — count가 늘어나면 추가 생성, 줄어들면 앞 N개만 사용해 위치 안정 ===
@@ -233,13 +264,16 @@ function ensureStarsLayer() {
   layer.className = 'village-stars-layer';  // 이벤트 CSS selector용 (event-ticks.js)
   layer.dataset.w = String(w);
   layer.dataset.h = String(h);
-  layer.style.cssText = 'position:absolute;inset:0;pointer-events:none;z-index:14;overflow:hidden';
+  // z-index:5 — 천체(달/행성)가 캐릭터(.ws-agent z:10) 뒤에 깔리도록
+  layer.style.cssText = 'position:absolute;inset:0;pointer-events:none;z-index:5;overflow:hidden';
 
   // === 은하수 (해금 후) ===
   // unlockGalaxy 해금 필요. 밀도/크기는 버프로 배수, 색조는 blueTint/orangeTint 해금
   // galaxy_rotation 활성 시 별도 wrapper에 회전 클래스 — 일반 별/성운은 회전하지 않게 격리
+  // galaxy_arms는 density에 +20%/stack 추가 (나선팔 강조)
   if (_bf('unlockGalaxy') > 0) {
-    var densityMul = 1 + _bf('galaxyDensityMul');
+    var galaxyArmsBoost = 1 + (_bf('galaxyArmsAdd') * 0.20);
+    var densityMul = (1 + _bf('galaxyDensityMul')) * galaxyArmsBoost;
     var sizeMul = 1 + _bf('galaxySizeMul');
     var forceBlue = _bf('galaxyBlueTint') > 0;
     var forceOrange = _bf('galaxyOrangeTint') > 0;
@@ -283,21 +317,24 @@ function ensureStarsLayer() {
     }
   }
 
+  // 공통 layout cache — 성운/일반별/푸른별/주황별/큰별/반짝이는별/천체 모두 공유
+  var layoutStars = _ensureLayout(w, h);
+
   // === Nebula 구름 (해금 후) — 위치는 _layoutCache에 비율로 고정, buff로는 크기/맥동만 동적 ===
   // unlockNebula 해금 필요. 첫 성운 해금 시 1개 등장, nebula_count로 +1씩 추가 (최대 3개)
   // nebula_purple로 보라 성운 1개 추가 (기존 count와 별개로 +1)
   if (_bf('unlockNebula') > 0) {
-    var layout = _ensureLayout(w, h);
     var basicNebulae = 1 + Math.round(_bf('nebulaCountAdd'));  // 1 + stacks
     var purpleNebulae = _bf('nebulaPurpleAdd') > 0 ? 1 : 0;
     var numNebulae = basicNebulae + purpleNebulae;
-    _ensureNebulaeCount(layout.nebulae, numNebulae);  // 부족하면 추가 생성, 있으면 재사용
+    _ensureNebulaeCount(layoutStars.nebulae, numNebulae);  // 부족하면 추가 생성, 있으면 재사용
     var nebulaSizeMul = 1 + _bf('nebulaSizeMul');
     // 화면 단축 축의 35%를 절대 상한 — 작은 화면에서 성운이 뷰포트를 덮지 않도록
     var nebulaMaxSize = Math.round(Math.min(w, h) * 0.35);
     var nebulaPulseAmp = _bf('nebulaPulseAdd');  // 0 = 없음, 최대 0.3 (stack 5)
+    var nebulaLightning = _bf('nebulaLightning') > 0;  // 번개 효과
     for (var n = 0; n < numNebulae; n++) {
-      var spec = layout.nebulae[n];
+      var spec = layoutStars.nebulae[n];
       // 크기는 sizeRatio × 450 × buff (buff 변경 시 같은 위치에서 커지기만)
       var nebulaSize = Math.round(spec.sizeRatio * 450 * nebulaSizeMul);
       if (nebulaSize > nebulaMaxSize) nebulaSize = nebulaMaxSize;
@@ -308,7 +345,7 @@ function ensureStarsLayer() {
       if (purpleNebulae > 0 && n === numNebulae - 1) {
         nebulaColor = 'rgba(168, 85, 247, 0.36)';  // 진한 보라
       } else {
-        nebulaColor = layout.nebulaColorOrder[n % layout.nebulaColorOrder.length];
+        nebulaColor = layoutStars.nebulaColorOrder[n % layoutStars.nebulaColorOrder.length];
       }
       // blur를 크기 비례로 — 고정 22px은 작은 성운을 뭉갬. 5.5% 비율 + 최소 10px 가드
       var nebulaBlurPx = Math.max(10, Math.round(nebulaSize * 0.055));
@@ -322,7 +359,7 @@ function ensureStarsLayer() {
         varStyle += '--pulse-amp:' + nebulaPulseAmp.toFixed(2) + ';';
       }
       var nebula = document.createElement('div');
-      nebula.className = 'village-nebula';
+      nebula.className = 'village-nebula' + (nebulaLightning ? ' lightning' : '');
       nebula.style.cssText = 'position:absolute;' +
         'left:' + nx + 'px;top:' + ny + 'px;' +
         'width:' + nebulaSize + 'px;height:' + nebulaSize + 'px;' +
@@ -334,9 +371,8 @@ function ensureStarsLayer() {
     }
   }
 
-  // === 일반 별 (반짝임) — layout 캐시 기반 ===
+  // === 일반 별 (반짝임) — layout 캐시 기반 (layoutStars는 함수 상단에서 이미 선언) ===
   // 시작 상태: 0개 (완전 검정 우주 — 캐릭터만 존재). star_count 아이템 구매 시 +10씩 (최대 +100)
-  var layoutStars = _ensureLayout(w, h);
   var baseStars = 0;
   var numStars = baseStars + Math.round(_bf('starCountAdd'));
   var twinkleMul = 1 / (1 + _bf('starTwinkleMul'));  // 속도 +10% → duration × 1/1.1
@@ -469,6 +505,107 @@ function ensureStarsLayer() {
     }
   }
 
+  // === 🌙 천체 (Celestial) — 달, 행성, 펄사, 쌍성, 우주정거장 ===
+  // 달 — 화면 한 코너에 큰 원형 div + radial-gradient + crater
+  if (_bf('celestialMoon') > 0) {
+    // 달 크기는 화면 단축 축의 13% — 작은 화면에서 최소 50px, 큰 화면에서도 110px 이하로 제한
+    // 우주 전체 대비 비율 유지 + 달이 너무 거대하거나 사라지는 것 방지
+    var moonSize = Math.round(Math.min(w, h) * 0.13);
+    if (moonSize < 50) moonSize = 50;
+    if (moonSize > 110) moonSize = 110;
+    var moon = document.createElement('div');
+    moon.className = 'village-moon';
+    var corners = [
+      { left: '5%', top: '5%' },
+      { right: '5%', top: '5%' },
+      { left: '5%', bottom: '8%' },
+      { right: '5%', bottom: '8%' },
+    ];
+    var corner = corners[layoutStars.moonCorner];
+    var posCSS = '';
+    Object.keys(corner).forEach(function(k) { posCSS += k + ':' + corner[k] + ';'; });
+    moon.style.cssText = 'position:absolute;' + posCSS +
+      'width:' + moonSize + 'px;height:' + moonSize + 'px;';
+    layer.appendChild(moon);
+  }
+
+  // 떠도는 행성 — 화면 중앙 기준 큰 궤도로 매우 천천히 공전
+  var numPlanets = Math.round(_bf('celestialPlanetAdd'));
+  if (numPlanets > 0) {
+    _ensurePlanetsCount(layoutStars.planets, numPlanets);
+    for (var pi = 0; pi < numPlanets; pi++) {
+      var pSp = layoutStars.planets[pi];
+      var orbitR = Math.round(Math.min(w, h) * pSp.orbitRadiusRatio);
+      var orbit = document.createElement('div');
+      orbit.className = 'village-planet-orbit';
+      orbit.style.cssText = 'position:absolute;left:50%;top:50%;' +
+        'width:' + (orbitR * 2) + 'px;height:' + (orbitR * 2) + 'px;' +
+        'margin-left:' + (-orbitR) + 'px;margin-top:' + (-orbitR) + 'px;' +
+        'animation:villagePlanetOrbit ' + pSp.orbitDur + 's linear infinite;' +
+        'transform:rotate(' + pSp.startAngle + 'deg);';
+      var planet = document.createElement('div');
+      planet.className = 'village-planet';
+      planet.style.cssText = 'position:absolute;left:50%;top:0;' +
+        'width:' + pSp.sizePx + 'px;height:' + pSp.sizePx + 'px;' +
+        'margin-left:' + (-pSp.sizePx / 2) + 'px;' +
+        'background:radial-gradient(circle at 35% 35%, ' + pSp.color + ' 0%, rgba(50,50,80,.4) 70%, transparent 100%);' +
+        'border-radius:50%;box-shadow:0 0 6px ' + pSp.color + ';';
+      orbit.appendChild(planet);
+      layer.appendChild(orbit);
+    }
+  }
+
+  // 펄사 — 매우 빠른 점멸 별
+  var numPulsars = Math.round(_bf('celestialPulsarAdd'));
+  if (numPulsars > 0) {
+    _ensurePulsarsCount(layoutStars.pulsars, numPulsars);
+    for (var psi = 0; psi < numPulsars; psi++) {
+      var pulSp = layoutStars.pulsars[psi];
+      var pulsar = document.createElement('div');
+      pulsar.className = 'village-pulsar';
+      pulsar.style.cssText = 'position:absolute;' +
+        'left:' + Math.round(pulSp.xRatio * w) + 'px;' +
+        'top:' + Math.round(pulSp.yRatio * h) + 'px;' +
+        'width:' + pulSp.sizePx + 'px;height:' + pulSp.sizePx + 'px;' +
+        'background:' + pulSp.color + ';border-radius:50%;' +
+        'box-shadow:0 0 8px ' + pulSp.color + ',0 0 16px ' + pulSp.color + ';' +
+        'animation:villagePulsar ' + pulSp.blinkDur + 's ease-in-out infinite;';
+      layer.appendChild(pulsar);
+    }
+  }
+
+  // 쌍성 — 두 큰 별이 wrapper 안에서 서로 회전
+  // moonCorner와 반대쪽 영역에 배치해서 달/쌍성이 겹치지 않게
+  if (_bf('celestialBinary') > 0) {
+    var binW = document.createElement('div');
+    binW.className = 'village-binary-wrapper';
+    // moonCorner 0(좌상) / 1(우상) / 2(좌하) / 3(우하) — 반대 코너 영역에 쌍성
+    var BIN_POS = [
+      { xr: 0.70, yr: 0.70 },  // moon 좌상 → 쌍성 우하
+      { xr: 0.30, yr: 0.70 },  // moon 우상 → 쌍성 좌하
+      { xr: 0.70, yr: 0.25 },  // moon 좌하 → 쌍성 우상
+      { xr: 0.30, yr: 0.25 },  // moon 우하 → 쌍성 좌상
+    ];
+    var bpos = BIN_POS[layoutStars.moonCorner];
+    var binCx = Math.round(w * bpos.xr);
+    var binCy = Math.round(h * bpos.yr);
+    binW.style.cssText = 'position:absolute;left:' + binCx + 'px;top:' + binCy + 'px;' +
+      'width:0;height:0;animation:villageBinaryRotate 18s linear infinite;';
+    var bA = document.createElement('div');
+    bA.className = 'village-binary-star';
+    bA.style.cssText = 'position:absolute;left:-22px;top:-4px;width:8px;height:8px;' +
+      'background:#a8c8ff;border-radius:50%;box-shadow:0 0 10px #a8c8ff,0 0 20px #a8c8ff;';
+    var bB = document.createElement('div');
+    bB.className = 'village-binary-star';
+    bB.style.cssText = 'position:absolute;left:14px;top:-4px;width:8px;height:8px;' +
+      'background:#ffd0a0;border-radius:50%;box-shadow:0 0 10px #ffd0a0,0 0 20px #ffd0a0;';
+    binW.appendChild(bA);
+    binW.appendChild(bB);
+    layer.appendChild(binW);
+  }
+
+  // 우주 정거장은 정적 div 아님 — event-ticks.js에서 5분마다 다양한 각도로 spawn (spawnStation)
+
   ws.appendChild(layer);
 }
 
@@ -585,7 +722,22 @@ function spawnShootingStar(opts) {
   star.style.animation = anim;
 
   layer.appendChild(star);
-  setTimeout(function() { star.remove(); }, Math.round(dur * 1000) + 200);
+  // meteor_explode: 별똥별이 사라지는 시점 직전에 작은 폭발 파티클
+  var doExplode = _bf('meteorExplode') > 0 && !opts.noExplode;
+  setTimeout(function() {
+    if (doExplode && layer.parentNode) {
+      // 별똥별의 종착점 좌표 계산 (시작 + dx/dy)
+      var ex = sx + dx;
+      var ey = sy + dy;
+      var explode = document.createElement('div');
+      explode.className = 'village-meteor-explode';
+      explode.style.cssText = 'position:absolute;left:' + Math.round(ex) + 'px;top:' + Math.round(ey) + 'px;' +
+        'background:' + color + ';';
+      layer.appendChild(explode);
+      setTimeout(function() { explode.remove(); }, 700);
+    }
+    star.remove();
+  }, Math.round(dur * 1000) + 200);
 }
 
 // burst 보조 setTimeout 핸들 (stopShootingStars에서 일괄 정리)

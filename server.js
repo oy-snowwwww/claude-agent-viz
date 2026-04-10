@@ -713,6 +713,37 @@ var POINTS_FILE = path.join(__dirname, 'points.json');
 // lifetime에는 포함 안 함 (받은 것이지 번 것이 아니므로 누적 획득에서 제외)
 var STARTER_BONUS = 200;
 
+// 삭제된 레거시 아이템 가격표 — 기존 사용자가 보유 중이면 환불/계산 시 fallback으로 사용
+// GAME_ITEMS(constants.js)에서 제거된 아이템이라도 이 표에 있으면 환불 가능
+// 가격은 Phase 2의 ×2 적용 기준. 아이템이 점진적으로 삭제되면 여기에 추가.
+var DEPRECATED_ITEMS = {
+  legendary_aurora:     { price: 4000 },
+  legendary_voidpulse:  { price: 5600 },
+  event_blackhole:      { price: 1400 },
+  event_meteorrush:     { price: 3000 },
+  event_fourway:        { price: 1600 },
+  event_fullshower:     { price: 2000 },
+  event_warp:           { price: 2800 },
+  event_gravity_wave:   { price: 2400 },
+  event_warp_drive:     { price: 1400 },
+  meteor_color:         { price: 50 },
+  unlock_ambient:       { price: 200 },
+  ambient_rate:         { price: 80 },
+  ambient_size:         { price: 60 },
+  ambient_height:       { price: 60 },
+  ambient_colors:       { price: 120 },
+  event_ambientburst:   { price: 700 },
+};
+
+// 아이템 가격 조회 — 현행 ITEMS 우선, 없으면 DEPRECATED_ITEMS fallback
+function itemPrice(id) {
+  var def = GAME_ITEMS[id];
+  if (def) return def.price;
+  var dep = DEPRECATED_ITEMS[id];
+  if (dep) return dep.price;
+  return 0;
+}
+
 function loadPoints() {
   try {
     if (fs.existsSync(POINTS_FILE)) {
@@ -722,6 +753,8 @@ function loadPoints() {
       if (typeof data.total !== 'number') data.total = 0;
       if (typeof data.lifetime !== 'number') data.lifetime = 0;
       if (!data.inventory || typeof data.inventory !== 'object') data.inventory = {};
+      if (typeof data.streak !== 'number') data.streak = 0;
+      if (typeof data.lastStreakDay !== 'string') data.lastStreakDay = null;
       return data;
     }
   } catch(e) {
@@ -734,6 +767,8 @@ function loadPoints() {
     total: STARTER_BONUS,
     lifetime: 0,
     inventory: {},
+    streak: 0,
+    lastStreakDay: null,
     createdAt: new Date().toISOString(),
   };
 }
@@ -756,15 +791,47 @@ function recordPoints(event) {
   pointsData.total = (pointsData.total || 0) + delta;
   pointsData.lifetime = (pointsData.lifetime || 0) + delta;
   pointsData.lastEarnedAt = new Date().toISOString();
+  // 스트릭 추적 — meta_streak 아이템 보유와 무관하게 항상 카운트 (UI 표시만 buff에 따라)
+  updateStreak();
   savePoints();
   broadcastEvent({
     event: 'points_updated',
     total: pointsData.total,
     lifetime: pointsData.lifetime,
     inventory: pointsData.inventory,
+    streak: pointsData.streak || 0,
     delta: delta,
     reason: event,
   });
+}
+
+// 일자 키 (로컬 기준 YYYY-MM-DD)
+function _ymd(d) {
+  var y = d.getFullYear();
+  var m = String(d.getMonth() + 1).padStart(2, '0');
+  var dd = String(d.getDate()).padStart(2, '0');
+  return y + '-' + m + '-' + dd;
+}
+
+// 스트릭 갱신 로직
+// - 오늘 날짜와 lastStreakDay 비교
+// - 같은 날 = 변화 없음
+// - 어제 = streak + 1
+// - 그보다 이전 = streak 1로 reset (오늘이 새 시작일)
+function updateStreak() {
+  var today = _ymd(new Date());
+  var last = pointsData.lastStreakDay;
+  if (last === today) return;
+  if (!last) {
+    pointsData.streak = 1;
+  } else {
+    var lastD = new Date(last);
+    var diffMs = new Date(today) - lastD;
+    var diffDays = Math.floor(diffMs / (24 * 3600 * 1000));
+    if (diffDays === 1) pointsData.streak = (pointsData.streak || 0) + 1;
+    else pointsData.streak = 1;
+  }
+  pointsData.lastStreakDay = today;
 }
 
 // 구매 처리 — 포인트 차감 + 인벤토리 증가
@@ -786,6 +853,7 @@ function purchaseItem(itemId) {
     total: pointsData.total,
     lifetime: pointsData.lifetime,
     inventory: pointsData.inventory,
+    streak: pointsData.streak || 0,
     purchasedItem: itemId,
   });
   return { ok: true, total: pointsData.total, inventory: pointsData.inventory };
@@ -796,8 +864,8 @@ function resetPoints(mode) {
   if (mode === 'refund') {
     var refundAmount = 0;
     Object.keys(pointsData.inventory || {}).forEach(function(id) {
-      var def = GAME_ITEMS[id];
-      if (def) refundAmount += def.price * (pointsData.inventory[id] || 0);
+      // DEPRECATED_ITEMS 포함 — 삭제된 레거시 아이템도 과거 가격으로 정당하게 환불
+      refundAmount += itemPrice(id) * (pointsData.inventory[id] || 0);
     });
     pointsData.total = (pointsData.total || 0) + refundAmount;
     pointsData.inventory = {};
@@ -806,6 +874,7 @@ function resetPoints(mode) {
       event: 'points_updated',
       total: pointsData.total,
       lifetime: pointsData.lifetime,
+      streak: pointsData.streak || 0,
       inventory: {},
       refunded: refundAmount,
     });
@@ -813,12 +882,14 @@ function resetPoints(mode) {
   }
   if (mode === 'full') {
     // 완전 초기화 = 신규 사용자 시뮬레이션 → 환영 보너스 STARTER_BONUS도 함께 지급
-    // (loadPoints fallback과 동일한 동작 보장 — lifetime은 0)
+    // (loadPoints fallback과 동일한 동작 보장 — lifetime/streak/lastStreakDay 모두 0/null)
     pointsData = {
       version: 1,
       total: STARTER_BONUS,
       lifetime: 0,
       inventory: {},
+      streak: 0,
+      lastStreakDay: null,
       createdAt: new Date().toISOString(),
     };
     savePoints();
@@ -826,6 +897,7 @@ function resetPoints(mode) {
       event: 'points_updated',
       total: STARTER_BONUS,
       lifetime: 0,
+      streak: 0,
       inventory: {},
       fullReset: true,
     });
@@ -1429,6 +1501,8 @@ const server = http.createServer(function(req, res) {
       lifetime: Math.floor(pointsData.lifetime || 0),
       inventory: pointsData.inventory || {},
       buffs: computeBuffs(pointsData.inventory || {}),
+      streak: pointsData.streak || 0,
+      lastStreakDay: pointsData.lastStreakDay || null,
       createdAt: pointsData.createdAt || null,
       lastEarnedAt: pointsData.lastEarnedAt || null,
     }));

@@ -283,10 +283,15 @@ function walkLegs(pix) {
 function startWalkInterval() {
   if (_walkInterval) return;
   _walkInterval = setInterval(function() {
+    var b = (typeof window !== 'undefined' && window.gameBuffs) || {};
+    var hasJump = (b.charJump || 0) > 0;
+    var hasTrail = (b.charTrail || 0) > 0;
     // working 캐릭터: 항상 걷기
     document.querySelectorAll('.ws-agent.working .pix-lg').forEach(function(pix) {
       if (Math.random() > 0.6) return;
       walkLegs(pix);
+      if (hasJump && Math.random() < 0.05) doJump(pix.parentElement);
+      if (hasTrail && Math.random() < 0.4) addTrail(pix.parentElement);
     });
     // idle + roam 캐릭터: 배회 중일 때만 걷기
     document.querySelectorAll('.ws-agent.idle .pix-lg').forEach(function(pix) {
@@ -296,9 +301,39 @@ function startWalkInterval() {
       if (c && c.beh === 'roam') {
         if (Math.random() > 0.5) return;
         walkLegs(pix);
+        if (hasJump && Math.random() < 0.04) doJump(agent);
+        if (hasTrail && Math.random() < 0.25) addTrail(agent);
       }
     });
   }, 350);
+}
+
+// char_jump 아이템 효과 — 캐릭터에 `.char-jumping` 클래스를 잠깐 부착
+// CSS의 @keyframes charJump가 margin-top을 0 ↔ -12px로 변형 (transform 대신 margin 사용 — master의 중심정렬 translate와 충돌 방지)
+// 중복 호출 방지: 이미 jumping 상태면 skip
+// 참고: char_halo는 workspace data attribute 기반 CSS selector만으로 동작. char_jump/trail은 여기서 JS 주기적 트리거.
+function doJump(agent) {
+  if (!agent || agent.classList.contains('char-jumping')) return;
+  agent.classList.add('char-jumping');
+  setTimeout(function() { agent.classList.remove('char-jumping'); }, 500);
+}
+
+// char_trail 아이템 효과 — 캐릭터 현재 위치에 ghost div 생성 후 0.7초 fade-out
+// agent bounding rect → workspace 좌표계 변환 → 복사 div 생성
+// DOM 상한 가드: ghost가 10개 초과면 skip (700ms remove라 정상 시 ~4개 동시 존재)
+function addTrail(agent) {
+  if (!agent) return;
+  var ws = document.getElementById('workspace');
+  if (!ws) return;
+  if (ws.querySelectorAll('.char-trail-ghost').length >= 10) return;
+  var r = agent.getBoundingClientRect();
+  var wr = ws.getBoundingClientRect();
+  var t = document.createElement('div');
+  t.className = 'char-trail-ghost';
+  t.style.cssText = 'position:absolute;left:' + (r.left - wr.left) + 'px;top:' + (r.top - wr.top) + 'px;' +
+    'width:' + r.width + 'px;height:' + r.height + 'px;';
+  ws.appendChild(t);
+  setTimeout(function() { t.remove(); }, 700);
 }
 
 function stopWalkInterval() {
