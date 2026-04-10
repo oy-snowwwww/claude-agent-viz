@@ -26,6 +26,16 @@ const GAME_ITEMS = GAME_CONSTANTS.ITEMS || {};
 const POINTS_RULES = GAME_CONSTANTS.POINTS_RULES || {};
 const computeBuffs = GAME_CONSTANTS.computeBuffs || function() { return {}; };
 
+// cwd 검증: 실존 디렉토리이고, 상위 탈출(../) 없는지 확인
+function isValidCwd(cwd) {
+  if (!cwd || typeof cwd !== 'string') return false;
+  var resolved = path.resolve(cwd);
+  // .. 포함 여부 (path traversal 방지)
+  if (resolved !== cwd && cwd.indexOf('..') !== -1) return false;
+  // 실존 디렉토리인지 확인
+  try { return fs.statSync(resolved).isDirectory(); } catch(e) { return false; }
+}
+
 // Path Traversal 방어: 대상 경로가 허용 디렉토리 하위인지 검증
 function safePath(baseDir, userInput) {
   var resolved = path.resolve(baseDir, userInput);
@@ -1517,6 +1527,7 @@ const server = http.createServer(function(req, res) {
     var params = {};
     qs.split('&').forEach(function(p) { var kv = p.split('='); if (kv[0]) params[decodeURIComponent(kv[0])] = decodeURIComponent(kv[1] || ''); });
     var targetCwd = params.cwd || process.cwd();
+    if (!isValidCwd(targetCwd)) { res.writeHead(400, {'Content-Type': 'application/json'}); res.end(JSON.stringify({error: 'invalid cwd'})); return; }
     var projectPath = path.join(targetCwd, 'CLAUDE.md');
 
     var master = { global: '', project: '', projectPath: '', globalPath: GLOBAL_CLAUDE_MD, cwd: targetCwd };
@@ -1543,8 +1554,9 @@ const server = http.createServer(function(req, res) {
         if (type === 'global') {
           filepath = GLOBAL_CLAUDE_MD;
         } else {
-          // cwd 기반 프로젝트 CLAUDE.md
+          // cwd 기반 프로젝트 CLAUDE.md (Path Traversal 방어)
           var targetCwd = data.cwd || process.cwd();
+          if (!isValidCwd(targetCwd)) { res.writeHead(400, {'Content-Type': 'application/json'}); res.end(JSON.stringify({error: 'invalid cwd'})); return; }
           filepath = path.join(targetCwd, 'CLAUDE.md');
         }
         fs.writeFileSync(filepath, data.content, 'utf8');
@@ -1645,6 +1657,7 @@ const server = http.createServer(function(req, res) {
     var enabled = []; // 빈 배열 = 제한 없음 (전부 사용)
     var hasRestriction = false;
     if (cwd) {
+      if (!isValidCwd(cwd)) { res.writeHead(400, {'Content-Type': 'application/json'}); res.end(JSON.stringify({error: 'invalid cwd'})); return; }
       var claudeMd = path.join(cwd, 'CLAUDE.md');
       if (fs.existsSync(claudeMd)) {
         var content = fs.readFileSync(claudeMd, 'utf8');
@@ -1672,7 +1685,7 @@ const server = http.createServer(function(req, res) {
         var cwd = data.cwd || '';
         var enabled = data.enabled || [];
         var hasRestriction = data.hasRestriction !== undefined ? data.hasRestriction : enabled.length > 0;
-        if (!cwd) { res.writeHead(400); res.end(JSON.stringify({error: 'cwd required'})); return; }
+        if (!cwd || !isValidCwd(cwd)) { res.writeHead(400, {'Content-Type': 'application/json'}); res.end(JSON.stringify({error: 'invalid cwd'})); return; }
 
         var claudeMd = path.join(cwd, 'CLAUDE.md');
         var content = '';
