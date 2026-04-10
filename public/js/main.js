@@ -38,6 +38,7 @@ function applyTheme(t) {
 function cycleTheme() {
   applyTheme(currentTheme === 'dark' ? 'light' : 'dark');
   renderAll();
+  if (typeof renderVillage === 'function') renderVillage();
 }
 
 applyTheme(currentTheme);
@@ -130,8 +131,8 @@ document.addEventListener('keydown', function(e) {
   if (histOv && histOv.classList.contains('show')) { toggleHistory(); return; }
   var helpOv = document.getElementById('helpOverlay');
   if (helpOv && helpOv.classList.contains('show')) { toggleHelp(); return; }
-  var modalOv = document.getElementById('modalOverlay');
-  if (modalOv && modalOv.style.display !== 'none') { closeModal(); return; }
+  var modalOv = document.getElementById('overlay');
+  if (modalOv && modalOv.classList.contains('show')) { closeModal(); return; }
 });
 
 // === Page Visibility: 탭 비활성 시 애니메이션 일시정지 ===
@@ -149,6 +150,9 @@ document.addEventListener('visibilitychange', function() {
     startWalkInterval();
     if (typeof startShootingStars === 'function') startShootingStars();
     if (typeof startEventTicks === 'function') startEventTicks();
+    // thinking 중이었으면 타이머 재개
+    var cs = currentSession && sessions[currentSession];
+    if (cs && cs._thinkStart && typeof startThinkTimer === 'function') startThinkTimer();
     renderAll();
   }
 });

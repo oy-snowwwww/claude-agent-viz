@@ -28,6 +28,16 @@ https://github.com/user-attachments/assets/30cf8a5c-3e5a-4264-904e-31a7310a8cb2
 - **민감정보 자동 마스킹** — `sk-*`, `ghp_*`, `AKIA*`, JWT, Bearer 토큰 등 자동 치환
 - **브라우저 알림** — 탭 비활성 시 에이전트 완료, 응답 완료 알림 (on/off 토글)
 - **일일 통계** — 오늘의 질문 수, 에이전트별/도구별 사용 횟수, 주간/누적 통계, 🔄 전체 초기화 지원
+- **🌱 활동 잔디** — GitHub contribution graph 스타일. 년도별 1월~12월 전체 표시 + 년도 탭 전환. 데이터 무제한 보관
+- **😄 캐릭터 감정 이모지** — working(💦🔥⚡), done(✨🎉❤️), ESC 중단(❗😵) 시 캐릭터 위에 팝업
+- **💬 캐릭터 간 대화** — 2명 이상 동시 working 시 랜덤 대화 교환 ("도와줄까?" → "괜찮아 거의 끝나")
+- **⏱️ 세션 타이머** — 헤더에 현재 세션 경과 시간 표시
+- **⌨️ ESC 단축키** — 열려있는 모달을 ESC 키로 닫기
+
+<img src="./screenshots/history.png" alt="세션 히스토리" width="480">
+
+<img src="./screenshots/grass.png" alt="활동 잔디" width="700">
+
 - **마을(우주) 모드** — 우주 배경 + 별/은하수/nebula/별똥별/별자리. 워크스페이스 폭에 따라 캐릭터 크기 자동 조정 (Tier 1/2/3). 항상 활성 (이전 환경 효과 토글은 제거됨)
 - **💭 Thinking 말풍선** — Master가 생각 중일 때 구름 모양 말풍선 + `···` 바운스 애니메이션 (일반 작업 말풍선과 시각적 구분)
 - **🖱️ 캐릭터 드래그 재배치** — 워크스페이스에서 캐릭터를 마우스/터치로 자유롭게 이동 (grab 커서, 글로우 효과, 안전 경계 clamp)
@@ -197,6 +207,7 @@ claude-agents off      # 세션 시작 시 자동 실행 OFF
 |------|------|
 | ⭐ 포인트 배지 | 현재 잔고 + 누적 표시. 클릭 시 🛒 상점 모달 열기 |
 | 🏆 | 포인트 히스토리 & 성취 모달 (일별 추이 + 성취 배지) |
+| 🌱 | 활동 잔디 모달 (GitHub 스타일, 년도별) |
 | 🔔 | 브라우저 알림 on/off |
 | 🕐 | 세션 히스토리 |
 | ? | 도움말 |
@@ -365,6 +376,7 @@ CLAUDE.md
 | **🛒 상점 모달** | `constants.js` `ITEMS` 카탈로그 + `pointsData.inventory` | 14 카테고리 탭 · `POST /api/points/purchase`로 구매 (화이트리스트/Origin/1KB DoS 가드) · `POST /api/points/reset` `mode:refund`로 환불 |
 | **🏆 성취 모달** | `GET /api/points/achievements` → 성취 정의 + 달성 상태 | 10개 카테고리 × 51개 성취, 이모지 탭 전환, 달성 시 포인트 보상 |
 | **📐 계보선** | 실시간 이벤트 (Master working + 에이전트 working) | `updateLineage()` — Master→working 에이전트 SVG 대시선, 15fps 업데이트 |
+| **🌱 활동 잔디** | `GET /api/stats/activity` → `agent-stats.json` history | 년도별 1월~12월 격자, 데이터 무제한 보관 |
 | **우주 버프 반영** | `computeBuffs(inventory)` → `window.gameBuffs` → `village.js` / `workspace.js` / `event-ticks.js` | 구매 즉시 `renderVillage()` 재호출로 레이어 재생성 + Aurora 상시 오버레이 재부착 |
 
 ### 파일을 만들면 → 대시보드에 자동 반영

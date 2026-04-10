@@ -12,6 +12,15 @@
 var _eventTickInterval = null;
 var _eventLastFired = {};  // { eventKey: timestamp } — 마지막 발동 시각
 var _eventPartTimers = []; // 이벤트 내 보조 setTimeout 핸들 (stop 시 일괄 정리)
+// 자동 정리 push — 실행 후 배열에서 제거 (메모리 누적 방지)
+function _pushTimer(fn, ms) {
+  var id = setTimeout(function() {
+    fn();
+    var idx = _eventPartTimers.indexOf(id);
+    if (idx >= 0) _eventPartTimers.splice(idx, 1);
+  }, ms);
+  _eventPartTimers.push(id);
+}
 
 // 이벤트 스펙: [buffKey, intervalMs, fireFn]
 // fireFn은 layer(DOM)와 시간 정보를 받아서 발동

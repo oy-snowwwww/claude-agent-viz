@@ -26,6 +26,31 @@ const GAME_ITEMS = GAME_CONSTANTS.ITEMS || {};
 const POINTS_RULES = GAME_CONSTANTS.POINTS_RULES || {};
 const computeBuffs = GAME_CONSTANTS.computeBuffs || function() { return {}; };
 
+// 공통 보안 가드: CSRF(Origin) + body 크기 제한
+// skipOrigin: true면 Origin 체크 생략 (훅 엔드포인트용)
+var MAX_BODY_DEFAULT = 50 * 1024; // 50KB
+function guardMutate(req, res, opts) {
+  opts = opts || {};
+  if (!opts.skipOrigin && !isAllowedOrigin(req)) {
+    res.writeHead(403, {'Content-Type': 'application/json'});
+    res.end(JSON.stringify({ error: 'forbidden origin' }));
+    return false;
+  }
+  return true;
+}
+function readBodySafe(req, maxBytes, cb) {
+  var chunks = []; var len = 0; var aborted = false;
+  maxBytes = maxBytes || MAX_BODY_DEFAULT;
+  req.on('data', function(c) {
+    if (aborted) return;
+    len += c.length;
+    if (len > maxBytes) { aborted = true; req.destroy(); return; }
+    chunks.push(c);
+  });
+  req.on('end', function() { if (!aborted) cb(null, Buffer.concat(chunks).toString()); });
+  req.on('error', function() { if (!aborted) cb(new Error('read error')); });
+}
+
 // cwd 검증: 실존 디렉토리이고, 상위 탈출(../) 없는지 확인
 function isValidCwd(cwd) {
   if (!cwd || typeof cwd !== 'string') return false;
@@ -789,6 +814,8 @@ function loadPoints() {
       if (typeof data.agentCount !== 'number') data.agentCount = 0;
       if (typeof data.earlyCount !== 'number') data.earlyCount = 0;
       if (typeof data.dropCount !== 'number') data.dropCount = 0;
+      // 레벨 복원 — 서버 재시작 시 레벨업 토스트 오발 방지
+      data._lastLevel = calcLevel(data.lifetime || 0);
       return data;
     }
   } catch(e) {
@@ -1195,6 +1222,7 @@ function resetPoints(mode) {
       earlyCount: 0,
       dropCount: 0,
       lastDailyBonus: null,
+      _lastLevel: 1,
       createdAt: new Date().toISOString(),
     };
     savePoints();
@@ -1375,6 +1403,15 @@ const server = http.createServer(function(req, res) {
               parsed.session_name = sessions[existingSession].name;
             }
             if (!sessions[targetPid]) {
+              // 세션 상한 (50개) — 초과 시 가장 오래된 비활성 세션 제거
+              var MAX_SESSIONS = 50;
+              var sKeys = Object.keys(sessions);
+              if (sKeys.length >= MAX_SESSIONS) {
+                var oldest = sKeys.filter(function(k) { return !sessions[k].alive; }).sort(function(a, b) {
+                  return (sessions[a].lastActivity || '').localeCompare(sessions[b].lastActivity || '');
+                })[0];
+                if (oldest) { delete sessions[oldest]; delete sessionTrackers[oldest]; }
+              }
               sessions[targetPid] = {
                 pid: targetPid,
                 name: session.name || 'Session ' + targetPid,
@@ -1500,12 +1537,12 @@ const server = http.createServer(function(req, res) {
 
   // API: 세션 이름 변경
   if (url.startsWith('/api/sessions/') && req.method === 'PUT') {
+    if (!guardMutate(req, res)) return;
     var pid = url.split('/api/sessions/')[1];
-    var bodyChunks = [];
-    req.on('data', function(c) { bodyChunks.push(c); });
-    req.on('end', function() {
+    readBodySafe(req, 1024, function(err, body) {
+      if (err) { res.writeHead(400); res.end('{}'); return; }
       try {
-        var data = JSON.parse(Buffer.concat(bodyChunks).toString());
+        var data = JSON.parse(body);
         if (sessions[pid]) {
           sessions[pid].name = data.name || sessions[pid].name;
           broadcastEvent({ event: 'session_renamed', session_pid: pid, session_name: sessions[pid].name });
@@ -1547,12 +1584,12 @@ const server = http.createServer(function(req, res) {
 
   // API: Master CLAUDE.md 저장 (PUT /api/master/:type)
   if (url.startsWith('/api/master/') && req.method === 'PUT') {
+    if (!guardMutate(req, res)) return;
     var type = url.split('/api/master/')[1];
-    var bodyChunks = [];
-    req.on('data', function(c) { bodyChunks.push(c); });
-    req.on('end', function() {
+    readBodySafe(req, 100 * 1024, function(err, body) {
+      if (err) { res.writeHead(400); res.end('{}'); return; }
       try {
-        var data = JSON.parse(Buffer.concat(bodyChunks).toString());
+        var data = JSON.parse(body);
         var filepath;
         if (type === 'global') {
           filepath = GLOBAL_CLAUDE_MD;
@@ -1582,12 +1619,12 @@ const server = http.createServer(function(req, res) {
 
   // API: 에이전트 저장 (PUT /api/agents/:id)
   if (url.startsWith('/api/agents/') && req.method === 'PUT') {
+    if (!guardMutate(req, res)) return;
     var id = url.split('/api/agents/')[1];
-    var bodyChunks = [];
-    req.on('data', function(c) { bodyChunks.push(c); });
-    req.on('end', function() {
+    readBodySafe(req, 50 * 1024, function(err, body) {
+      if (err) { res.writeHead(400); res.end('{}'); return; }
       try {
-        var data = JSON.parse(Buffer.concat(bodyChunks).toString());
+        var data = JSON.parse(body);
         var meta = {
           name: data.name || id,
           description: data.description || '',
@@ -1610,11 +1647,11 @@ const server = http.createServer(function(req, res) {
 
   // API: 에이전트 생성 (POST /api/agents)
   if (url === '/api/agents' && req.method === 'POST') {
-    var bodyChunks = [];
-    req.on('data', function(c) { bodyChunks.push(c); });
-    req.on('end', function() {
+    if (!guardMutate(req, res)) return;
+    readBodySafe(req, 50 * 1024, function(err, body) {
+      if (err) { res.writeHead(400); res.end('{}'); return; }
       try {
-        var data = JSON.parse(Buffer.concat(bodyChunks).toString());
+        var data = JSON.parse(body);
         var id = data.id || data.name || 'new-agent';
         id = id.toLowerCase().replace(/[^a-z0-9-]/g, '-');
         var meta = {
@@ -1624,7 +1661,9 @@ const server = http.createServer(function(req, res) {
           model: data.model || 'sonnet'
         };
         var content = buildFrontmatter(meta, data.body || '');
-        fs.writeFileSync(path.join(AGENTS_DIR, id + '.md'), content, 'utf8');
+        var agentPath = safePath(AGENTS_DIR, id + '.md');
+        if (!agentPath) { res.writeHead(400); res.end(JSON.stringify({error: 'invalid id'})); return; }
+        fs.writeFileSync(agentPath, content, 'utf8');
         res.writeHead(201, {'Content-Type': 'application/json'});
         res.end(JSON.stringify({ok: true, id: id}));
       } catch(e) {
@@ -1637,6 +1676,8 @@ const server = http.createServer(function(req, res) {
 
   // API: 에이전트 삭제 (DELETE /api/agents/:id)
   if (url.startsWith('/api/agents/') && req.method === 'DELETE') {
+    if (!guardMutate(req, res)) return;
+    req.resume();
     var id = url.split('/api/agents/')[1];
     var filepath = safePath(AGENTS_DIR, id + '.md');
     if (!filepath) { res.writeHead(400, {'Content-Type': 'application/json'}); res.end(JSON.stringify({error: 'invalid id'})); return; }
@@ -1680,11 +1721,11 @@ const server = http.createServer(function(req, res) {
 
   // API: 프로젝트별 에이전트 설정 저장 (PUT /api/project-agents)
   if (url === '/api/project-agents' && req.method === 'PUT') {
-    var bodyChunks = [];
-    req.on('data', function(c) { bodyChunks.push(c); });
-    req.on('end', function() {
+    if (!guardMutate(req, res)) return;
+    readBodySafe(req, 2048, function(err, body) {
+      if (err) { res.writeHead(400); res.end('{}'); return; }
       try {
-        var data = JSON.parse(Buffer.concat(bodyChunks).toString());
+        var data = JSON.parse(body);
         var cwd = data.cwd || '';
         var enabled = data.enabled || [];
         var hasRestriction = data.hasRestriction !== undefined ? data.hasRestriction : enabled.length > 0;
