@@ -258,3 +258,9 @@ function setLang(lang) {
 }
 
 function getLang() { return _lang; }
+
+// 언어 버튼 텍스트 업데이트 (DOM 로드 후)
+document.addEventListener('DOMContentLoaded', function() {
+  var btn = document.getElementById('langBtn');
+  if (btn) btn.textContent = _lang === 'ko' ? 'KO' : 'EN';
+});

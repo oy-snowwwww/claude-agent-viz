@@ -12,20 +12,20 @@
 
 // 카테고리 메타 — 탭 순서/라벨
 var SHOP_CATEGORIES = [
-  { id: 'unlock',    label: '🔓 해금' },
-  { id: 'stars',     label: '⭐ 별' },
-  { id: 'pulse',     label: '💫 큰별' },
-  { id: 'blue',      label: '🔵 푸른별' },
-  { id: 'orange',    label: '🟠 주황별' },
-  { id: 'rainbow',   label: '💎 무지개' },
-  { id: 'galaxy',    label: '🌌 은하수' },
-  { id: 'nebula',    label: '☁️ 성운' },
-  { id: 'meteor',    label: '🌠 유성' },
-  { id: 'celestial', label: '🌙 천체' },
-  { id: 'character', label: '👤 캐릭터' },
-  { id: 'event',     label: '🎆 이벤트' },
-  { id: 'meta',      label: '📈 메타' },
-  { id: 'legendary', label: '👑 Legendary' },
+  { id: 'unlock',    label: '🔓 해금',    label_en: '🔓 Unlock' },
+  { id: 'stars',     label: '⭐ 별',      label_en: '⭐ Stars' },
+  { id: 'pulse',     label: '💫 큰별',    label_en: '💫 Pulse' },
+  { id: 'blue',      label: '🔵 푸른별',  label_en: '🔵 Blue' },
+  { id: 'orange',    label: '🟠 주황별',  label_en: '🟠 Orange' },
+  { id: 'rainbow',   label: '💎 무지개',  label_en: '💎 Rainbow' },
+  { id: 'galaxy',    label: '🌌 은하수',  label_en: '🌌 Galaxy' },
+  { id: 'nebula',    label: '☁️ 성운',   label_en: '☁️ Nebula' },
+  { id: 'meteor',    label: '🌠 유성',    label_en: '🌠 Meteor' },
+  { id: 'celestial', label: '🌙 천체',    label_en: '🌙 Celestial' },
+  { id: 'character', label: '👤 캐릭터',  label_en: '👤 Character' },
+  { id: 'event',     label: '🎆 이벤트',  label_en: '🎆 Event' },
+  { id: 'meta',      label: '📈 메타',    label_en: '📈 Meta' },
+  { id: 'legendary', label: '👑 Legendary', label_en: '👑 Legendary' },
 ];
 
 // 카테고리 해금 조건 — 미해금 시 아이템 전체 "잠금" 표시
@@ -73,7 +73,7 @@ function ensureShopModal() {
   SHOP_CATEGORIES.forEach(function(cat) {
     var btn = document.createElement('button');
     btn.className = 'shop-tab' + (cat.id === _shopCurrentCategory ? ' active' : '');
-    btn.textContent = cat.label;
+    btn.textContent = _lang === 'en' && cat.label_en ? cat.label_en : cat.label;
     btn.dataset.cat = cat.id;
     (function(catId) {
       btn.onclick = function() { switchShopTab(catId); };
@@ -175,14 +175,14 @@ function renderShopGrid(category) {
     var header = document.createElement('div');
     header.className = 'shop-item-header';
     header.innerHTML =
-      '<span class="shop-item-name">' + esc(def.name) + '</span>' +
+      '<span class="shop-item-name">' + esc(_lang === 'en' && def.name_en ? def.name_en : def.name) + '</span>' +
       '<span class="shop-item-rarity ' + def.rarity + '">' + def.rarity + '</span>';
     card.appendChild(header);
 
     // 설명
     var desc = document.createElement('div');
     desc.className = 'shop-item-desc';
-    desc.textContent = def.desc;
+    desc.textContent = _lang === 'en' && def.desc_en ? def.desc_en : def.desc;
     card.appendChild(desc);
 
     // 스택 (1회 아이템은 "1/1" 대신 "보유 중"/"미보유" 표시)

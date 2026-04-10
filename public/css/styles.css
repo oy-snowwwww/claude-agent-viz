@@ -87,6 +87,7 @@
     .notif-btn:hover{border-color:var(--accent);box-shadow:0 0 8px var(--glow);opacity:.7}
     .notif-btn.on{color:var(--accent);border-color:var(--accent);box-shadow:0 0 6px var(--glow);opacity:1;background:rgba(0,255,200,.1)}
     .help-btn{color:var(--accent)}
+    #langBtn{font-size:.65rem !important;font-weight:700 !important;color:#ffffff !important}
     .help-btn:hover{border-color:var(--accent);box-shadow:0 0 8px var(--glow)}
     .stop-btn{color:var(--negative)}
     .stop-btn:hover{border-color:var(--negative);box-shadow:0 0 8px rgba(244,63,94,.3)}
