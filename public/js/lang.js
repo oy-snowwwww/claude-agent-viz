@@ -107,6 +107,40 @@ var L = {
     ws_thinking: '생각 중...',
     ws_master: 'Master',
 
+    // === 헤더 툴팁 ===
+    tip_timer: '현재 세션 경과 시간',
+    tip_points: '포인트 · 클릭: 상점',
+    tip_streak: '연속 활동 일수',
+    tip_achievement: '성취',
+    tip_grass: '활동 잔디',
+    tip_notif: '알림',
+    tip_history: '히스토리',
+    tip_help: '도움말',
+    tip_restart: '재시작',
+    tip_shutdown: '종료',
+
+    // === 모달/히스토리 정적 텍스트 ===
+    modal_settings: '설정',
+    modal_delete: '삭제',
+    modal_cancel: '취소',
+    modal_save: '저장',
+    modal_project_claude: '프로젝트 CLAUDE.md',
+    hint_agent_id: '영문 소문자, 하이픈만 사용',
+    hint_agent_desc: '에이전트 설명',
+    hint_prompt: '시스템 프롬프트...',
+    hist_session_history: '세션 히스토리',
+    hist_privacy_tip: '다음 세션부터 프롬프트/요약을 디스크에 저장하지 않습니다',
+    hist_privacy_label: '사용 안 함',
+    hist_clear_tip: '저장된 히스토리 파일 전체 삭제 (되돌릴 수 없음)',
+    hist_clear_btn: '전체 삭제',
+    hist_search_placeholder: '프롬프트/파일명/세션명 검색...',
+    hist_all: '전체',
+    hist_today: '오늘',
+    hist_3days: '최근 3일',
+    hist_7days: '최근 7일',
+    hist_all_agents: '모든 에이전트',
+    hist_no_data: '히스토리가 없습니다',
+
     // === 서버 ===
     srv_restart: '서버 재시작',
     srv_restart_confirm: '서버를 재시작합니다.\n브라우저가 자동으로 재연결됩니다.',
@@ -227,6 +261,40 @@ var L = {
     ws_thinking: 'Thinking...',
     ws_master: 'Master',
 
+    // === Header Tooltips ===
+    tip_timer: 'Session elapsed time',
+    tip_points: 'Points · Click: Shop',
+    tip_streak: 'Activity streak',
+    tip_achievement: 'Achievements',
+    tip_grass: 'Activity graph',
+    tip_notif: 'Notifications',
+    tip_history: 'History',
+    tip_help: 'Help',
+    tip_restart: 'Restart',
+    tip_shutdown: 'Shutdown',
+
+    // === Modal/History static text ===
+    modal_settings: 'Settings',
+    modal_delete: 'Delete',
+    modal_cancel: 'Cancel',
+    modal_save: 'Save',
+    modal_project_claude: 'Project CLAUDE.md',
+    hint_agent_id: 'lowercase letters and hyphens only',
+    hint_agent_desc: 'Agent description',
+    hint_prompt: 'System prompt...',
+    hist_session_history: 'Session History',
+    hist_privacy_tip: 'Stop saving prompts/summaries to disk from next session',
+    hist_privacy_label: 'Disabled',
+    hist_clear_tip: 'Delete all saved history files (cannot be undone)',
+    hist_clear_btn: 'Clear All',
+    hist_search_placeholder: 'Search prompts/files/sessions...',
+    hist_all: 'All',
+    hist_today: 'Today',
+    hist_3days: 'Last 3 days',
+    hist_7days: 'Last 7 days',
+    hist_all_agents: 'All agents',
+    hist_no_data: 'No history',
+
     // === Server ===
     srv_restart: 'Restart Server',
     srv_restart_confirm: 'Restart the server?\nThe browser will reconnect automatically.',
@@ -259,8 +327,90 @@ function setLang(lang) {
 
 function getLang() { return _lang; }
 
-// 언어 버튼 텍스트 업데이트 (DOM 로드 후)
+// DOM 로드 후 정적 텍스트 + 툴팁 일괄 교체
 document.addEventListener('DOMContentLoaded', function() {
+  // 언어 버튼
   var btn = document.getElementById('langBtn');
   if (btn) btn.textContent = _lang === 'ko' ? 'KO' : 'EN';
+
+  // data-tip 교체 (id → lang key 매핑)
+  var tipMap = {
+    sessionTimer: 'tip_timer',
+    pointsBadge: 'tip_points',
+    streakBadge: 'tip_streak',
+    notifBtn: 'tip_notif',
+  };
+  Object.keys(tipMap).forEach(function(id) {
+    var el = document.getElementById(id);
+    if (el) el.dataset.tip = t(tipMap[id]);
+  });
+
+  // 버튼 data-tip (onclick 기반 매핑)
+  var btnTips = {
+    'openPointsChart()': 'tip_achievement',
+    'openGrassModal()': 'tip_grass',
+    'toggleHistory()': 'tip_history',
+    'toggleHelp()': 'tip_help',
+    'restartServer()': 'tip_restart',
+    'shutdownServer()': 'tip_shutdown',
+  };
+  document.querySelectorAll('.help-btn,.stop-btn,.restart-btn').forEach(function(el) {
+    var oc = el.getAttribute('onclick') || '';
+    Object.keys(btnTips).forEach(function(k) {
+      if (oc.indexOf(k) >= 0) el.dataset.tip = t(btnTips[k]);
+    });
+  });
+
+  // 정적 텍스트 교체
+  var textMap = {
+    noSessionsHint: 'sessions_waiting',
+    modalTitle: 'modal_settings',
+  };
+  Object.keys(textMap).forEach(function(id) {
+    var el = document.getElementById(id);
+    if (el) el.textContent = t(textMap[id]);
+  });
+
+  // 모달 버튼
+  var btnDel = document.getElementById('btnDel');
+  if (btnDel) btnDel.textContent = t('modal_delete');
+  document.querySelectorAll('.btn-cancel').forEach(function(el) { el.textContent = t('modal_cancel'); });
+  document.querySelectorAll('.btn-save').forEach(function(el) { el.textContent = t('modal_save'); });
+
+  // 히스토리 모달
+  var histTitle = document.querySelector('.hist-header h2');
+  if (histTitle) histTitle.innerHTML = '&#128337; ' + t('hist_session_history') + ' <span class="hist-meta-info" id="histMetaInfo"></span>';
+  var histPrivacy = document.querySelector('.hist-privacy');
+  if (histPrivacy) histPrivacy.dataset.tip = t('hist_privacy_tip');
+  var histPrivLabel = document.querySelector('.hist-privacy span');
+  if (histPrivLabel) histPrivLabel.textContent = '🔒 ' + t('hist_privacy_label');
+  var histClearBtn = document.querySelector('.hist-clear-all');
+  if (histClearBtn) { histClearBtn.dataset.tip = t('hist_clear_tip'); histClearBtn.textContent = '🗑 ' + t('hist_clear_btn'); }
+  var histSearchQ = document.getElementById('histSearchQ');
+  if (histSearchQ) histSearchQ.placeholder = '🔍 ' + t('hist_search_placeholder');
+  // 히스토리 기간 옵션
+  var histDays = document.getElementById('histSearchDays');
+  if (histDays) {
+    var opts = histDays.querySelectorAll('option');
+    var dayLabels = [t('hist_all'), t('hist_today'), t('hist_3days'), t('hist_7days')];
+    opts.forEach(function(o, i) { if (dayLabels[i]) o.textContent = dayLabels[i]; });
+  }
+  // 에이전트 필터 첫 옵션
+  var histAgent = document.getElementById('histAgentFilter');
+  if (histAgent && histAgent.options[0]) histAgent.options[0].textContent = t('hist_all_agents');
+  // 빈 히스토리
+  var histEmpty = document.querySelector('.hist-empty');
+  if (histEmpty) histEmpty.textContent = t('hist_no_data');
+  // 에이전트 모달 힌트
+  document.querySelectorAll('.hint').forEach(function(el) {
+    if (el.textContent.indexOf('영문') >= 0) el.textContent = t('hint_agent_id');
+  });
+  var fDesc = document.getElementById('fDesc');
+  if (fDesc) fDesc.placeholder = t('hint_agent_desc');
+  var fBody = document.getElementById('fBody');
+  if (fBody) fBody.placeholder = t('hint_prompt');
+  // 프로젝트 CLAUDE.md 탭
+  document.querySelectorAll('.tab-bar button').forEach(function(btn) {
+    if (btn.textContent.indexOf('프로젝트') >= 0) btn.textContent = t('modal_project_claude');
+  });
 });
