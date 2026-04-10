@@ -1865,8 +1865,8 @@ const server = http.createServer(function(req, res) {
   // === 게임화: 포인트 API ===
 
   // GET /api/points — 현재 상태 조회 (?lang=en 지원)
-  if ((url === '/api/points' || url.startsWith('/api/points?')) && req.method === 'GET') {
-    var ptsLang = (url.split('lang=')[1] || 'ko').split('&')[0];
+  if (url === '/api/points' && req.method === 'GET') {
+    var ptsLang = (req.url.split('lang=')[1] || 'ko').split('&')[0];
     res.writeHead(200, {'Content-Type': 'application/json; charset=utf-8'});
     res.end(JSON.stringify({
       version: pointsData.version || 1,
@@ -1888,8 +1888,8 @@ const server = http.createServer(function(req, res) {
   }
 
   // GET /api/points/achievements — 성취 정의 + 달성 상태 + 카테고리 (?lang=en 지원)
-  if ((url === '/api/points/achievements' || url.startsWith('/api/points/achievements?')) && req.method === 'GET') {
-    var achLang = (url.split('lang=')[1] || 'ko').split('&')[0];
+  if (url === '/api/points/achievements' && req.method === 'GET') {
+    var achLang = (req.url.split('lang=')[1] || 'ko').split('&')[0];
     var isEn = achLang === 'en';
     res.writeHead(200, {'Content-Type': 'application/json; charset=utf-8'});
     res.end(JSON.stringify({
