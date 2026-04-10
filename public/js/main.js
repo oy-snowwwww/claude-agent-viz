@@ -57,7 +57,9 @@ function renderAll() {
       renderLogs();
       updateHeaderStat();
       renderSessionTabs();
-      if (typeof renderVillage === 'function') renderVillage();
+      // renderVillage는 여기서 호출하지 않음 — buffs 변경(구매/초기화) 시에만 points.js에서 호출
+      // renderAll이 SSE 이벤트마다 불리는데, 매번 stars layer를 삭제→재생성하면
+      // CSS 애니메이션이 초기화되어 "깜빡이는" 현상 발생
     } catch (e) {
       console.error('[agent-viz] renderAll error:', e);
     }

@@ -159,7 +159,10 @@ function renderWorkspace() {
       if (nd.id === 'master') lbl.innerHTML = '<span style="color:#c084fc">Master</span><span class="ws-badge" style="background:rgba(251,191,36,.15);color:#fbbf24">SESSION</span>';
       else lbl.innerHTML = esc(nd.name) + '<span class="ws-badge model-' + esc(nd.model || 'sonnet') + '">' + esc((nd.model || '').toUpperCase()) + '</span>';
       el.appendChild(lbl);
-      var bub = document.createElement('div'); bub.className = 'ws-bubble'; bub.textContent = nd._task || ''; if (!nd._task) bub.style.display = 'none'; el.appendChild(bub);
+      var bub = document.createElement('div'); var isThk = nd._st === 'thinking'; bub.className = 'ws-bubble' + (isThk ? ' thought' : '');
+      if (isThk) { bub.innerHTML = '<span class="thought-dots"><span>\u00b7</span><span>\u00b7</span><span>\u00b7</span></span>'; bub.style.display = '' }
+      else { bub.textContent = nd._task || ''; if (!nd._task) bub.style.display = 'none' }
+      el.appendChild(bub);
       ws.appendChild(el);
     });
     startAmbient(ws);
@@ -172,7 +175,12 @@ function renderWorkspace() {
       el.dataset.st = nd._st || 'idle';
       // idle → working 전환 시 현재 위치 그대로 (그 자리에서 일 시작)
       var bub = el.querySelector('.ws-bubble');
-      if (bub) { bub.textContent = nd._task || ''; bub.style.display = nd._task ? '' : 'none' }
+      if (bub) {
+        var isThk = nd._st === 'thinking';
+        bub.className = 'ws-bubble' + (isThk ? ' thought' : '');
+        if (isThk) { bub.innerHTML = '<span class="thought-dots"><span>\u00b7</span><span>\u00b7</span><span>\u00b7</span></span>'; bub.style.display = '' }
+        else { bub.textContent = nd._task || ''; bub.style.display = nd._task ? '' : 'none' }
+      }
     });
   }
   // 상태별 이펙트: 아우라 (working), 이모션 (done)
@@ -302,4 +310,31 @@ function getPositions(n) {
     });
   }
   return pos;
+}
+
+// === 계보선: Master → 활동 중인 에이전트 연결선 ===
+function updateLineage() {
+  var ws = document.getElementById('workspace');
+  if (!ws) return;
+  var svg = ws.querySelector('.ws-line');
+  if (!svg) {
+    svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('class', 'ws-line');
+    svg.style.cssText = 'inset:0;width:100%;height:100%';
+    ws.insertBefore(svg, ws.firstChild);
+  }
+  var masterEl = document.getElementById('ws-master');
+  if (!masterEl) { svg.innerHTML = ''; return; }
+  var masterSt = masterEl.dataset.st || 'idle';
+  if (masterSt !== 'working' && masterSt !== 'thinking') { svg.innerHTML = ''; return; }
+  var mx = parseFloat(masterEl.style.left) || 50;
+  var my = parseFloat(masterEl.style.top) || 50;
+  var html = '';
+  ws.querySelectorAll('.ws-agent.working').forEach(function(el) {
+    if (el.id === 'ws-master') return;
+    var x = parseFloat(el.style.left) || 50;
+    var y = parseFloat(el.style.top) || 50;
+    html += '<line x1="' + mx + '%" y1="' + my + '%" x2="' + x + '%" y2="' + y + '%"/>';
+  });
+  if (svg.innerHTML !== html) svg.innerHTML = html;
 }

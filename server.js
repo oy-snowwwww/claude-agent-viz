@@ -390,16 +390,22 @@ function isNoiseUserText(text) {
 
 // JSONL transcript에서 가장 최근 /rename 명령의 인자(새 이름)를 추출
 // Claude Code의 /rename은 system + local_command 메시지에 <command-name>/rename</command-name> + <command-args>NAME</command-args> 형식
+// 끝에서 TAIL_BYTES만 읽어 rename 추출 (대형 transcript 블로킹 방지)
+var RENAME_TAIL_BYTES = 32 * 1024; // 32KB — rename은 항상 최근에 있으므로 충분
 function extractLatestRenameFromTranscript(transcriptPath) {
   if (!isValidTranscriptPath(transcriptPath)) return null;
   if (!fs.existsSync(transcriptPath)) return null;
   try {
     var stat = fs.statSync(transcriptPath);
     if (stat.size > TRANSCRIPT_MAX_BYTES) return null;
-    var fileContent = fs.readFileSync(transcriptPath, 'utf8');
-    var lines = fileContent.split('\n').filter(function(l) { return l.trim(); });
+    var readSize = Math.min(stat.size, RENAME_TAIL_BYTES);
+    var buf = Buffer.alloc(readSize);
+    var fd = fs.openSync(transcriptPath, 'r');
+    fs.readSync(fd, buf, 0, readSize, stat.size - readSize);
+    fs.closeSync(fd);
+    var tail = buf.toString('utf8');
+    var lines = tail.split('\n').filter(function(l) { return l.trim(); });
     var latest = null;
-    // 끝에서 거꾸로 스캔 (최신 rename 우선)
     for (var i = lines.length - 1; i >= 0; i--) {
       var d;
       try { d = JSON.parse(lines[i]); } catch(e) { continue; }
@@ -407,10 +413,7 @@ function extractLatestRenameFromTranscript(transcriptPath) {
       var content = d.content || '';
       if (content.indexOf('<command-name>/rename</command-name>') === -1) continue;
       var m = content.match(/<command-args>([\s\S]*?)<\/command-args>/);
-      if (m && m[1]) {
-        latest = m[1].trim();
-        break;
-      }
+      if (m && m[1]) { latest = m[1].trim(); break; }
     }
     return latest;
   } catch(e) { return null; }
@@ -678,9 +681,15 @@ function ensureToday() {
   if (!statsData.history) statsData.history = [];
 }
 
+var _saveStatsTimer = null;
 function saveStats() {
-  try { fs.writeFileSync(STATS_FILE, JSON.stringify(statsData), 'utf8'); } catch(e) {}
+  if (_saveStatsTimer) return;
+  _saveStatsTimer = setTimeout(function() {
+    _saveStatsTimer = null;
+    try { fs.writeFileSync(STATS_FILE, JSON.stringify(statsData), 'utf8'); } catch(e) {}
+  }, 1500);
 }
+function flushStats() { if (_saveStatsTimer) { clearTimeout(_saveStatsTimer); _saveStatsTimer = null; } try { fs.writeFileSync(STATS_FILE, JSON.stringify(statsData), 'utf8'); } catch(e) {} }
 
 function recordStat(event, toolName, agentType) {
   ensureToday();
@@ -701,11 +710,15 @@ function recordStat(event, toolName, agentType) {
 
 // === 게임화: 포인트 저장/획득/구매 ===
 // points.json은 STATS_FILE 옆에 저장 (같은 __dirname)
-// 스키마: { version, total, lifetime, inventory: { itemId: count }, createdAt, lastEarnedAt }
+// 스키마: { version, total, lifetime, inventory, achievements, pointsHistory, ... }
 // - version: 스키마 마이그레이션용
 // - total: 현재 사용 가능한 포인트 (소수점 누적, UI는 정수 반올림)
 // - lifetime: 누적 획득 (초기화해도 유지 — 자랑용)
 // - inventory: 아이템 ID → 스택 수
+// - achievements: { id: unlockedAt ISO } — 달성한 성취 목록
+// - pointsHistory: [{ date, earned, spent }] — 일별 포인트 이력 (최대 30일)
+// - lastDailyBonus: "YYYY-MM-DD" — 데일리 보너스 지급 날짜
+// - nightCount: 새벽 1~5시 활동 횟수 (올빼미 성취용)
 var POINTS_FILE = path.join(__dirname, 'points.json');
 
 // 신규 사용자 환영 보너스 — points.json이 없을 때 1회 지급
@@ -755,6 +768,14 @@ function loadPoints() {
       if (!data.inventory || typeof data.inventory !== 'object') data.inventory = {};
       if (typeof data.streak !== 'number') data.streak = 0;
       if (typeof data.lastStreakDay !== 'string') data.lastStreakDay = null;
+      if (!data.achievements || typeof data.achievements !== 'object') data.achievements = {};
+      if (!Array.isArray(data.pointsHistory)) data.pointsHistory = [];
+      if (typeof data.nightCount !== 'number') data.nightCount = 0;
+      if (typeof data.promptCount !== 'number') data.promptCount = 0;
+      if (typeof data.toolCount !== 'number') data.toolCount = 0;
+      if (typeof data.agentCount !== 'number') data.agentCount = 0;
+      if (typeof data.earlyCount !== 'number') data.earlyCount = 0;
+      if (typeof data.dropCount !== 'number') data.dropCount = 0;
       return data;
     }
   } catch(e) {
@@ -769,19 +790,153 @@ function loadPoints() {
     inventory: {},
     streak: 0,
     lastStreakDay: null,
+    achievements: {},
+    pointsHistory: [],
+    nightCount: 0,
+    promptCount: 0,
+    toolCount: 0,
+    agentCount: 0,
+    earlyCount: 0,
+    dropCount: 0,
     createdAt: new Date().toISOString(),
   };
 }
 
+var _savePointsTimer = null;
 function savePoints() {
-  try {
-    fs.writeFileSync(POINTS_FILE, JSON.stringify(pointsData), 'utf8');
-  } catch(e) {
-    console.log('  [POINTS] save error:', e.message);
-  }
+  if (_savePointsTimer) return;
+  _savePointsTimer = setTimeout(function() {
+    _savePointsTimer = null;
+    try { fs.writeFileSync(POINTS_FILE, JSON.stringify(pointsData), 'utf8'); } catch(e) { console.log('  [POINTS] save error:', e.message); }
+  }, 1500);
 }
+function flushPoints() { if (_savePointsTimer) { clearTimeout(_savePointsTimer); _savePointsTimer = null; } try { fs.writeFileSync(POINTS_FILE, JSON.stringify(pointsData), 'utf8'); } catch(e) {} }
 
 var pointsData = loadPoints();
+
+// === 성취 정의 (서버에서 조건 체크 — 클라이언트는 표시만) ===
+// 성취 카테고리 — 클라이언트에서 섹션 헤더로 사용
+var ACH_CATEGORIES = {
+  prompt:   '🎯 질문',
+  tool:     '🔧 도구',
+  agent:    '🤖 에이전트',
+  streak:   '🔥 연속 활동',
+  time:     '🕐 시간대',
+  shop:     '🛒 상점',
+  points:   '💰 포인트',
+  spend:    '💸 소비',
+  luck:     '🎰 행운',
+  master:   '⭐ 마스터',
+};
+
+var ACHIEVEMENTS = {
+  // ── 🎯 질문 ──
+  prompt_10:     { cat: 'prompt', name: '첫 발걸음',     desc: '질문 10회',               reward: 30,   check: function() { return (pointsData.promptCount || 0) >= 10; } },
+  prompt_50:     { cat: 'prompt', name: '호기심',        desc: '질문 50회',               reward: 80,   check: function() { return (pointsData.promptCount || 0) >= 50; } },
+  prompt_100:    { cat: 'prompt', name: '탐구자',        desc: '질문 100회',              reward: 150,  check: function() { return (pointsData.promptCount || 0) >= 100; } },
+  prompt_300:    { cat: 'prompt', name: '연구자',        desc: '질문 300회',              reward: 300,  check: function() { return (pointsData.promptCount || 0) >= 300; } },
+  prompt_500:    { cat: 'prompt', name: '학자',          desc: '질문 500회',              reward: 500,  check: function() { return (pointsData.promptCount || 0) >= 500; } },
+  prompt_1000:   { cat: 'prompt', name: '현자',          desc: '질문 1,000회',            reward: 1000, check: function() { return (pointsData.promptCount || 0) >= 1000; } },
+  prompt_5000:   { cat: 'prompt', name: '대현자',        desc: '질문 5,000회',            reward: 3000, check: function() { return (pointsData.promptCount || 0) >= 5000; } },
+  // ── 🔧 도구 ──
+  tool_50:       { cat: 'tool', name: '견습생',        desc: '도구 50회 사용',          reward: 30,   check: function() { return (pointsData.toolCount || 0) >= 50; } },
+  tool_200:      { cat: 'tool', name: '기능공',        desc: '도구 200회 사용',         reward: 80,   check: function() { return (pointsData.toolCount || 0) >= 200; } },
+  tool_500:      { cat: 'tool', name: '장인',          desc: '도구 500회 사용',         reward: 200,  check: function() { return (pointsData.toolCount || 0) >= 500; } },
+  tool_1000:     { cat: 'tool', name: '명장',          desc: '도구 1,000회 사용',       reward: 500,  check: function() { return (pointsData.toolCount || 0) >= 1000; } },
+  tool_3000:     { cat: 'tool', name: '달인',          desc: '도구 3,000회 사용',       reward: 1000, check: function() { return (pointsData.toolCount || 0) >= 3000; } },
+  tool_5000:     { cat: 'tool', name: '마스터',        desc: '도구 5,000회 사용',       reward: 2000, check: function() { return (pointsData.toolCount || 0) >= 5000; } },
+  // ── 🤖 에이전트 ──
+  agent_5:       { cat: 'agent', name: '팀 빌딩',       desc: '에이전트 5회 완료',       reward: 30,   check: function() { return (pointsData.agentCount || 0) >= 5; } },
+  agent_20:      { cat: 'agent', name: '팀 리더',       desc: '에이전트 20회 완료',      reward: 100,  check: function() { return (pointsData.agentCount || 0) >= 20; } },
+  agent_50:      { cat: 'agent', name: '지휘관',        desc: '에이전트 50회 완료',      reward: 300,  check: function() { return (pointsData.agentCount || 0) >= 50; } },
+  agent_100:     { cat: 'agent', name: '사령관',        desc: '에이전트 100회 완료',     reward: 800,  check: function() { return (pointsData.agentCount || 0) >= 100; } },
+  agent_500:     { cat: 'agent', name: '총사령관',      desc: '에이전트 500회 완료',     reward: 2000, check: function() { return (pointsData.agentCount || 0) >= 500; } },
+  // ── 🔥 연속 활동 ──
+  streak_3:      { cat: 'streak', name: '시동',          desc: '3일 연속 활동',           reward: 50,   check: function() { return (pointsData.streak || 0) >= 3; } },
+  streak_7:      { cat: 'streak', name: '주간 챔피언',   desc: '7일 연속 활동',           reward: 200,  check: function() { return (pointsData.streak || 0) >= 7; } },
+  streak_14:     { cat: 'streak', name: '2주 마라톤',    desc: '14일 연속 활동',          reward: 500,  check: function() { return (pointsData.streak || 0) >= 14; } },
+  streak_30:     { cat: 'streak', name: '한 달의 기적',  desc: '30일 연속 활동',          reward: 1500, check: function() { return (pointsData.streak || 0) >= 30; } },
+  streak_60:     { cat: 'streak', name: '철인',          desc: '60일 연속 활동',          reward: 3000, check: function() { return (pointsData.streak || 0) >= 60; } },
+  streak_100:    { cat: 'streak', name: '전설',          desc: '100일 연속 활동',         reward: 5000, check: function() { return (pointsData.streak || 0) >= 100; } },
+  // ── 🕐 시간대 ──
+  night_owl:     { cat: 'time', name: '올빼미',         desc: '새벽 1~5시 활동 10회',    reward: 100,  check: function() { return (pointsData.nightCount || 0) >= 10; } },
+  night_owl_50:  { cat: 'time', name: '야행성',         desc: '새벽 1~5시 활동 50회',    reward: 500,  check: function() { return (pointsData.nightCount || 0) >= 50; } },
+  early_bird:    { cat: 'time', name: '얼리버드',       desc: '오전 6~8시 활동 10회',    reward: 100,  check: function() { return (pointsData.earlyCount || 0) >= 10; } },
+  early_bird_50: { cat: 'time', name: '아침형 인간',    desc: '오전 6~8시 활동 50회',    reward: 500,  check: function() { return (pointsData.earlyCount || 0) >= 50; } },
+  // ── 🛒 상점 ──
+  first_buy:     { cat: 'shop', name: '첫 구매',        desc: '상점에서 첫 아이템 구매', reward: 30,   check: function() { return Object.keys(pointsData.inventory || {}).length >= 1; } },
+  collector_5:   { cat: 'shop', name: '초보 수집가',    desc: '아이템 5종 보유',         reward: 100,  check: function() { return Object.keys(pointsData.inventory || {}).length >= 5; } },
+  collector_10:  { cat: 'shop', name: '수집가',         desc: '아이템 10종 보유',        reward: 300,  check: function() { return Object.keys(pointsData.inventory || {}).length >= 10; } },
+  collector_20:  { cat: 'shop', name: '컬렉터',         desc: '아이템 20종 보유',        reward: 800,  check: function() { return Object.keys(pointsData.inventory || {}).length >= 20; } },
+  collector_30:  { cat: 'shop', name: '박물관장',       desc: '아이템 30종 보유',        reward: 1500, check: function() { return Object.keys(pointsData.inventory || {}).length >= 30; } },
+  all_unlock:    { cat: 'shop', name: '완전 해금',      desc: '모든 해금 아이템 구매',   reward: 300,  check: function() { var inv = pointsData.inventory || {}; return !!(inv.unlock_pulse && inv.unlock_nebula && inv.unlock_galaxy && inv.unlock_meteor && inv.unlock_rainbow); } },
+  full_celestial:{ cat: 'shop', name: '천문학자',       desc: '천체 아이템 전종 보유',   reward: 500,  check: function() { var inv = pointsData.inventory || {}; return !!(inv.celestial_moon && inv.celestial_planet && inv.celestial_pulsar && inv.celestial_binary && inv.celestial_station); } },
+  // ── 💰 포인트 ──
+  lifetime_500:  { cat: 'points', name: '500P',          desc: '누적 500P 획득',          reward: 50,   check: function() { return (pointsData.lifetime || 0) >= 500; } },
+  lifetime_1k:   { cat: 'points', name: '1,000P',        desc: '누적 1,000P 획득',        reward: 100,  check: function() { return (pointsData.lifetime || 0) >= 1000; } },
+  lifetime_5k:   { cat: 'points', name: '5,000P',        desc: '누적 5,000P 획득',        reward: 200,  check: function() { return (pointsData.lifetime || 0) >= 5000; } },
+  lifetime_10k:  { cat: 'points', name: '10,000P',       desc: '누적 10,000P 획득',       reward: 400,  check: function() { return (pointsData.lifetime || 0) >= 10000; } },
+  lifetime_30k:  { cat: 'points', name: '30,000P',       desc: '누적 30,000P 획득',       reward: 800,  check: function() { return (pointsData.lifetime || 0) >= 30000; } },
+  lifetime_100k: { cat: 'points', name: '100,000P',      desc: '누적 100,000P 획득',      reward: 2000, check: function() { return (pointsData.lifetime || 0) >= 100000; } },
+  // ── 💸 소비 ──
+  spend_1k:      { cat: 'spend', name: '소비자',         desc: '누적 1,000P 사용',        reward: 50,   check: function() { return _totalSpent() >= 1000; } },
+  spend_5k:      { cat: 'spend', name: '큰 손',          desc: '누적 5,000P 사용',        reward: 200,  check: function() { return _totalSpent() >= 5000; } },
+  spend_20k:     { cat: 'spend', name: '고래',           desc: '누적 20,000P 사용',       reward: 800,  check: function() { return _totalSpent() >= 20000; } },
+  spend_50k:     { cat: 'spend', name: '재벌',           desc: '누적 50,000P 사용',       reward: 2000, check: function() { return _totalSpent() >= 50000; } },
+  // ── 🎰 행운 ──
+  lucky_drop:    { cat: 'luck', name: '행운의 시작',    desc: '보너스 드롭 첫 획득',     reward: 50,   check: function() { return (pointsData.dropCount || 0) >= 1; } },
+  lucky_3:       { cat: 'luck', name: '행운아',         desc: '보너스 드롭 3회',         reward: 150,  check: function() { return (pointsData.dropCount || 0) >= 3; } },
+  lucky_10:      { cat: 'luck', name: '대박',           desc: '보너스 드롭 10회',        reward: 500,  check: function() { return (pointsData.dropCount || 0) >= 10; } },
+  // ── ⭐ 마스터 ──
+  master_galaxy: { cat: 'master', name: '은하계 정복',    desc: '은하수 4개 + 행성 3개 보유', reward: 2000, check: function() { var inv = pointsData.inventory || {}; return (inv.galaxy_extra || 0) >= 3 && (inv.celestial_planet || 0) >= 3; } },
+  master_legend: { cat: 'master', name: '전설의 시작',    desc: 'Legendary 아이템 보유',    reward: 1000, check: function() { var inv = pointsData.inventory || {}; return !!(inv.legendary_supernova || inv.legendary_cosmicrain || inv.legendary_twinmoon); } },
+  master_all_leg:{ cat: 'master', name: '신화',           desc: 'Legendary 전종 보유',     reward: 5000, check: function() { var inv = pointsData.inventory || {}; return !!(inv.legendary_supernova && inv.legendary_cosmicrain && inv.legendary_twinmoon); } },
+};
+
+// 누적 사용 금액 — pointsHistory의 spent 합산 (환불 시에도 정확)
+function _totalSpent() {
+  var hist = pointsData.pointsHistory || [];
+  var sum = 0;
+  for (var i = 0; i < hist.length; i++) sum += (hist[i].spent || 0);
+  return Math.round(sum);
+}
+
+// 성취 체크 — earnPoints/purchase 후 호출. 새 달성 시 보상 지급 + SSE
+// 2단계: 먼저 조건 체크 → 보상은 루프 후 일괄 지급 (연쇄 달성 방지)
+function checkAchievements() {
+  if (!pointsData.achievements) pointsData.achievements = {};
+  var newlyUnlocked = [];
+  // 1단계: 조건 체크 (현재 상태 기준, 보상 미반영)
+  Object.keys(ACHIEVEMENTS).forEach(function(id) {
+    if (pointsData.achievements[id]) return;
+    if (ACHIEVEMENTS[id].check()) {
+      newlyUnlocked.push({ id: id, name: ACHIEVEMENTS[id].name, reward: ACHIEVEMENTS[id].reward });
+    }
+  });
+  // 2단계: 보상 일괄 지급
+  newlyUnlocked.forEach(function(a) {
+    pointsData.achievements[a.id] = new Date().toISOString();
+    pointsData.total = (pointsData.total || 0) + a.reward;
+    pointsData.lifetime = (pointsData.lifetime || 0) + a.reward;
+    _recordHistory('earn', a.reward);
+  });
+  return newlyUnlocked;
+}
+
+// 포인트 히스토리 기록 — 일별 earned/spent 누적 (최대 30일 보관)
+function _recordHistory(type, amount) {
+  if (!pointsData.pointsHistory) pointsData.pointsHistory = [];
+  var today = _ymd(new Date());
+  var last = pointsData.pointsHistory[pointsData.pointsHistory.length - 1];
+  if (!last || last.date !== today) {
+    last = { date: today, earned: 0, spent: 0 };
+    pointsData.pointsHistory.push(last);
+  }
+  if (type === 'earn') last.earned = (last.earned || 0) + amount;
+  else if (type === 'spend') last.spent = (last.spent || 0) + amount;
+  // 30일 초과 시 오래된 것 삭제
+  while (pointsData.pointsHistory.length > 30) pointsData.pointsHistory.shift();
+}
 
 // 점수 획득 — recordStat 옆에서 호출
 // SSE 'points_updated' 브로드캐스트로 클라이언트 즉시 갱신
@@ -791,10 +946,54 @@ function recordPoints(event) {
   pointsData.total = (pointsData.total || 0) + delta;
   pointsData.lifetime = (pointsData.lifetime || 0) + delta;
   pointsData.lastEarnedAt = new Date().toISOString();
+
+  // 활동 카운터
+  if (event === 'thinking_start') pointsData.promptCount = (pointsData.promptCount || 0) + 1;
+  if (event === 'tool_use') pointsData.toolCount = (pointsData.toolCount || 0) + 1;
+  if (event === 'agent_done') pointsData.agentCount = (pointsData.agentCount || 0) + 1;
+
+  // 시간대 카운터
+  var hour = new Date().getHours();
+  if (hour >= 1 && hour < 5 && event === 'thinking_start') {
+    pointsData.nightCount = (pointsData.nightCount || 0) + 1;
+  }
+  if (hour >= 6 && hour < 8 && event === 'thinking_start') {
+    pointsData.earlyCount = (pointsData.earlyCount || 0) + 1;
+  }
+
+  // 데일리 보너스 — 하루 첫 thinking_start에 +15P
+  if (event === 'thinking_start') {
+    var today = _ymd(new Date());
+    if (pointsData.lastDailyBonus !== today) {
+      pointsData.lastDailyBonus = today;
+      var dailyBonus = 15;
+      pointsData.total += dailyBonus;
+      pointsData.lifetime += dailyBonus;
+      delta += dailyBonus;
+    }
+  }
+
+  // 에이전트 완료 드롭 — 5% 확률 보너스 50~200P
+  var dropBonus = 0;
+  if (event === 'agent_done' && Math.random() < 0.05) {
+    dropBonus = 50 + Math.floor(Math.random() * 151);
+    pointsData.total += dropBonus;
+    pointsData.lifetime += dropBonus;
+    pointsData.dropCount = (pointsData.dropCount || 0) + 1;
+    delta += dropBonus;
+  }
+
   // 스트릭 추적 — meta_streak 아이템 보유와 무관하게 항상 카운트 (UI 표시만 buff에 따라)
   updateStreak();
+
+  // 히스토리 기록 — 기본 earn + 드롭 보너스 한번에 기록
+  _recordHistory('earn', delta);
+
+  // 성취 체크
+  var newAch = checkAchievements();
+
   savePoints();
-  broadcastEvent({
+  var sseData = {
     event: 'points_updated',
     total: pointsData.total,
     lifetime: pointsData.lifetime,
@@ -802,7 +1001,10 @@ function recordPoints(event) {
     streak: pointsData.streak || 0,
     delta: delta,
     reason: event,
-  });
+  };
+  if (dropBonus > 0) sseData.drop = dropBonus;
+  if (newAch.length > 0) sseData.achievements = newAch;
+  broadcastEvent(sseData);
 }
 
 // 일자 키 (로컬 기준 YYYY-MM-DD)
@@ -847,6 +1049,8 @@ function purchaseItem(itemId) {
   pointsData.total -= def.price;
   if (!pointsData.inventory) pointsData.inventory = {};
   pointsData.inventory[itemId] = currentStack + 1;
+  _recordHistory('spend', def.price);
+  checkAchievements();
   savePoints();
   broadcastEvent({
     event: 'points_updated',
@@ -890,6 +1094,15 @@ function resetPoints(mode) {
       inventory: {},
       streak: 0,
       lastStreakDay: null,
+      achievements: {},
+      pointsHistory: [],
+      nightCount: 0,
+      promptCount: 0,
+      toolCount: 0,
+      agentCount: 0,
+      earlyCount: 0,
+      dropCount: 0,
+      lastDailyBonus: null,
       createdAt: new Date().toISOString(),
     };
     savePoints();
@@ -1503,8 +1716,29 @@ const server = http.createServer(function(req, res) {
       buffs: computeBuffs(pointsData.inventory || {}),
       streak: pointsData.streak || 0,
       lastStreakDay: pointsData.lastStreakDay || null,
+      achievements: pointsData.achievements || {},
       createdAt: pointsData.createdAt || null,
       lastEarnedAt: pointsData.lastEarnedAt || null,
+    }));
+    return;
+  }
+
+  // GET /api/points/achievements — 성취 정의 + 달성 상태 + 카테고리
+  if (url === '/api/points/achievements' && req.method === 'GET') {
+    res.writeHead(200, {'Content-Type': 'application/json; charset=utf-8'});
+    res.end(JSON.stringify({
+      categories: ACH_CATEGORIES,
+      achievementDefs: Object.keys(ACHIEVEMENTS).map(function(id) {
+        return {
+          id: id,
+          cat: ACHIEVEMENTS[id].cat || 'master',
+          name: ACHIEVEMENTS[id].name,
+          desc: ACHIEVEMENTS[id].desc,
+          reward: ACHIEVEMENTS[id].reward,
+          unlocked: !!(pointsData.achievements || {})[id],
+          unlockedAt: (pointsData.achievements || {})[id] || null,
+        };
+      }),
     }));
     return;
   }
@@ -1991,6 +2225,9 @@ function saveAllTrackers() {
 }
 
 function gracefulShutdown() {
+  // 디바운스된 저장 즉시 flush
+  flushStats();
+  flushPoints();
   // 모든 module-level 타이머를 일괄 정리 (24h 백그라운드 운영 시 일관성)
   if (_ssePingInterval) { clearInterval(_ssePingInterval); _ssePingInterval = null; }
   if (_cleanHistoryInterval) { clearInterval(_cleanHistoryInterval); _cleanHistoryInterval = null; }

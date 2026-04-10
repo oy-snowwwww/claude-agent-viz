@@ -144,6 +144,9 @@ var ITEMS = {
   event_color_storm:  { name: '컬러 스톰',         desc: '1분마다 모든 별이 1초간 색상 회전 (1s)', category: 'event', rarity: 'epic',  price: 1200,  maxStack: 1, effect: { key: 'eventColorStorm',  delta: 1 } },
   event_pulse_chain:  { name: '맥동 연쇄',         desc: '1분마다 큰 별들이 차례로 강하게 맥동 (3s)', category: 'event', rarity: 'rare', price: 1000, maxStack: 1, effect: { key: 'eventPulseChain', delta: 1 } },
 
+  // ─── ⭐ 별자리 (Constellation) — 별 사이에 선을 그려 별자리 형성 ───
+  constellation: { name: '별자리',  desc: '유명 별자리가 밤하늘에 등장 (오리온, 북두칠성 등)',  category: 'celestial', rarity: 'rare', price: 300, maxStack: 5, effect: { key: 'constellationCount', delta: 1 } },
+
   // ─── 📈 메타 (Meta) — 진척/리워드 ───
   meta_streak: { name: '연속 스트릭',  desc: '헤더에 🔥 N일 연속 활동 배지 표시',   category: 'meta', rarity: 'common', price: 200, maxStack: 1, effect: { key: 'metaStreak', delta: 1 } },
 
@@ -153,12 +156,12 @@ var ITEMS = {
   legendary_twinmoon:  { name: 'Binary Worlds',      desc: '좌측 달 + 우측 가스 행성 (자전)',      category: 'legendary', rarity: 'legendary', price: 5000, maxStack: 1, effect: { key: 'legendaryTwinMoon',  delta: 1 } },
 };
 
-// 점수 체계 v3 (소수점 누적, UI는 반올림)
+// 점수 체계 v4 — 성취 보상이 메인 수입원, 기본 획득은 낮게
 var POINTS_RULES = {
-  thinking_start: 3,     // 질문 제출
-  tool_use: 0.5,         // 도구 사용
-  agent_done: 10,        // 에이전트 완료
-  thinking_end: 1,       // 응답 완료
+  thinking_start: 2,     // 질문 제출
+  tool_use: 0.3,         // 도구 사용
+  agent_done: 5,         // 에이전트 완료
+  thinking_end: 0.5,     // 응답 완료
 };
 
 // === 아이템 카탈로그 → 버프 객체 계산 ===

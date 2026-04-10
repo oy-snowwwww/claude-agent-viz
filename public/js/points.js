@@ -94,6 +94,23 @@ function updatePointsFromEvent(ev) {
     showPointsFloat('+' + (ev.delta % 1 === 0 ? ev.delta : ev.delta.toFixed(1)));
   }
 
+  // 드롭 보너스 토스트
+  if (typeof ev.drop === 'number' && ev.drop > 0) {
+    if (typeof toast === 'function') toast('🎰 보너스 드롭! +' + ev.drop + 'P');
+  }
+
+  // 성취 달성 토스트
+  if (ev.achievements && ev.achievements.length > 0) {
+    ev.achievements.forEach(function(a) {
+      if (typeof toast === 'function') toast('🏆 ' + a.name + ' 달성! +' + a.reward + 'P');
+    });
+    // 로컬 achievements도 갱신
+    if (!pointsData.achievements) pointsData.achievements = {};
+    ev.achievements.forEach(function(a) {
+      pointsData.achievements[a.id] = new Date().toISOString();
+    });
+  }
+
   renderPointsBadge();
   syncCharBuffs();
 
@@ -133,4 +150,116 @@ function showPointsFloat(text) {
   float.textContent = text;
   badge.appendChild(float);
   setTimeout(function() { float.remove() }, 1400);
+}
+
+// === 포인트 히스토리 + 성취 모달 (lazy 생성) ===
+var _chartModalBuilt = false;
+
+// 성취 데이터 캐시 (모달 열 때 1회 fetch, 탭 전환은 캐시 사용)
+var _achData = null;
+var _achCurrentCat = null;
+
+function openPointsChart() {
+  if (!_chartModalBuilt) {
+    _chartModalBuilt = true;
+    var overlay = document.createElement('div');
+    overlay.className = 'chart-overlay';
+    overlay.id = 'chartOverlay';
+    overlay.onclick = function(e) { if (e.target === overlay) closePointsChart(); };
+    overlay.innerHTML =
+      '<div class="chart-modal">' +
+        '<div class="chart-header">' +
+          '<div class="ach-summary" id="achSummary"></div>' +
+          '<button class="chart-close" onclick="closePointsChart()">&times;</button>' +
+        '</div>' +
+        '<div class="ach-tabs" id="achTabs"></div>' +
+        '<div class="chart-body" id="chartBody"></div>' +
+      '</div>';
+    document.body.appendChild(overlay);
+  }
+  document.getElementById('chartOverlay').classList.add('show');
+  _achData = null;
+  _fetchAndRenderAch();
+}
+
+function closePointsChart() {
+  var overlay = document.getElementById('chartOverlay');
+  if (overlay) overlay.classList.remove('show');
+}
+
+function _fetchAndRenderAch() {
+  var body = document.getElementById('chartBody');
+  if (!body) return;
+  body.innerHTML = '<div class="chart-loading">로딩 중...</div>';
+  fetch(API + '/api/points/achievements').then(function(r) { return r.json(); }).then(function(data) {
+    _achData = data;
+    var defs = data.achievementDefs || [];
+    var cats = data.categories || {};
+    // 달성률 요약
+    var total = defs.length;
+    var unlocked = defs.filter(function(a) { return a.unlocked; }).length;
+    var summaryEl = document.getElementById('achSummary');
+    if (summaryEl) summaryEl.textContent = unlocked + ' / ' + total + ' 달성';
+    // 카테고리 순서 보존
+    var catOrder = [];
+    defs.forEach(function(a) {
+      var c = a.cat || 'master';
+      if (catOrder.indexOf(c) < 0) catOrder.push(c);
+    });
+    // 탭 렌더 (이모지만)
+    var tabsEl = document.getElementById('achTabs');
+    if (tabsEl) {
+      tabsEl.innerHTML = '';
+      catOrder.forEach(function(c) {
+        var label = cats[c] || c;
+        var emoji = label.split(' ')[0] || c;  // "🎯 질문" → "🎯"
+        var catItems = defs.filter(function(a) { return a.cat === c; });
+        var catDone = catItems.filter(function(a) { return a.unlocked; }).length;
+        var btn = document.createElement('button');
+        btn.className = 'ach-tab' + (c === (_achCurrentCat || catOrder[0]) ? ' active' : '');
+        btn.textContent = emoji;
+        btn.dataset.cat = c;
+        btn.dataset.tip = label + ' ' + catDone + '/' + catItems.length;
+        (function(catId) { btn.onclick = function() { _switchAchTab(catId); }; })(c);
+        tabsEl.appendChild(btn);
+      });
+    }
+    // 첫 탭 또는 이전 선택 탭 렌더
+    if (!_achCurrentCat || catOrder.indexOf(_achCurrentCat) < 0) _achCurrentCat = catOrder[0];
+    _renderAchTab(_achCurrentCat);
+  }).catch(function() {
+    body.innerHTML = '<div class="chart-empty">서버 연결 실패</div>';
+  });
+}
+
+function _switchAchTab(cat) {
+  _achCurrentCat = cat;
+  document.querySelectorAll('.ach-tab').forEach(function(btn) {
+    btn.classList.toggle('active', btn.dataset.cat === cat);
+  });
+  _renderAchTab(cat);
+}
+
+function _renderAchTab(cat) {
+  var body = document.getElementById('chartBody');
+  if (!body || !_achData) return;
+  var defs = _achData.achievementDefs || [];
+  var cats = _achData.categories || {};
+  var items = defs.filter(function(a) { return a.cat === cat; });
+  var label = cats[cat] || cat;
+  var catDone = items.filter(function(a) { return a.unlocked; }).length;
+  var html = '<div class="ach-section-header">' + esc(label) + ' <span class="ach-section-count">' + catDone + '/' + items.length + '</span></div>';
+  html += '<div class="ach-grid">';
+  items.forEach(function(a) {
+    html += '<div class="ach-card' + (a.unlocked ? ' unlocked' : '') + '">' +
+      '<div class="ach-icon">' + (a.unlocked ? '✓' : '·') + '</div>' +
+      '<div class="ach-info">' +
+        '<div class="ach-name">' + esc(a.name) + '</div>' +
+        '<div class="ach-desc">' + esc(a.desc) + '</div>' +
+        '<div class="ach-reward">+' + esc(String(a.reward)) + 'P</div>' +
+      '</div>' +
+    '</div>';
+  });
+  html += '</div>';
+  body.innerHTML = html;
 }

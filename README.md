@@ -7,7 +7,7 @@ Claude Code의 에이전트 활동을 실시간으로 시각화하는 로컬 대
 
 https://github.com/user-attachments/assets/b3595469-2546-4624-adf8-9a119ea00c2d
 
-![우주 모드](./screenshots/main.png)
+<img src="./screenshots/main.png" alt="메인 대시보드 — 에이전트 working + 계보선" width="800">
 
 ## 주요 기능
 
@@ -28,13 +28,23 @@ https://github.com/user-attachments/assets/b3595469-2546-4624-adf8-9a119ea00c2d
 - **민감정보 자동 마스킹** — `sk-*`, `ghp_*`, `AKIA*`, JWT, Bearer 토큰 등 자동 치환
 - **브라우저 알림** — 탭 비활성 시 에이전트 완료, 응답 완료 알림 (on/off 토글)
 - **일일 통계** — 오늘의 질문 수, 에이전트별/도구별 사용 횟수, 주간/누적 통계, 🔄 전체 초기화 지원
-- **마을(우주) 모드** — 우주 배경 + 별/은하수/nebula/별똥별. 워크스페이스 폭에 따라 캐릭터 크기 자동 조정 (Tier 1/2/3). 항상 활성 (이전 환경 효과 토글은 제거됨)
-- **🎮 게임화 — 우주 꾸미기 (Phase 2)** — 완전 검정 우주에서 시작, 활동하며 포인트를 모아 아이템으로 꾸며가는 Cookie Clicker 스타일. **65개 아이템** (해금 5 / 별 5 / 큰별 4 / 푸른별·주황별 각 3 / 반짝이는별 5 / 은하수 7 / 성운 5 / 별똥별 8 / 천체 5 / 캐릭터 4 / 이벤트 6 / 메타 1 / Legendary 3) + 14 카테고리 탭. 신규 사용자 환영 보너스 **200P** + 이벤트 훅 자동 포인트 획득(질문 +3, 도구 +0.5, 에이전트 완료 +10, 응답 +1) → **⭐ 포인트 배지** 클릭 시 **🛒 상점 모달** → 구매 즉시 우주에 반영 (SSE). 천체 5종(달/행성/펄사/쌍성/우주정거장) + 캐릭터 효과 4종(후광/잔상/점프/팡파르) + 연속 스트릭 배지. 가격 일괄 ×2, 삭제 아이템 DEPRECATED_ITEMS fallback 환불. 프리뷰 모드 지원(`?preview=empty/mid/full`).
+- **마을(우주) 모드** — 우주 배경 + 별/은하수/nebula/별똥별/별자리. 워크스페이스 폭에 따라 캐릭터 크기 자동 조정 (Tier 1/2/3). 항상 활성 (이전 환경 효과 토글은 제거됨)
+- **💭 Thinking 말풍선** — Master가 생각 중일 때 구름 모양 말풍선 + `···` 바운스 애니메이션 (일반 작업 말풍선과 시각적 구분)
+- **🖱️ 캐릭터 드래그 재배치** — 워크스페이스에서 캐릭터를 마우스/터치로 자유롭게 이동 (grab 커서, 글로우 효과, 안전 경계 clamp)
+- **📐 계보선** — Master가 에이전트를 spawn하면 대시 연결선이 실시간으로 표시, 캐릭터 이동에 따라 15fps 업데이트
+- **🏆 포인트 히스토리 & 성취** — 일별 포인트 획득/사용 추이 + 성취 배지 (마스터/에이전트/수집/이벤트 카테고리). 🏆 버튼으로 모달 열기
+
+<p>
+<img src="./screenshots/achievements.png" alt="성취 모달" width="380">&nbsp;&nbsp;
+<img src="./screenshots/shop.png" alt="우주 상점" width="420">
+</p>
+
+- **🎮 게임화 — 우주 꾸미기 (Phase 2)** — 완전 검정 우주에서 시작, 활동하며 포인트를 모아 아이템으로 꾸며가는 Cookie Clicker 스타일. **66개 아이템** (해금 5 / 별 5 / 큰별 4 / 푸른별·주황별 각 3 / 반짝이는별 5 / 은하수 7 / 성운 5 / 별똥별 8 / 천체 5 / 별자리 1 / 캐릭터 4 / 이벤트 7 / 메타 1 / Legendary 3) + 14 카테고리 탭. 신규 사용자 환영 보너스 **200P** + 이벤트 훅 자동 포인트 획득(질문 +3, 도구 +0.5, 에이전트 완료 +10, 응답 +1) → **⭐ 포인트 배지** 클릭 시 **🛒 상점 모달** → 구매 즉시 우주에 반영 (SSE). 천체 5종(달/행성/펄사/쌍성/우주정거장) + 캐릭터 효과 4종(후광/잔상/점프/팡파르) + 연속 스트릭 배지. 가격 일괄 ×2, 삭제 아이템 DEPRECATED_ITEMS fallback 환불. 프리뷰 모드 지원(`?preview=empty/mid/full`).
 - **성능 최적화** — 탭 비활성 시 애니메이션 자동 정지, renderAll 디바운스, 이벤트 마스터 틱 single-interval, DOM 파티클 상한 가드
 
 ## 요구사항
 
-- macOS (Linux 미테스트)
+- macOS / Windows (Linux 미테스트)
 - Node.js 16+ (`node --version`으로 확인)
 - Claude Code CLI
 
@@ -175,7 +185,7 @@ claude-agents off      # 세션 시작 시 자동 실행 OFF
 | 영역 | 설명 |
 |------|------|
 | **좌측 패널** | Master(CLAUDE.md), Agents(관리/토글), MCP 서버, Hooks |
-| **워크스페이스** | 픽셀아트 캐릭터 + 우주 배경 (별/은하수/nebula/별똥별). 워크스페이스 폭에 따라 캐릭터 크기 자동 (Tier 1/2/3) |
+| **워크스페이스** | 픽셀아트 캐릭터 + 우주 배경 (별/은하수/nebula/별똥별/별자리). 드래그 재배치, Thinking 말풍선, 계보선. Tier 1/2/3 자동 크기 |
 | **액티비티** | Master + 에이전트별 프로그레스 바 + 상태 |
 | **타임라인** | 에이전트 실행 시간 시각화 (Master는 액티비티 패널) |
 | **로그** | 실시간 이벤트 로그 |
@@ -186,6 +196,7 @@ claude-agents off      # 세션 시작 시 자동 실행 OFF
 | 버튼 | 기능 |
 |------|------|
 | ⭐ 포인트 배지 | 현재 잔고 + 누적 표시. 클릭 시 🛒 상점 모달 열기 |
+| 🏆 | 포인트 히스토리 & 성취 모달 (일별 추이 + 성취 배지) |
 | 🔔 | 브라우저 알림 on/off |
 | 🕐 | 세션 히스토리 |
 | ? | 도움말 |
@@ -351,7 +362,9 @@ CLAUDE.md
 | **사용 안 함 토글** | `~/.claude/agent-viz/privacy` (파일 존재 여부) | `/api/privacy` 토글 — ON 시 `saveSessionHistory()` 스킵, 다음 세션부터 디스크에 기록 안 함 (디스크 정리는 별도 "전체 삭제" 액션) |
 | **민감정보 마스킹** | `server.js`의 `maskSecrets()` | `sk-*`/`ghp_*`/`AKIA*`/JWT/Bearer 자동 치환 |
 | **⭐ 포인트 배지** | `points.json` → `GET /api/points` + SSE `points_updated` | 잔고/누적/인벤토리/buffs. 이벤트 훅에서 `POINTS_RULES`에 따라 자동 획득 (질문 +3, 도구 +0.5, 에이전트 완료 +10, 응답 +1) |
-| **🛒 상점 모달** | `constants.js` `ITEMS` 카탈로그 + `pointsData.inventory` | 12 카테고리 탭 · `POST /api/points/purchase`로 구매 (화이트리스트/Origin/1KB DoS 가드) · `POST /api/points/reset` `mode:refund`로 환불 |
+| **🛒 상점 모달** | `constants.js` `ITEMS` 카탈로그 + `pointsData.inventory` | 14 카테고리 탭 · `POST /api/points/purchase`로 구매 (화이트리스트/Origin/1KB DoS 가드) · `POST /api/points/reset` `mode:refund`로 환불 |
+| **🏆 성취 모달** | `GET /api/points/achievements` → 성취 정의 + 달성 상태 | 10개 카테고리 × 51개 성취, 이모지 탭 전환, 달성 시 포인트 보상 |
+| **📐 계보선** | 실시간 이벤트 (Master working + 에이전트 working) | `updateLineage()` — Master→working 에이전트 SVG 대시선, 15fps 업데이트 |
 | **우주 버프 반영** | `computeBuffs(inventory)` → `window.gameBuffs` → `village.js` / `workspace.js` / `event-ticks.js` | 구매 즉시 `renderVillage()` 재호출로 레이어 재생성 + Aurora 상시 오버레이 재부착 |
 
 ### 파일을 만들면 → 대시보드에 자동 반영

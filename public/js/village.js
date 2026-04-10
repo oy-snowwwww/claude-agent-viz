@@ -248,6 +248,88 @@ function makeGalaxy(layer, w, h, opts) {
   return { cx: mwCx, cy: mwCy, rx: mwRx, angle: mwAngle };
 }
 
+// === 별자리 렌더링 (유명 별자리 템플릿) ===
+// 실제 별자리 모양을 정규화 좌표(0~1)로 정의. 화면에 배치 시 위치/크기 랜덤.
+// 별자리당 DOM: 별 N개(2px dot) + 선 M개(div rotate). 애니메이션 없음 — 정적 렌더.
+var CONSTELLATION_TEMPLATES = [
+  { name: '오리온',
+    stars: [[0.2,0],[0.8,0.05],[0.35,0.4],[0.5,0.42],[0.65,0.4],[0.25,0.9],[0.75,0.95]],
+    lines: [[0,2],[1,4],[2,3],[3,4],[2,5],[4,6],[0,1]] },
+  { name: '북두칠성',
+    stars: [[0,0.3],[0.15,0],[0.3,0.25],[0.15,0.55],[0.45,0.3],[0.65,0.25],[0.9,0.15]],
+    lines: [[0,1],[1,2],[2,3],[3,0],[2,4],[4,5],[5,6]] },
+  { name: '카시오페이아',
+    stars: [[0,0],[0.25,0.9],[0.5,0.15],[0.75,0.85],[1,0.05]],
+    lines: [[0,1],[1,2],[2,3],[3,4]] },
+  { name: '백조자리',
+    stars: [[0.5,0],[0.5,0.4],[0,0.35],[1,0.45],[0.5,1]],
+    lines: [[0,1],[1,4],[2,1],[1,3]] },
+  { name: '쌍둥이자리',
+    stars: [[0.15,0],[0.85,0.05],[0.1,0.35],[0.8,0.4],[0.2,0.7],[0.75,0.75],[0.3,1],[0.7,0.95]],
+    lines: [[0,2],[2,4],[4,6],[1,3],[3,5],[5,7],[0,1]] },
+];
+
+function _drawConstellations(layer, layoutStars, w, h, count) {
+  // 별자리 배치 캐시 — 위치/크기/회전은 최초 1회만 결정
+  if (!layoutStars.constellationPlacements) layoutStars.constellationPlacements = [];
+  while (layoutStars.constellationPlacements.length < count) {
+    var idx = layoutStars.constellationPlacements.length % CONSTELLATION_TEMPLATES.length;
+    layoutStars.constellationPlacements.push({
+      templateIdx: idx,
+      cx: 0.15 + Math.random() * 0.7,   // 중심 x (15~85%)
+      cy: 0.15 + Math.random() * 0.7,   // 중심 y
+      scale: 0.08 + Math.random() * 0.07, // 화면 대비 크기 (8~15%)
+      rotation: Math.random() * 360,      // 회전
+    });
+  }
+  for (var ci = 0; ci < count; ci++) {
+    var pl = layoutStars.constellationPlacements[ci];
+    var tpl = CONSTELLATION_TEMPLATES[pl.templateIdx];
+    if (!tpl) continue;
+    var rad = pl.rotation * Math.PI / 180;
+    var cosR = Math.cos(rad);
+    var sinR = Math.sin(rad);
+    var sz = Math.min(w, h) * pl.scale;
+    // 별 위치 계산 (회전 적용)
+    var pts = tpl.stars.map(function(s) {
+      var lx = (s[0] - 0.5) * sz;
+      var ly = (s[1] - 0.5) * sz;
+      return {
+        x: Math.max(0, Math.min(w, Math.round(pl.cx * w + lx * cosR - ly * sinR))),
+        y: Math.max(0, Math.min(h, Math.round(pl.cy * h + lx * sinR + ly * cosR))),
+      };
+    });
+    // 별 점 렌더
+    pts.forEach(function(p) {
+      var dot = document.createElement('div');
+      dot.className = 'village-constellation-star';
+      dot.style.cssText = 'position:absolute;left:' + p.x + 'px;top:' + p.y + 'px;' +
+        'width:2px;height:2px;background:#c8dcff;border-radius:50%;' +
+        'box-shadow:0 0 3px #c8dcff;pointer-events:none;';
+      layer.appendChild(dot);
+    });
+    // 선 렌더
+    tpl.lines.forEach(function(ln) {
+      var a = pts[ln[0]];
+      var b = pts[ln[1]];
+      if (!a || !b) return;
+      var dx = b.x - a.x;
+      var dy = b.y - a.y;
+      var len = Math.sqrt(dx * dx + dy * dy);
+      if (len < 2) return;
+      var angle = Math.atan2(dy, dx) * 180 / Math.PI;
+      var line = document.createElement('div');
+      line.className = 'village-constellation-line';
+      line.style.cssText = 'position:absolute;left:' + a.x + 'px;top:' + a.y + 'px;' +
+        'width:' + Math.round(len) + 'px;height:1px;' +
+        'background:rgba(200,220,255,0.12);' +
+        'transform-origin:0 0;transform:rotate(' + angle.toFixed(2) + 'deg);' +
+        'pointer-events:none;';
+      layer.appendChild(line);
+    });
+  }
+}
+
 function ensureStarsLayer() {
   var ws = document.querySelector('.workspace');
   if (!ws) return;
@@ -605,6 +687,14 @@ function ensureStarsLayer() {
   }
 
   // 우주 정거장은 정적 div 아님 — event-ticks.js에서 5분마다 다양한 각도로 spawn (spawnStation)
+
+  // === 별자리 (constellation) — 가까운 별 3~5개를 선으로 연결 ===
+  // constellationCount buff만큼 별자리 생성 (최대 5). 기존 별 위치 재사용.
+  // SVG 아닌 div line — 별 개수 적을 때 별자리 없음 (최소 3개 필요)
+  var numConst = Math.round(_bf('constellationCount'));
+  if (numConst > 0) {
+    _drawConstellations(layer, layoutStars, w, h, numConst);
+  }
 
   ws.appendChild(layer);
 }

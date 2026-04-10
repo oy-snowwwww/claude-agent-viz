@@ -55,10 +55,10 @@ function initCreature(id, el) {
 var CREATURE_X_MIN_PCT = 4, CREATURE_X_MAX_PCT = 96;
 var CREATURE_Y_MIN_PCT = 6, CREATURE_Y_MAX_PCT = 94;
 // .ws-label: 0.55rem ~13px (line-height 포함), margin-top 4px → ~17px
-// .ws-bubble: padding+text ~14px, 캐릭터로부터 8px 위 → ~22px (working/thinking/done에서만 보임)
+// .ws-bubble: padding+text ~14px, 캐릭터로부터 8px 위 + thought circles ~12px → ~34px
 var LABEL_BLOCK_PX = 17;
-var BUBBLE_BLOCK_PX = 22;
-var SAFETY_PX = 4;
+var BUBBLE_BLOCK_PX = 34;
+var SAFETY_PX = 6;
 
 var _wsBoxCache = null;
 var _safeBoundsCache = null;
@@ -152,6 +152,7 @@ function tickCreatures() {
   _lastCreatureTick = now;
   document.querySelectorAll('.ws-agent').forEach(function(el) {
     var id = el.id.replace('ws-', '');
+    if (_dragId === id) return;
     var agSt = el.dataset.st || 'idle';
     // done 후 5초 지나면 idle로 강제 전환 (creature 재활성화)
     if (agSt === 'done') {
@@ -255,6 +256,7 @@ function tickCreatures() {
       }
     }
   });
+  if (typeof updateLineage === 'function') updateLineage();
 }
 
 // === Walk Animation (다리 움직임) ===
@@ -355,10 +357,60 @@ function stopBlinkInterval() {
   }
 }
 
+// === Drag & Drop (캐릭터 재배치) ===
+var _dragId = null;
+
+function initDrag() {
+  var ws = document.getElementById('workspace');
+  if (!ws) return;
+  function startDrag(id) {
+    _dragId = id;
+    var el = document.getElementById('ws-' + id);
+    if (el) el.classList.add('dragging');
+    if (!creatureLife[id]) creatureLife[id] = initCreature(id, el || { style: {} });
+    creatureLife[id].beh = 'dragging';
+  }
+  function moveDrag(cx, cy) {
+    if (!_dragId) return;
+    var wsEl = document.getElementById('workspace');
+    var el = document.getElementById('ws-' + _dragId);
+    if (!wsEl || !el) { _dragId = null; return; }
+    var rect = wsEl.getBoundingClientRect();
+    var x = ((cx - rect.left) / rect.width) * 100;
+    var y = ((cy - rect.top) / rect.height) * 100;
+    var b = getSafeBounds();
+    x = Math.max(b.minX, Math.min(b.maxX, x));
+    y = Math.max(b.minY, Math.min(b.maxY, y));
+    el.style.left = x.toFixed(2) + '%';
+    el.style.top = y.toFixed(2) + '%';
+    if (creatureLife[_dragId]) { creatureLife[_dragId].x = x; creatureLife[_dragId].y = y; }
+  }
+  function endDrag() {
+    if (!_dragId) return;
+    var el = document.getElementById('ws-' + _dragId);
+    if (el) el.classList.remove('dragging');
+    if (creatureLife[_dragId]) { creatureLife[_dragId].beh = 'stand'; creatureLife[_dragId].nextAction = Date.now() + 2000; }
+    _dragId = null;
+  }
+  ws.addEventListener('mousedown', function(e) {
+    var a = e.target.closest('.ws-agent'); if (!a) return;
+    e.preventDefault(); startDrag(a.id.replace('ws-', ''));
+  });
+  document.addEventListener('mousemove', function(e) { if (_dragId) { e.preventDefault(); moveDrag(e.clientX, e.clientY); } });
+  document.addEventListener('mouseup', endDrag);
+  ws.addEventListener('touchstart', function(e) {
+    var a = e.target.closest('.ws-agent'); if (!a) return;
+    startDrag(a.id.replace('ws-', ''));
+  }, { passive: true });
+  document.addEventListener('touchmove', function(e) { if (_dragId) { e.preventDefault(); moveDrag(e.touches[0].clientX, e.touches[0].clientY); } }, { passive: false });
+  document.addEventListener('touchend', endDrag);
+}
+
 // === 초기화 ===
 // 인라인 Init 섹션에서 호출
 function initCreatureSystem() {
   startBlinkInterval();
   requestAnimationFrame(tickCreatures);
   startWalkInterval();
+  initDrag();
 }
