@@ -204,7 +204,15 @@ function _handleAgentDone(data, sp, sn) {
     inst.st = 'done'; inst.doneTime = Date.now(); inst.task = inst.desc + ' \u2014 \uC644\uB8CC (' + sec + 's)'; inst.prog = 100;
     var ai = getAgentInfo(at); var doneAgentName = ai ? ai.name : at;
     addLog({ name: doneAgentName, color: inst.color }, (sn ? '[' + sn + '] ' : '') + inst.desc + ' \uC644\uB8CC (' + sec + 's)', 'ok', sp, sn);
-    renderAll(); setTimeout(function() { sparks('inst-' + key, inst.color); flyDot('inst-' + key, 'master') }, 50);
+    renderAll(); setTimeout(function() {
+      sparks('inst-' + key, inst.color);
+      flyDot('inst-' + key, 'master');
+      // char_fanfare: 게임 버프 활성 시 별이 위로 튀어오르는 화려한 팡파르 추가
+      // workspace.js의 실제 DOM id는 'ws-' + agentId 형식 (sparks/flyDot의 inst- prefix는 기존 버그)
+      if ((window.gameBuffs || {}).charFanfare > 0 && typeof charFanfare === 'function') {
+        charFanfare(inst.agentId, inst.color);
+      }
+    }, 50);
     if (!Object.values(liveInstances).some(function(i) { return i.sessionPid === sp && i.st === 'working' })) {
       // 아직 응답 작성 중이면 thinking으로 복귀, 아니면 idle
       var sd = sp && sessions[sp] ? sessions[sp] : null;
@@ -240,6 +248,9 @@ function handleLiveEvent(data) {
   var evt = data.event; var sp = data.session_pid || ''; var sn = data.session_name || '';
   if (evt === 'connected') return;
   updateDailyStatFromEvent(data);
+  // 게임화 포인트 이벤트 — points.js가 로드되어 있을 때만 호출. 로그 기록은 안 함 (중요 로그 가독성 보호)
+  if (typeof updatePointsFromEvent === 'function') updatePointsFromEvent(data);
+  if (evt === 'points_updated') return;
   // session_start 계열 이벤트는 lastActivity 갱신 대상이 아님
   if (_activityEvents[evt] && sp && sessions[sp]) { sessions[sp].lastActivity = new Date().toISOString() }
   var handler = _eventHandlers[evt];

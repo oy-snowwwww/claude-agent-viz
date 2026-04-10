@@ -65,6 +65,36 @@ function flyDot(fid, tid) {
   requestAnimationFrame(anim);
 }
 
+// === char_fanfare 아이템 — agent_done 시 캐릭터에서 별 12개가 위로 튀어오름 ===
+// sparks와 다른 점: 더 큼, 더 많이, 더 위로, 컬러풀
+function charFanfare(wid, color) {
+  var el = document.getElementById('ws-' + wid);
+  var ws = document.getElementById('workspace');
+  if (!el || !ws) return;
+  var r = el.getBoundingClientRect();
+  var wr = ws.getBoundingClientRect();
+  var cx = r.left - wr.left + r.width / 2;
+  var cy = r.top - wr.top + r.height / 2;
+  var fanColors = [color, '#fbbf24', '#a78bfa', '#00ffc8', '#f472b6'];
+  for (var i = 0; i < 12; i++) {
+    (function(idx) {
+      setTimeout(function() {
+        var p = document.createElement('div');
+        p.className = 'char-fanfare-particle';
+        p.style.background = fanColors[idx % fanColors.length];
+        p.style.left = cx + 'px';
+        p.style.top = cy + 'px';
+        var dx = (Math.random() * 80 - 40);
+        var dy = -60 - Math.random() * 60;
+        p.style.setProperty('--fan-dx', dx + 'px');
+        p.style.setProperty('--fan-dy', dy + 'px');
+        ws.appendChild(p);
+        setTimeout(function() { p.remove(); }, 1500);
+      }, idx * 30);
+    })(i);
+  }
+}
+
 // === 축하 파티클 (전체 작업 완료 시) ===
 function celebrate() {
   var ws = document.getElementById('workspace');

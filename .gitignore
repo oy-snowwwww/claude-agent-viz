@@ -4,6 +4,7 @@
 /privacy
 /enabled
 /agent-stats.json
+/points.json
 
 # 설정 / 에디터
 .idea/

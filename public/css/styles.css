@@ -328,12 +328,17 @@
       0%,100%{transform:translate(0,0)}
       50%{transform:translate(8px,-4px)}
     }
+    /* 성운 맥동 — 인라인 --pulse-amp(0~0.3)로 진폭, --neb-base-opacity(0.75/0.9)로 기본 밝기 */
+    @keyframes village-nebula-pulse{
+      0%,100%{opacity:var(--neb-base-opacity, .75)}
+      50%{opacity:calc(var(--neb-base-opacity, .75) + var(--pulse-amp, 0))}
+    }
     .village-nebula{
       pointer-events:none;
       mix-blend-mode:screen;
-      filter:blur(22px);
-      will-change:transform;
-      opacity:.7;
+      will-change:transform,opacity;
+      opacity:var(--neb-base-opacity, .75);
+      /* filter는 village.js에서 크기 비례로 inline 설정 */
     }
 
     /* === 은하수는 점점이 밀집된 작은 별 무리로 표현 (village.js, .village-star 재사용) === */
@@ -353,11 +358,20 @@
       pointer-events:none;
     }
     .village-shooting-star::before{
-      content:'';position:absolute;right:1px;top:1px;
+      /* 꼬리 anchor를 별 중앙(50%/50%)으로 → 별 크기와 무관하게 꼬리가 별 중앙에서 시작 */
+      content:'';position:absolute;
+      right:50%;top:50%;
+      margin-top:-.5px;
       width:var(--shoot-trail-len,40px);height:1px;
       background:linear-gradient(to right,transparent,var(--shoot-color,rgba(255,255,255,.8)));
       transform-origin:right center;
       transform:rotate(var(--shoot-trail-angle,27deg));
+    }
+    /* 무지개 꼬리 (meteor_rainbow 아이템) — inline animation에 meteorHueRotate 추가 전달
+       filter가 요소 전체(자식 ::before 포함)에 걸려 머리/꼬리 동시 순환 */
+    @keyframes meteorHueRotate{
+      0%{filter:hue-rotate(0deg) saturate(1.6) brightness(1.1)}
+      100%{filter:hue-rotate(360deg) saturate(1.6) brightness(1.1)}
     }
 
     .ws-bubble{position:absolute;bottom:calc(100% + 8px);left:50%;transform:translateX(-50%);background:var(--surface);border:1px solid var(--border);border-radius:5px;padding:3px 8px;font-size:.5rem;font-family:monospace;color:var(--text);white-space:nowrap;opacity:0;transition:opacity .3s;box-shadow:0 2px 8px rgba(0,0,0,.4);pointer-events:none}
@@ -379,9 +393,631 @@
     .ws-agent{animation:agentEnter .5s ease-out}
     @keyframes agentEnter{from{opacity:0;transform:translate(-50%,-50%) translateY(15px)}to{opacity:1;transform:translate(-50%,-50%) translateY(0)}}
 
-    /* 떠다니는 파티클 */
+    /* 떠다니는 파티클 — --dy는 game-buff로 상승 높이 조정 (기본 -150px) */
     .ambient{position:absolute;width:3px;height:3px;border-radius:50%;pointer-events:none;z-index:0;opacity:0;animation:floatUp linear infinite}
-    @keyframes floatUp{0%{opacity:0;transform:translate(0,0)}10%{opacity:.6}90%{opacity:.6}100%{opacity:0;transform:translate(var(--dx),-150px)}}
+    @keyframes floatUp{0%{opacity:0;transform:translate(0,0)}10%{opacity:.6}90%{opacity:.6}100%{opacity:0;transform:translate(var(--dx),var(--dy,-150px))}}
+
+    /* ========== 게임화: 포인트 배지 ========== */
+    .points-badge{
+      display:inline-flex;align-items:center;gap:4px;
+      padding:3px 10px;
+      background:linear-gradient(135deg,rgba(251,191,36,.15),rgba(167,139,250,.15));
+      border:1px solid rgba(251,191,36,.4);
+      border-radius:12px;
+      font-size:.55rem;font-family:monospace;
+      color:#fbbf24;
+      cursor:pointer;
+      transition:all .2s;
+      position:relative;
+      user-select:none;
+    }
+    .points-badge:hover{
+      background:linear-gradient(135deg,rgba(251,191,36,.25),rgba(167,139,250,.25));
+      border-color:rgba(251,191,36,.7);
+      box-shadow:0 0 8px rgba(251,191,36,.4);
+    }
+    .points-badge strong{font-weight:700;color:#fff}
+    .points-icon{font-size:.65rem}
+    .points-preview-tag{
+      font-size:.45rem;padding:1px 5px;
+      background:rgba(167,139,250,.3);
+      border-radius:6px;color:#a78bfa;
+    }
+    /* 포인트 획득 시 "+N" 플로팅 애니메이션 */
+    .points-float{
+      position:absolute;top:-4px;left:50%;
+      transform:translateX(-50%);
+      color:#10b981;
+      font-weight:700;font-size:.55rem;
+      pointer-events:none;
+      animation:pointsFloat 1.4s ease-out forwards;
+      text-shadow:0 0 4px rgba(16,185,129,.6);
+    }
+    @keyframes pointsFloat{
+      0%{opacity:0;transform:translate(-50%,0) scale(.8)}
+      20%{opacity:1;transform:translate(-50%,-4px) scale(1.1)}
+      80%{opacity:1;transform:translate(-50%,-20px) scale(1)}
+      100%{opacity:0;transform:translate(-50%,-30px) scale(.9)}
+    }
+
+    /* ========== 게임화: 상점 모달 ========== */
+    .shop-overlay{
+      position:fixed;inset:0;
+      background:rgba(8,8,16,.85);
+      backdrop-filter:blur(4px);
+      display:none;align-items:center;justify-content:center;
+      z-index:9998;
+    }
+    .shop-overlay.show{display:flex}
+    .shop-modal{
+      background:var(--surface,#111120);
+      border:1px solid rgba(251,191,36,.35);
+      border-radius:12px;
+      width:min(900px,94vw);
+      height:min(680px,88vh);
+      display:flex;flex-direction:column;
+      box-shadow:0 20px 60px rgba(0,0,0,.6),0 0 40px rgba(251,191,36,.1);
+      font-family:monospace;
+    }
+    .shop-header{
+      display:flex;align-items:center;gap:16px;
+      padding:14px 18px;
+      border-bottom:1px solid var(--border);
+      flex-shrink:0;
+    }
+    .shop-header h2{
+      margin:0;font-size:.85rem;color:#fbbf24;flex-shrink:0;
+    }
+    .shop-wallet{
+      flex:1;
+      font-size:.65rem;
+      color:#f5f5fa;
+    }
+    .shop-wallet strong{color:#fbbf24;font-size:.8rem}
+    .shop-lifetime{
+      color:#b8b8c8;
+      margin-left:10px;
+      font-size:.55rem;
+    }
+    .shop-preview-warning{
+      color:#a78bfa;
+      padding:3px 8px;
+      background:rgba(167,139,250,.15);
+      border:1px solid rgba(167,139,250,.4);
+      border-radius:4px;
+      font-size:.5rem;
+    }
+    .shop-close{
+      background:transparent;border:none;
+      color:#d0d0e0;
+      font-size:1.4rem;cursor:pointer;
+      padding:0 4px;
+      transition:color .2s;
+    }
+    .shop-close:hover{color:#fff}
+    .shop-tabs{
+      display:flex;flex-wrap:wrap;gap:4px;
+      padding:10px 18px;
+      border-bottom:1px solid var(--border);
+      flex-shrink:0;
+    }
+    .shop-tab{
+      padding:4px 10px;
+      background:var(--surface-alt,#1a1a28);
+      border:1px solid var(--border);
+      border-radius:6px;
+      color:#d8d8e8;
+      font-size:.55rem;font-family:monospace;
+      cursor:pointer;
+      transition:all .15s;
+    }
+    .shop-tab:hover{
+      background:rgba(251,191,36,.1);
+      border-color:rgba(251,191,36,.4);
+      color:#fbbf24;
+    }
+    .shop-tab.active{
+      background:rgba(251,191,36,.2);
+      border-color:#fbbf24;
+      color:#fbbf24;
+      font-weight:700;
+    }
+    .shop-grid{
+      flex:1;
+      padding:14px 18px;
+      overflow-y:auto;
+      display:grid;
+      grid-template-columns:repeat(auto-fill,minmax(220px,1fr));
+      gap:10px;
+      align-content:start;
+    }
+    .shop-grid::-webkit-scrollbar{width:6px}
+    .shop-grid::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+    .shop-category-locked{
+      grid-column:1/-1;
+      padding:10px 14px;
+      background:rgba(239,68,68,.1);
+      border:1px solid rgba(239,68,68,.3);
+      border-radius:6px;
+      color:#fca5a5;
+      font-size:.55rem;
+    }
+    .shop-category-locked strong{color:#fbbf24}
+    .shop-empty{
+      grid-column:1/-1;
+      text-align:center;
+      color:#b8b8c8;
+      font-size:.6rem;
+      padding:40px 0;
+    }
+    .shop-item{
+      background:var(--surface-alt,#1a1a28);
+      border:1px solid var(--border);
+      border-radius:8px;
+      padding:10px;
+      display:flex;flex-direction:column;
+      gap:6px;
+      transition:all .2s;
+      position:relative;
+    }
+    .shop-item:hover{
+      border-color:rgba(251,191,36,.5);
+      transform:translateY(-2px);
+      box-shadow:0 4px 12px rgba(0,0,0,.4);
+    }
+    .shop-item.locked{opacity:.5}
+    .shop-item.maxed{border-color:rgba(16,185,129,.4);background:rgba(16,185,129,.05)}
+    .shop-item.rarity-common{border-left:3px solid #9ca3af}
+    .shop-item.rarity-rare{border-left:3px solid #60a5fa}
+    .shop-item.rarity-epic{border-left:3px solid #a78bfa;box-shadow:0 0 8px rgba(167,139,250,.15)}
+    .shop-item.rarity-legendary{
+      border-left:3px solid #fbbf24;
+      background:linear-gradient(135deg,rgba(251,191,36,.08),var(--surface-alt,#1a1a28));
+      box-shadow:0 0 12px rgba(251,191,36,.2);
+    }
+    .shop-item-header{
+      display:flex;justify-content:space-between;align-items:center;gap:8px;
+    }
+    .shop-item-name{
+      color:#ffffff;font-size:.65rem;font-weight:700;
+      text-shadow:0 0 8px rgba(255,255,255,.15);
+    }
+    .shop-item-rarity{
+      font-size:.4rem;
+      padding:1px 6px;
+      border-radius:8px;
+      text-transform:uppercase;
+      font-weight:600;
+    }
+    .shop-item-rarity.common{background:rgba(156,163,175,.2);color:#9ca3af}
+    .shop-item-rarity.rare{background:rgba(96,165,250,.2);color:#60a5fa}
+    .shop-item-rarity.epic{background:rgba(167,139,250,.2);color:#a78bfa}
+    .shop-item-rarity.legendary{background:rgba(251,191,36,.25);color:#fbbf24}
+    .shop-item-desc{
+      color:#d0d0e0;
+      font-size:.55rem;
+      min-height:24px;
+      line-height:1.5;
+    }
+    .shop-item-stack{
+      color:#a8a8b8;
+      font-size:.5rem;
+    }
+    .shop-item.maxed .shop-item-stack{color:#10b981}
+    .shop-buy-btn{
+      background:linear-gradient(135deg,rgba(251,191,36,.2),rgba(167,139,250,.15));
+      border:1px solid rgba(251,191,36,.4);
+      border-radius:4px;
+      color:#fbbf24;
+      font-family:monospace;font-size:.55rem;font-weight:700;
+      padding:6px;
+      cursor:pointer;
+      transition:all .15s;
+      margin-top:auto;
+    }
+    .shop-buy-btn:hover:not(:disabled){
+      background:linear-gradient(135deg,rgba(251,191,36,.35),rgba(167,139,250,.25));
+      border-color:#fbbf24;
+      transform:scale(1.02);
+    }
+    .shop-buy-btn:disabled{
+      cursor:not-allowed;
+      opacity:.5;
+    }
+    .shop-buy-btn.insufficient{
+      background:rgba(156,163,175,.1);
+      border-color:rgba(156,163,175,.4);
+      color:#b0b0c0;
+    }
+    .shop-buy-btn.confirming{
+      background:rgba(239,68,68,.3);
+      border-color:#ef4444;
+      color:#fff;
+      animation:pulse .8s ease-in-out infinite;
+    }
+    .shop-footer{
+      padding:12px 18px;
+      border-top:1px solid var(--border);
+      display:flex;gap:10px;justify-content:flex-end;
+      flex-shrink:0;
+    }
+    .shop-refund-btn{
+      padding:6px 14px;
+      border-radius:6px;
+      font-family:monospace;font-size:.55rem;
+      cursor:pointer;
+      transition:all .15s;
+      font-weight:700;
+      background:rgba(96,165,250,.15);
+      border:1px solid rgba(96,165,250,.4);
+      color:#93c5fd;
+    }
+    .shop-refund-btn:hover{
+      background:rgba(96,165,250,.25);
+      border-color:#60a5fa;
+      color:#dbeafe;
+    }
+    .shop-refund-btn.confirming{
+      background:rgba(239,68,68,.4);
+      border-color:#ef4444;
+      color:#fff;
+      animation:pulse .8s ease-in-out infinite;
+    }
+
+    /* ========== 게임화: 신규 이펙트 ========== */
+
+    /* 반짝이는 별 (무지개 회전) — village.js에서 생성 */
+    @keyframes village-rainbow{
+      0%{filter:hue-rotate(0deg) brightness(1.1);opacity:.6}
+      25%{filter:hue-rotate(90deg) brightness(1.4);opacity:1}
+      50%{filter:hue-rotate(180deg) brightness(1.1);opacity:.7}
+      75%{filter:hue-rotate(270deg) brightness(1.4);opacity:1}
+      100%{filter:hue-rotate(360deg) brightness(1.1);opacity:.6}
+    }
+    .village-rainbow-star{position:absolute;will-change:filter,opacity;color:#a8c8ff}
+
+    /* 이벤트: 우주의 숨결 (전체 페이드) */
+    .village-stars-layer.evt-heartbeat{animation:evtHeartbeat .5s ease-in-out}
+    @keyframes evtHeartbeat{0%,100%{filter:brightness(1)}50%{filter:brightness(1.8)}}
+
+    /* 이벤트: 별빛 부스터 (밝기 2배) */
+    .village-stars-layer.evt-booster{animation:evtBooster 1s ease-in-out}
+    @keyframes evtBooster{0%,100%{filter:brightness(1)}50%{filter:brightness(2.2)}}
+
+    /* 이벤트: 은하수 번쩍 */
+    .village-stars-layer.evt-galaxy-flash{animation:evtGalaxyFlash 2s ease-in-out}
+    @keyframes evtGalaxyFlash{0%,100%{filter:brightness(1)}50%{filter:brightness(2.5) contrast(1.2)}}
+
+    /* 이벤트: 성운 개화 */
+    .village-nebula.evt-bloom{animation:evtNebulaBloom 3s ease-in-out;will-change:transform,opacity}
+    @keyframes evtNebulaBloom{0%,100%{transform:scale(1);opacity:.7}50%{transform:scale(1.5);opacity:1}}
+
+    /* 이벤트: 무지개 물결 */
+    .village-stars-layer.evt-rainbow-wave{animation:evtRainbowWave 2s linear}
+    @keyframes evtRainbowWave{0%{filter:hue-rotate(0deg)}100%{filter:hue-rotate(360deg)}}
+
+    /* Legendary: Supernova flash
+       이전: position:absolute;inset:0 — layer 박스 전체에 깔린 div → boundary에서 빛 잘려 사각형 박스 그대로 노출
+       해결: 작은 원형 div(20px) + scale 변환으로 점진 확산 → 박스 boundary 흔적 없음 */
+    .evt-supernova-flash{
+      position:absolute;
+      left:50%;top:50%;
+      width:20px;height:20px;
+      border-radius:50%;
+      transform:translate(-50%,-50%) scale(0);
+      background:radial-gradient(circle,rgba(255,255,255,.9) 0%,rgba(251,191,36,.5) 30%,rgba(255,107,107,.25) 60%,transparent 100%);
+      box-shadow:0 0 30px rgba(255,255,255,.6),0 0 60px rgba(251,191,36,.4);
+      pointer-events:none;
+      animation:evtSupernovaFlash 1.5s ease-out forwards;
+    }
+    @keyframes evtSupernovaFlash{
+      0%  {transform:translate(-50%,-50%) scale(0);  opacity:0}
+      15% {transform:translate(-50%,-50%) scale(1.5);opacity:1}
+      40% {transform:translate(-50%,-50%) scale(6);  opacity:.85}
+      100%{transform:translate(-50%,-50%) scale(18); opacity:0}
+    }
+    .evt-supernova-particle{
+      position:absolute;
+      width:4px;height:4px;border-radius:50%;
+      box-shadow:0 0 8px currentColor;
+      pointer-events:none;
+      animation:evtSupernovaParticle 2.5s ease-out forwards;
+      --sx:0px;--sy:0px;
+    }
+    @keyframes evtSupernovaParticle{
+      0%{transform:translate(-50%,-50%);opacity:1}
+      100%{transform:translate(calc(-50% + var(--sx)),calc(-50% + var(--sy)));opacity:0}
+    }
+
+    /* === 🌙 천체 (Celestial) === */
+    /* 달 — 큰 원형 + 표면 디테일 + 글로우 */
+    .village-moon{
+      pointer-events:none;
+      border-radius:50%;
+      background:
+        radial-gradient(circle at 60% 65%,rgba(60,40,20,.35) 5%,transparent 9%),
+        radial-gradient(circle at 30% 70%,rgba(60,40,20,.30) 4%,transparent 8%),
+        radial-gradient(circle at 70% 35%,rgba(60,40,20,.25) 4%,transparent 7%),
+        radial-gradient(circle at 35% 35%,#fff8e8 0%,#e8d8b8 60%,#c8b890 100%);
+      box-shadow:0 0 25px rgba(255,240,200,.5),0 0 50px rgba(255,240,200,.25),inset -10px -10px 14px rgba(60,40,20,.45);
+      will-change:transform;
+      animation:villageMoonFloat 12s ease-in-out infinite;
+    }
+    @keyframes villageMoonFloat{
+      0%,100%{transform:translateY(0)}
+      50%{transform:translateY(8px)}
+    }
+
+    /* 떠도는 행성 — orbit wrapper가 회전, 행성은 wrapper 안에서 정적 위치
+       .village-planet/.village-binary-star 자체 시각 속성은 inline style에 있음 (여기엔 공통 애니메이션만) */
+    .village-planet-orbit{
+      border-radius:50%;
+    }
+    @keyframes villagePlanetOrbit{
+      from{transform:rotate(0deg)}
+      to{transform:rotate(360deg)}
+    }
+
+    /* 펄사 — 매우 빠른 점멸 */
+    .village-pulsar{
+      will-change:opacity,transform;
+    }
+    @keyframes villagePulsar{
+      0%,100%{opacity:.2;transform:scale(.6)}
+      50%{opacity:1;transform:scale(1.2)}
+    }
+
+    /* 쌍성 — wrapper 회전으로 두 별이 서로 공전 */
+    .village-binary-wrapper{
+      transform-origin:center;
+    }
+    @keyframes villageBinaryRotate{
+      from{transform:rotate(0deg)}
+      to{transform:rotate(360deg)}
+    }
+
+    /* 우주 정거장 — event-ticks.js fireStation()이 5분마다 새 div spawn
+       매번 4가지 경로 중 랜덤 (좌↔우 수평 + 좌상↔우하/우상↔좌하 대각선)
+       빛점 + 진행 방향 트레일 + 30초 지속 (매우 느린 순항 느낌) */
+    .village-station{
+      position:absolute;
+      width:3px;height:3px;
+      background:#ffffff;
+      border-radius:50%;
+      box-shadow:0 0 6px #ffffff,0 0 12px #a8c8ff;
+      pointer-events:none;
+      will-change:transform,opacity;
+      animation:villageStationCross 30s linear forwards;
+    }
+    .village-station::before{
+      content:'';
+      position:absolute;
+      right:2px;top:1px;
+      width:70px;height:1px;
+      background:linear-gradient(to right,transparent 0%,rgba(168,200,255,.4) 50%,rgba(255,255,255,.9) 100%);
+      transform-origin:right center;
+      transform:rotate(var(--st-angle,0deg));
+    }
+    @keyframes villageStationCross{
+      0%   {transform:translate(var(--st-sx,-80px),var(--st-sy,0)); opacity:0}
+      5%   {opacity:1}
+      95%  {opacity:1}
+      100% {transform:translate(var(--st-ex,100vw),var(--st-ey,0)); opacity:0}
+    }
+
+    /* === 👤 캐릭터 효과 (char_*) === */
+    /* char_halo: working 중인 캐릭터 주변 후광 — ::after 사용 (::before는 기존 그림자) */
+    .workspace[data-char-halo="1"] .ws-agent.working::after{
+      content:'';
+      position:absolute;
+      left:50%;top:50%;
+      width:140%;height:140%;
+      transform:translate(-50%,-50%);
+      border-radius:50%;
+      background:radial-gradient(circle,rgba(255,240,150,.35) 0%,rgba(255,200,100,.15) 30%,transparent 65%);
+      pointer-events:none;
+      animation:charHaloPulse 2s ease-in-out infinite;
+      z-index:-1;
+    }
+    @keyframes charHaloPulse{
+      0%,100%{opacity:.6;transform:translate(-50%,-50%) scale(1)}
+      50%{opacity:1;transform:translate(-50%,-50%) scale(1.1)}
+    }
+
+    /* char_jump: 잠깐 위로 점프 — transform 대신 margin-top 변경으로
+       master 캐릭터의 `transform: translate(-50%, -50%)` 중심 정렬과 충돌 방지 */
+    .ws-agent.char-jumping{
+      animation:charJump .5s ease-out;
+    }
+    @keyframes charJump{
+      0%,100%{margin-top:0}
+      50%{margin-top:-12px}
+    }
+
+    /* char_trail: ghost 잔상 (fade-out) */
+    .char-trail-ghost{
+      position:absolute;
+      pointer-events:none;
+      background:rgba(255,255,255,.18);
+      filter:blur(3px);
+      border-radius:6px;
+      animation:charTrailFade .7s ease-out forwards;
+      z-index:1;
+    }
+    @keyframes charTrailFade{
+      0%{opacity:.5}
+      100%{opacity:0;transform:scale(.85)}
+    }
+
+    /* char_fanfare: 별 12개가 위로 튀어오름 */
+    .char-fanfare-particle{
+      position:absolute;
+      width:6px;height:6px;border-radius:50%;
+      pointer-events:none;
+      box-shadow:0 0 8px currentColor;
+      animation:charFanfare 1.5s cubic-bezier(.2,.6,.3,1) forwards;
+      z-index:25;
+      --fan-dx:0px;--fan-dy:-60px;
+    }
+    @keyframes charFanfare{
+      0%{transform:translate(0,0) scale(.5);opacity:0}
+      15%{transform:translate(0,0) scale(1.4);opacity:1}
+      100%{transform:translate(var(--fan-dx),var(--fan-dy)) scale(.6);opacity:0}
+    }
+
+    /* === 성운 번개 (nebula_lightning) — 성운 안에 가끔 flash === */
+    .village-nebula.lightning{
+      animation:village-nebula-drift var(--drift-dur,60s) ease-in-out 0s infinite,
+                villageNebulaLightning 7s linear infinite;
+    }
+    @keyframes villageNebulaLightning{
+      0%,89%{filter:blur(var(--neb-blur,16px)) brightness(1)}
+      90%,91%{filter:blur(var(--neb-blur,16px)) brightness(2.5)}
+      92%,100%{filter:blur(var(--neb-blur,16px)) brightness(1)}
+    }
+
+    /* === 유성 착지 폭발 (meteor_explode) === */
+    .village-meteor-explode{
+      width:4px;height:4px;border-radius:50%;
+      pointer-events:none;
+      box-shadow:0 0 12px currentColor,0 0 24px currentColor;
+      transform:translate(-50%,-50%) scale(0);
+      animation:villageMeteorExplode .7s ease-out forwards;
+    }
+    @keyframes villageMeteorExplode{
+      0%{transform:translate(-50%,-50%) scale(0);opacity:0}
+      30%{transform:translate(-50%,-50%) scale(2.5);opacity:1}
+      100%{transform:translate(-50%,-50%) scale(6);opacity:0}
+    }
+
+    /* === 헤더 스트릭 배지 (meta_streak) === */
+    .streak-badge{
+      display:inline-flex;align-items:center;
+      padding:3px 9px;
+      background:linear-gradient(135deg,rgba(251,146,60,.2),rgba(239,68,68,.15));
+      border:1px solid rgba(251,146,60,.5);
+      border-radius:12px;
+      font-size:.55rem;font-family:monospace;
+      color:#fb923c;font-weight:700;
+      cursor:default;
+      user-select:none;
+    }
+
+    /* === galaxy_rotation 아이템 — 은하수 wrapper만 180초 1회전 (별/성운은 회전하지 않음) === */
+    .village-galaxy-wrapper.rotating{
+      animation:villageGalaxyRotate 180s linear infinite;
+      transform-origin:50% 50%;
+      will-change:transform;
+    }
+    @keyframes villageGalaxyRotate{
+      from{transform:rotate(0deg)}
+      to{transform:rotate(360deg)}
+    }
+
+    /* === 이벤트: Color Storm — 1초 강한 hue-rotate + 채도 부스트 === */
+    .village-stars-layer.evt-color-storm{
+      animation:evtColorStorm 1s linear forwards;
+    }
+    @keyframes evtColorStorm{
+      0%,100%{filter:hue-rotate(0deg) saturate(1)}
+      50%{filter:hue-rotate(180deg) saturate(1.6)}
+    }
+
+    /* === 이벤트: Pulse Chain — 큰 별이 일시적으로 진폭 큰 맥동 (0.8s) === */
+    .village-pulse-star.evt-pulse-chain{
+      animation:evtPulseChain .8s ease-in-out forwards;
+    }
+    @keyframes evtPulseChain{
+      0%,100%{transform:scale(1);opacity:1;filter:brightness(1)}
+      50%{transform:scale(2.2);opacity:1;filter:brightness(1.8)}
+    }
+
+    /* === Legendary: Twin Moons — 서로 다른 두 행성 (바위 + 가스) ===
+       좌: 달 크레이터 바위 행성 (48px, 베이지, 느린 자전)
+       우: 가스 행성 stripe (34px, 주황/갈색, 빠른 자전, 대적점)
+       크기·색·패턴·자전 속도 모두 차이 → 시각적으로 확실히 구분 */
+    .evt-twinmoon{
+      position:absolute;
+      border-radius:50%;
+      overflow:hidden;
+      pointer-events:none;
+      will-change:transform;
+    }
+    /* inner 표면 — width 200%로 두고 translateX로 왼쪽으로 흘려보내면 자전 느낌 */
+    .evt-twinmoon::before{
+      content:'';
+      position:absolute;
+      top:0;left:0;
+      width:200%;height:100%;
+      will-change:transform;
+    }
+    /* 표면 위에 전체 구체 음영 (고정) — 3D 구 느낌 */
+    .evt-twinmoon::after{
+      content:'';
+      position:absolute;
+      inset:0;
+      border-radius:50%;
+      pointer-events:none;
+      background:radial-gradient(circle at 35% 35%,rgba(255,255,255,.3) 0%,transparent 40%),
+                 radial-gradient(circle at 70% 70%,rgba(0,0,0,.55) 0%,transparent 70%);
+    }
+
+    /* === 좌: 바위 행성 (달 크레이터, 48px) === */
+    .evt-twinmoon-left{
+      left:30px;top:30%;
+      width:48px;height:48px;
+      box-shadow:0 0 24px rgba(255,240,220,.45);
+      mix-blend-mode:screen;
+    }
+    .evt-twinmoon-left::before{
+      background:
+        radial-gradient(circle at 12% 35%,rgba(60,40,20,.60) 3.5%,transparent 7%),
+        radial-gradient(circle at 28% 65%,rgba(60,40,20,.50) 2.5%,transparent 6%),
+        radial-gradient(circle at 45% 25%,rgba(60,40,20,.55) 3%,transparent 6%),
+        radial-gradient(circle at 58% 70%,rgba(60,40,20,.45) 2%,transparent 5%),
+        radial-gradient(circle at 75% 40%,rgba(60,40,20,.55) 3%,transparent 6.5%),
+        radial-gradient(circle at 88% 60%,rgba(60,40,20,.40) 2%,transparent 5%),
+        linear-gradient(90deg,
+          #e8d8b8 0%,#f2e4c4 25%,#e0d0ac 50%,#f2e4c4 75%,#e8d8b8 100%);
+      animation:evtMoonSurface 80s linear infinite;
+    }
+
+    /* === 우: 가스 행성 (stripe + 대적점, 34px) === */
+    .evt-twinmoon-right{
+      right:30px;top:55%;
+      width:34px;height:34px;
+      box-shadow:0 0 22px rgba(255,180,120,.45);
+      mix-blend-mode:screen;
+    }
+    .evt-twinmoon-right::before{
+      background:
+        /* 대적점 (목성 Great Red Spot 컨셉) */
+        radial-gradient(ellipse 8% 5% at 30% 55%,rgba(200,60,40,.75) 40%,rgba(180,80,50,.45) 70%,transparent 100%),
+        radial-gradient(ellipse 8% 5% at 80% 55%,rgba(200,60,40,.75) 40%,rgba(180,80,50,.45) 70%,transparent 100%),
+        /* 가로 stripe (가스 행성 특유의 대기 띠) */
+        linear-gradient(180deg,
+          #d08848 0%,
+          #e8a868 12%,
+          #b06820 22%,
+          #d89858 35%,
+          #c07830 48%,
+          #e8b070 60%,
+          #a85818 72%,
+          #d89858 85%,
+          #c07830 100%);
+      animation:evtGasSurface 25s linear infinite;
+    }
+
+    /* 표면이 왼쪽에서 오른쪽으로 계속 흘러감 → 자전 느낌 */
+    @keyframes evtMoonSurface{
+      from{transform:translateX(0)}
+      to{transform:translateX(-50%)}
+    }
+    @keyframes evtGasSurface{
+      from{transform:translateX(0)}
+      to{transform:translateX(-50%)}
+    }
+
 
     /* Activity Panel */
     .activity{flex:0 0 auto;border-top:1px solid var(--border);background:var(--surface);max-height:180px;overflow-y:auto;scrollbar-width:thin}
