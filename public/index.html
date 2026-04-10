@@ -25,7 +25,8 @@
         <button class="notif-btn" onclick="toggleNotif()" id="notifBtn" data-tip="알림">&#128276;</button>
         <button class="help-btn" onclick="toggleHistory()" data-tip="히스토리">&#128337;</button>
         <button class="help-btn" onclick="toggleHelp()" data-tip="도움말">?</button>
-        <button class="help-btn" onclick="setLang(getLang()==='ko'?'en':'ko')" data-tip="한/EN" id="langBtn">EN</button>
+        <button class="help-btn" onclick="setLang(getLang()==='ko'?'en':'ko')" data-tip="언어 전환" id="langBtn"></button>
+        <script>document.getElementById('langBtn').textContent=getLang()==='ko'?'EN':'한';</script>
         <button class="help-btn restart-btn" onclick="restartServer()" data-tip="재시작">&#8635;</button>
         <button class="help-btn stop-btn" onclick="shutdownServer()" data-tip="종료">&#9632;</button>
         <button class="theme-btn" onclick="cycleTheme()" id="themeBtn" data-tip="Dark">🌙</button>

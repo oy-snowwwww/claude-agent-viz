@@ -181,7 +181,7 @@ function _loadGrassData() {
       var firstInCol = padded[col * 7];
       var mlbl = document.createElement('span');
       mlbl.className = 'grass-month-label';
-      mlbl.style.width = '17px'; // 14px cell + 3px gap
+      mlbl.style.width = '13px'; // 11px cell + 2px gap
       if (firstInCol) {
         var m = parseInt(firstInCol.date.slice(5, 7));
         if (m !== lastMonth) { mlbl.textContent = _lang === 'ko' ? m + '월' : ['','Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][m] || m; lastMonth = m; }
