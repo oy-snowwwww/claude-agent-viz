@@ -109,14 +109,16 @@ function _snakePlaceFood() {
 function _snakeKey(e) {
   if (_currentGame !== 'snake') return;
   var s = _snakeState; if (!s) return;
+  // 죽었으면 스페이스/엔터로 다시하기
+  if (s.dead && (e.key === ' ' || e.key === 'Enter')) { e.preventDefault(); localStorage.removeItem('game_snake'); _snakeState = null; _startSnake(); return; }
   var d = s.dir;
+  var k = e.key;
   var changed = false;
-  if (e.key === 'ArrowUp' && d.y !== 1) { s.nextDir = {x:0,y:-1}; changed = true; }
-  else if (e.key === 'ArrowDown' && d.y !== -1) { s.nextDir = {x:0,y:1}; changed = true; }
-  else if (e.key === 'ArrowLeft' && d.x !== 1) { s.nextDir = {x:-1,y:0}; changed = true; }
-  else if (e.key === 'ArrowRight' && d.x !== -1) { s.nextDir = {x:1,y:0}; changed = true; }
-  if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].indexOf(e.key) >= 0) e.preventDefault();
-  // 키 입력 즉시 이동 (틱 대기 없이)
+  if (k === 'ArrowUp' && d.y !== 1) { s.nextDir = {x:0,y:-1}; changed = true; }
+  else if (k === 'ArrowDown' && d.y !== -1) { s.nextDir = {x:0,y:1}; changed = true; }
+  else if (k === 'ArrowLeft' && d.x !== 1) { s.nextDir = {x:-1,y:0}; changed = true; }
+  else if (k === 'ArrowRight' && d.x !== -1) { s.nextDir = {x:1,y:0}; changed = true; }
+  if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].indexOf(k) >= 0) e.preventDefault();
   if (changed && _snakeTimer) { clearInterval(_snakeTimer); _snakeTick(); _snakeTimer = setInterval(_snakeTick, s.speed); }
 }
 
@@ -172,7 +174,7 @@ function _snakeRender() {
     }
   }
   html += '</div>';
-  if (s.dead) html += '<div class="game-over">Game Over!<br><button class="game-btn" onclick="localStorage.removeItem(\'game_snake\');_snakeState=null;_startSnake()">다시하기</button></div>';
+  if (s.dead) html += '<div class="game-over">Game Over!<br><span class=\"game-hint\">Space/Enter로 재시작</span><br><button class="game-btn" onclick="localStorage.removeItem(\'game_snake\');_snakeState=null;_startSnake()">다시하기</button></div>';
   if (!s.dead) html += '<div class="game-actions"><button class="game-btn-sm" onclick="localStorage.removeItem(\'game_snake\');_snakeState=null;_startSnake()">새로하기</button></div>';
   html += '<div class="game-hint">방향키로 조작</div>';
   body.innerHTML = html;
@@ -210,6 +212,8 @@ function _2048AddTile() {
 
 function _2048Key(e) {
   if (_currentGame !== '2048') return;
+  // 죽었으면 스페이스/엔터로 다시하기
+  if (_2048State && _2048State.dead && (e.key === ' ' || e.key === 'Enter')) { e.preventDefault(); localStorage.removeItem('game_2048'); _2048State = null; _start2048(); return; }
   var dirs = {ArrowUp:0,ArrowDown:1,ArrowLeft:2,ArrowRight:3};
   if (dirs[e.key] === undefined) return;
   e.preventDefault();
@@ -287,7 +291,7 @@ function _2048Render() {
   if (s.won && !s.dead) html += '<div class="game-win">🎉 2048 달성! 계속 플레이 가능</div>';
   if (s.dead) {
     localStorage.removeItem('game_2048');
-    html += '<div class="game-over">Game Over!<br><button class="game-btn" onclick="_2048State=null;_start2048()">다시하기</button></div>';
+    html += '<div class="game-over">Game Over!<br><span class=\"game-hint\">Space/Enter로 재시작</span><br><button class="game-btn" onclick="_2048State=null;_start2048()">다시하기</button></div>';
   }
   html += '<div class="game-actions"><button class="game-btn-sm" onclick="localStorage.removeItem(\'game_2048\');_2048State=null;_start2048()">새로하기</button></div>';
   html += '<div class="game-hint">방향키로 조작</div>';
@@ -326,6 +330,7 @@ function _flappyReset() {
 
 function _flappyKey(e) {
   if (_currentGame !== 'flappy') return;
+  if (_flappyState.dead && (e.key === ' ' || e.key === 'Enter')) { e.preventDefault(); _flappyReset(); _flappyRender(); return; }
   if (e.key === ' ' || e.key === 'ArrowUp') {
     e.preventDefault();
     if (_flappyState.dead) return;
@@ -400,6 +405,6 @@ function _flappyRender() {
   });
   html += '</div>';
   if (!s.started) html += '<div class="game-hint">스페이스바 또는 클릭으로 시작</div>';
-  if (s.dead) html += '<div class="game-over">Game Over!<br><button class="game-btn" onclick="_flappyReset();_flappyRender()">다시하기</button></div>';
+  if (s.dead) html += '<div class="game-over">Game Over!<br><span class=\"game-hint\">Space/Enter로 재시작</span><br><button class="game-btn" onclick="_flappyReset();_flappyRender()">다시하기</button></div>';
   body.innerHTML = html;
 }
