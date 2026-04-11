@@ -120,7 +120,9 @@ fetch(API + '/api/agents').then(function(r) { return r.json() }).then(function(d
 // === ESC 키로 모달 닫기 ===
 document.addEventListener('keydown', function(e) {
   if (e.key !== 'Escape') return;
-  // 우선순위: 상점 > 잔디 > 성취 > 히스토리 > 도움말 > 에이전트 모달
+  // 우선순위: 게임 > 상점 > 잔디 > 성취 > 히스토리 > 도움말 > 에이전트 모달
+  var gamesOv = document.getElementById('gamesOverlay');
+  if (gamesOv && gamesOv.classList.contains('show')) { closeGames(); return; }
   var shopOv = document.getElementById('shopOverlay');
   if (shopOv && shopOv.classList.contains('show')) { closeShop(); return; }
   var grassOv = document.getElementById('grassOverlay');

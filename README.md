@@ -50,6 +50,7 @@ https://github.com/user-attachments/assets/30cf8a5c-3e5a-4264-904e-31a7310a8cb2
 </p>
 
 - **🎮 게임화 — 우주 꾸미기 (Phase 2)** — 완전 검정 우주에서 시작, 활동하며 포인트를 모아 아이템으로 꾸며가는 Cookie Clicker 스타일. **66개 아이템** (해금 5 / 별 5 / 큰별 4 / 푸른별·주황별 각 3 / 반짝이는별 5 / 은하수 7 / 성운 5 / 별똥별 8 / 천체 5 / 별자리 1 / 캐릭터 4 / 이벤트 7 / 메타 1 / Legendary 3) + 14 카테고리 탭. 신규 사용자 환영 보너스 **200P** + 이벤트 훅 자동 포인트 획득(질문 +3, 도구 +0.5, 에이전트 완료 +10, 응답 +1) → **⭐ 포인트 배지** 클릭 시 **🛒 상점 모달** → 구매 즉시 우주에 반영 (SSE). 천체 5종(달/행성/펄사/쌍성/우주정거장) + 캐릭터 효과 4종(후광/잔상/점프/팡파르) + 연속 스트릭 배지. 가격 일괄 ×2, 삭제 아이템 DEPRECATED_ITEMS fallback 환불. 프리뷰 모드 지원(`?preview=empty/mid/full`).
+- **🎮 미니게임** — 응답 대기 중 즐기는 미니게임 3종 (🐍 Snake, 🔢 2048, 🐦 Flappy Bird). 최고점수 저장, Snake/2048 이어하기 지원. 🎮 버튼으로 모달 열기
 - **성능 최적화** — 탭 비활성 시 애니메이션 자동 정지, renderAll 디바운스, 이벤트 마스터 틱 single-interval, DOM 파티클 상한 가드
 
 ## 요구사항
@@ -208,6 +209,7 @@ claude-agents off      # 세션 시작 시 자동 실행 OFF
 | ⭐ 포인트 배지 | 현재 잔고 + 누적 표시. 클릭 시 🛒 상점 모달 열기 |
 | 🏆 | 포인트 히스토리 & 성취 모달 (일별 추이 + 성취 배지) |
 | 🌱 | 활동 잔디 모달 (GitHub 스타일, 년도별) |
+| 🎮 | 미니게임 (Snake, 2048, Flappy Bird) |
 | 🔔 | 브라우저 알림 on/off |
 | 🕐 | 세션 히스토리 |
 | ? | 도움말 |
@@ -330,6 +332,7 @@ CLAUDE.md
 │       ├── event-ticks.js     # 게임화 이벤트 마스터 틱 (10종 주기 이벤트 + Twin Moons 상시 오버레이)
 │       ├── points.js          # 게임화 포인트 — 배지 렌더 + SSE 수신 + 버프 동기화 (프리뷰 모드 격리)
 │       ├── shop.js            # 🛒 상점 모달 — 12 카테고리 탭, 구매 (Epic/Legendary 2단계 확인), 환불 초기화
+│       ├── games.js           # 🎮 미니게임 — Snake, 2048, Flappy Bird (localStorage 저장, 이어하기)
 │       ├── api.js             # 서버 API 호출 래퍼 (fetch/save/delete)
 │       ├── log.js             # 로그 패널 (addLog, renderLogs, fmtTime)
 │       ├── sessions.js        # 세션/탭 관리 (register/switch/rename/reorder + 상태 헬퍼)
