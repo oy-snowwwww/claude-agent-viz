@@ -95,6 +95,89 @@ function switchSession(pid) {
 }
 
 var _tabsBuilt = false;
+var _tabEventsInit = false;
+
+function _initTabEvents() {
+  if (_tabEventsInit) return;
+  _tabEventsInit = true;
+  var box = document.getElementById('sessionTabs');
+  if (!box) return;
+
+  function _findTab(e) { return e.target.closest('button[data-pid]'); }
+
+  box.addEventListener('click', function(e) {
+    var tab = _findTab(e);
+    if (!tab) return;
+    var pid = tab.dataset.pid;
+    if (e.target.classList.contains('sess-close')) {
+      e.stopPropagation();
+      delete sessions[pid];
+      Object.keys(liveInstances).forEach(function(k) { if (liveInstances[k].sessionPid === pid) delete liveInstances[k] });
+      if (currentSession === pid) { var remaining = Object.keys(sessions); currentSession = remaining.length > 0 ? remaining[0] : null }
+      _tabsBuilt = ''; renderAll();
+      return;
+    }
+    if (e.target.classList.contains('sess-rename')) return;
+    if (sessClickTimer) return;
+    sessClickTimer = setTimeout(function() { sessClickTimer = null; switchSession(pid) }, 280);
+  });
+
+  box.addEventListener('dblclick', function(e) {
+    var tab = _findTab(e);
+    if (!tab) return;
+    e.preventDefault();
+    if (sessClickTimer) { clearTimeout(sessClickTimer); sessClickTimer = null }
+    startRenameSession(tab.dataset.pid);
+  });
+
+  box.addEventListener('mousedown', function(e) {
+    if (e.target.classList.contains('sess-close')) e.stopPropagation();
+  });
+
+  box.addEventListener('dragstart', function(e) {
+    var tab = _findTab(e);
+    if (!tab) return;
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', tab.dataset.pid);
+    tab.classList.add('dragging');
+  });
+
+  box.addEventListener('dragend', function(e) {
+    var tab = _findTab(e);
+    if (!tab) return;
+    tab.classList.remove('dragging');
+    box.querySelectorAll('.sess-tab').forEach(function(t) { t.classList.remove('drop-left', 'drop-right') });
+  });
+
+  box.addEventListener('dragover', function(e) {
+    var tab = _findTab(e);
+    if (!tab) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    var rect = tab.getBoundingClientRect();
+    var isLeft = e.clientX < rect.left + rect.width / 2;
+    tab.classList.toggle('drop-left', isLeft);
+    tab.classList.toggle('drop-right', !isLeft);
+  });
+
+  box.addEventListener('dragleave', function(e) {
+    var tab = _findTab(e);
+    if (!tab) return;
+    tab.classList.remove('drop-left', 'drop-right');
+  });
+
+  box.addEventListener('drop', function(e) {
+    var tab = _findTab(e);
+    if (!tab) return;
+    e.preventDefault();
+    var srcPid = e.dataTransfer.getData('text/plain');
+    var pid = tab.dataset.pid;
+    if (!srcPid || srcPid === pid) return;
+    var rect = tab.getBoundingClientRect();
+    var isLeft = e.clientX < rect.left + rect.width / 2;
+    reorderTab(srcPid, pid, isLeft);
+  });
+}
 
 // 드래그앤드롭으로 탭 순서 변경 — srcPid를 targetPid의 왼쪽/오른쪽으로 이동
 function reorderTab(srcPid, targetPid, before) {
@@ -155,6 +238,7 @@ function renderSessionTabs() {
 
   // 구조 변경 → 전체 재구축
   _tabsBuilt = structKey;
+  _initTabEvents();
   box.innerHTML = '';
   if (pids.length === 0) { var h = document.createElement('span'); h.className = 'empty-sessions'; h.textContent = t('sessions_waiting'); box.appendChild(h); return }
   // 세션이 있는데 현재 선택이 없거나 삭제된 세션이면 첫 번째 세션 자동 선택
@@ -167,22 +251,12 @@ function renderSessionTabs() {
     var lastAct = new Date(s.lastActivity || s.startTime).getTime();
     var isStale = !s.alive;
     var isInactive = s.alive && (Date.now() - lastAct) > 600000;
-    var tab = document.createElement('button'); tab.className = 'sess-tab' + (currentSession === pid ? ' active' : '') + (isStale ? ' stale' : isInactive ? ' inactive' : '') + (s._completed ? ' completed' : ''); tab.dataset.session = pid; tab.draggable = true;
-    (function(p) {
-      tab.onclick = function(e) { if (e.target.classList.contains('sess-close') || e.target.classList.contains('sess-rename')) return; if (sessClickTimer) return; sessClickTimer = setTimeout(function() { sessClickTimer = null; switchSession(p) }, 280) };
-      tab.ondblclick = function(e) { e.preventDefault(); if (sessClickTimer) { clearTimeout(sessClickTimer); sessClickTimer = null } startRenameSession(p) };
-      // === 드래그앤드롭 ===
-      tab.ondragstart = function(e) { e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', p); tab.classList.add('dragging') };
-      tab.ondragend = function() { tab.classList.remove('dragging'); document.querySelectorAll('#sessionTabs .sess-tab').forEach(function(t) { t.classList.remove('drop-left', 'drop-right') }) };
-      tab.ondragover = function(e) { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; var rect = tab.getBoundingClientRect(); var isLeft = e.clientX < rect.left + rect.width / 2; tab.classList.toggle('drop-left', isLeft); tab.classList.toggle('drop-right', !isLeft) };
-      tab.ondragleave = function() { tab.classList.remove('drop-left', 'drop-right') };
-      tab.ondrop = function(e) { e.preventDefault(); var srcPid = e.dataTransfer.getData('text/plain'); if (!srcPid || srcPid === p) return; var rect = tab.getBoundingClientRect(); var isLeft = e.clientX < rect.left + rect.width / 2; reorderTab(srcPid, p, isLeft) };
-    })(pid);
+    var tab = document.createElement('button'); tab.className = 'sess-tab' + (currentSession === pid ? ' active' : '') + (isStale ? ' stale' : isInactive ? ' inactive' : '') + (s._completed ? ' completed' : ''); tab.dataset.session = pid; tab.dataset.pid = pid; tab.draggable = true;
     var dot = document.createElement('span'); dot.className = 'sess-dot'; dot.style.background = s.alive ? sColor : 'var(--text-secondary)'; dot.style.boxShadow = s.alive ? '0 0 4px ' + sColor : 'none'; dot.style.opacity = s.alive ? '1' : '.4'; tab.appendChild(dot);
     var ns = document.createElement('span'); ns.className = 'sess-name-text'; ns.textContent = displayName; tab.appendChild(ns);
     var hasWorking = Object.values(liveInstances).some(function(i) { return i.sessionPid === pid && i.st === 'working' }) || (s._masterSt === 'thinking' || s._masterSt === 'working');
     if (hasWorking) { var sp2 = document.createElement('span'); sp2.className = 'sess-spinner'; tab.appendChild(sp2) }
-    var cl = document.createElement('span'); cl.className = 'sess-close'; cl.textContent = '\u00d7'; cl.draggable = false; cl.onmousedown = function(e) { e.stopPropagation() }; cl.onclick = function(e) { e.stopPropagation(); delete sessions[pid]; Object.keys(liveInstances).forEach(function(k) { if (liveInstances[k].sessionPid === pid) delete liveInstances[k] }); if (currentSession === pid) { var remaining = Object.keys(sessions); currentSession = remaining.length > 0 ? remaining[0] : null } _tabsBuilt = ''; renderAll() }; tab.appendChild(cl);
+    var cl = document.createElement('span'); cl.className = 'sess-close'; cl.textContent = '\u00d7'; cl.draggable = false; tab.appendChild(cl);
     box.appendChild(tab);
   });
 }

@@ -89,7 +89,7 @@ function stopEventTicks() {
 
 // 이벤트 발동 시 DOM 상한 가드
 function _particleGuard(layer) {
-  return layer.querySelectorAll('.event-particle, .village-shooting-star, .ambient, .village-station').length < 200;
+  return layer.querySelectorAll('.event-particle, .village-shooting-star, .ambient, .village-station, .village-meteor-explode, .event-overlay').length < 200;
 }
 
 // === 이벤트 1: 우주의 숨결 (15초, 0.5초 fade) ===

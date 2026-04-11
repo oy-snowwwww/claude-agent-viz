@@ -163,6 +163,23 @@ var L = {
     // === 도움말 모달 ===
     help_html: '<div class="help-section"><h3>Terminal</h3><div class="help-cmd"><code>claude-agents</code><span>서버 시작 + 브라우저 열기</span></div><div class="help-cmd"><code>claude-agents stop</code><span>서버 종료 (헤더 ■ 버튼과 동일)</span></div><div class="help-cmd"><code>claude-agents status</code><span>현재 상태 확인</span></div><div class="help-cmd"><code>claude-agents on</code><span>세션 시작 시 자동 실행 ON</span></div><div class="help-cmd"><code>claude-agents off</code><span>자동 실행 OFF</span></div></div><div class="help-section"><h3>Header</h3><div class="help-tip"><strong>🔔</strong> — 브라우저 알림 on/off</div><div class="help-tip"><strong>🕐</strong> — 세션 히스토리</div><div class="help-tip"><strong>?</strong> — 이 도움말</div><div class="help-tip"><strong>↻</strong> — 서버 재시작</div><div class="help-tip"><strong>■</strong> — 서버 종료</div><div class="help-tip"><strong>🌙/☀️</strong> — 다크/라이트 테마 전환</div></div><div class="help-section"><h3>Session Tab</h3><div class="help-tip"><strong>클릭</strong> — 세션 필터</div><div class="help-tip"><strong>더블클릭</strong> — 이름 변경</div><div class="help-tip"><strong>드래그앤드롭</strong> — 탭 순서 변경</div><div class="help-tip"><strong>×</strong> — 탭 제거</div></div><div class="help-section"><h3>Workspace</h3><div class="help-tip">에이전트 캐릭터가 실시간 상태 표시 (idle/working/done)</div><div class="help-tip">우주 배경 + 별/은하수/성운/별똥별/별자리</div></div><div class="help-section"><h3>Left Panel</h3><div class="help-tip"><strong>Master</strong> — CLAUDE.md 편집</div><div class="help-tip"><strong>Agent</strong> — 에이전트 설정 편집</div><div class="help-tip"><strong>+ New</strong> — 새 에이전트 생성</div></div><div class="help-section"><h3>히스토리 & Privacy</h3><div class="help-tip">질문 프롬프트 + 응답 요약 + 통계</div><div class="help-tip">🔒 Privacy 토글로 기록 on/off</div><div class="help-tip">민감정보 자동 마스킹 (API 키, 토큰 등)</div><div class="help-tip">자동 정리: 7일 · 10MB · 1시간 주기</div></div><div class="help-section"><h3>알림</h3><div class="help-tip">탭 비활성 시 에이전트 완료/응답 완료 알림</div></div><div class="help-section"><h3>Hook Events</h3><div class="help-tip"><strong>SessionStart</strong> → 세션 등록</div><div class="help-tip"><strong>UserPromptSubmit</strong> → thinking_start</div><div class="help-tip"><strong>Stop</strong> → thinking_end</div><div class="help-tip"><strong>PreToolUse</strong> → 도구 사용</div><div class="help-tip"><strong>PostToolUse (Agent)</strong> → 에이전트 완료</div><div class="help-tip"><strong>SessionEnd</strong> → 히스토리 저장</div></div>',
 
+    // === 미니게임 ===
+    game_title: '🎮 미니게임',
+    game_continue: '이어하기',
+    game_best: '최고',
+    game_score: '점수',
+    game_back: '← 목록',
+    game_snake_rule: '먹이를 먹고 길어져라! 벽과 몸에 부딪히면 끝',
+    game_2048_rule: '같은 숫자를 밀어서 합쳐라! 2048 만들면 승리',
+    game_flappy_rule: '장애물 사이를 통과하라! 바닥에 떨어지면 끝',
+    game_over: 'Game Over!',
+    game_restart_hint: 'Space/Enter로 재시작',
+    game_retry: '다시하기',
+    game_new: '새로하기',
+    game_hint_arrow: '방향키로 조작',
+    game_hint_flappy: '스페이스바 또는 클릭으로 시작',
+    game_2048_win: '🎉 2048 달성! 계속 플레이 가능',
+
     // === 캐릭터 대화 ===
     chat_solo: ['흠...', '이거 복잡하네', '거의 다 됐다', '하나만 더...', '집중!', '좋아좋아', '오 이거 되네'],
     chat_pair: [
@@ -332,6 +349,23 @@ var L = {
 
     // === Help Modal ===
     help_html: '<div class="help-section"><h3>Terminal</h3><div class="help-cmd"><code>claude-agents</code><span>Start server + open browser</span></div><div class="help-cmd"><code>claude-agents stop</code><span>Stop server</span></div><div class="help-cmd"><code>claude-agents status</code><span>Check status</span></div><div class="help-cmd"><code>claude-agents on</code><span>Auto-start ON</span></div><div class="help-cmd"><code>claude-agents off</code><span>Auto-start OFF</span></div></div><div class="help-section"><h3>Header</h3><div class="help-tip"><strong>🔔</strong> — Browser notifications on/off</div><div class="help-tip"><strong>🕐</strong> — Session history</div><div class="help-tip"><strong>?</strong> — This help</div><div class="help-tip"><strong>↻</strong> — Restart server</div><div class="help-tip"><strong>■</strong> — Shutdown server</div><div class="help-tip"><strong>🌙/☀️</strong> — Dark/Light theme</div></div><div class="help-section"><h3>Session Tab</h3><div class="help-tip"><strong>Click</strong> — Filter by session</div><div class="help-tip"><strong>Double-click</strong> — Rename session</div><div class="help-tip"><strong>Drag & Drop</strong> — Reorder tabs</div><div class="help-tip"><strong>×</strong> — Remove tab</div></div><div class="help-section"><h3>Workspace</h3><div class="help-tip">Agent characters show real-time status (idle/working/done)</div><div class="help-tip">Space background + stars/galaxy/nebula/meteors/constellations</div></div><div class="help-section"><h3>Left Panel</h3><div class="help-tip"><strong>Master</strong> — Edit CLAUDE.md</div><div class="help-tip"><strong>Agent</strong> — Edit agent settings</div><div class="help-tip"><strong>+ New</strong> — Create new agent</div></div><div class="help-section"><h3>History & Privacy</h3><div class="help-tip">Question prompts + response summaries + stats</div><div class="help-tip">🔒 Privacy toggle to disable recording</div><div class="help-tip">Auto-masking of sensitive data (API keys, tokens)</div><div class="help-tip">Auto-cleanup: 7 days · 10MB · hourly</div></div><div class="help-section"><h3>Notifications</h3><div class="help-tip">Alerts when agents complete while tab is inactive</div></div><div class="help-section"><h3>Hook Events</h3><div class="help-tip"><strong>SessionStart</strong> → Session registered</div><div class="help-tip"><strong>UserPromptSubmit</strong> → thinking_start</div><div class="help-tip"><strong>Stop</strong> → thinking_end</div><div class="help-tip"><strong>PreToolUse</strong> → Tool use</div><div class="help-tip"><strong>PostToolUse (Agent)</strong> → Agent done</div><div class="help-tip"><strong>SessionEnd</strong> → History saved</div></div>',
+
+    // === Mini Games ===
+    game_title: '🎮 Mini Games',
+    game_continue: 'Continue',
+    game_best: 'Best',
+    game_score: 'Score',
+    game_back: '← Menu',
+    game_snake_rule: 'Eat food and grow! Hit a wall or yourself and it\'s over',
+    game_2048_rule: 'Slide tiles to merge! Make 2048 to win',
+    game_flappy_rule: 'Fly through the pipes! Don\'t hit the ground',
+    game_over: 'Game Over!',
+    game_restart_hint: 'Space/Enter to restart',
+    game_retry: 'Retry',
+    game_new: 'New Game',
+    game_hint_arrow: 'Use arrow keys',
+    game_hint_flappy: 'Press Space or Click to start',
+    game_2048_win: '🎉 2048 reached! Keep playing',
 
     // === Character Chat ===
     chat_solo: ['Hmm...', 'This is tricky', 'Almost done', 'One more...', 'Focus!', 'Nice nice', 'Oh this works'],

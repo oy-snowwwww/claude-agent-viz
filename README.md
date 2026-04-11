@@ -1,5 +1,9 @@
 # Claude Agent Orchestrator
 
+A local dashboard that visualizes Claude Code agent activity in real-time.
+Pixel-art characters represent agent states and roam freely in the workspace.
+🌐 **UI supports both Korean and English.**
+
 Claude Code의 에이전트 활동을 실시간으로 시각화하는 로컬 대시보드입니다.
 픽셀아트 캐릭터들이 에이전트의 상태를 표현하고, 워크스페이스에서 자율적으로 활동합니다.
 
@@ -320,7 +324,8 @@ CLAUDE.md
 │   ├── index.html             # UI 마크업 + <script> 태그만 (인라인 JS 없음)
 │   ├── css/
 │   │   └── styles.css         # 전체 스타일
-│   └── js/                    # JS 모듈 (20개, <script> 순서 로딩)
+│   └── js/                    # JS 모듈 (<script> 순서 로딩)
+│       ├── lang.js            # i18n (한/영) 문자열 관리, t(key) 함수
 │       ├── constants.js       # 상수 (색상, 도구 목록, 픽셀맵, Village Tier, 게임화 ITEMS 카탈로그)
 │       ├── state.js           # 전역 상태 (sessions, liveInstances, currentVillageTier 등)
 │       ├── utils.js           # 순수 헬퍼 (esc, shade, buildPix) + Village Tier 감지 + 글로벌 툴팁
@@ -332,10 +337,14 @@ CLAUDE.md
 │       ├── event-ticks.js     # 게임화 이벤트 마스터 틱 (10종 주기 이벤트 + Twin Moons 상시 오버레이)
 │       ├── points.js          # 게임화 포인트 — 배지 렌더 + SSE 수신 + 버프 동기화 (프리뷰 모드 격리)
 │       ├── shop.js            # 🛒 상점 모달 — 12 카테고리 탭, 구매 (Epic/Legendary 2단계 확인), 환불 초기화
-│       ├── games.js           # 🎮 미니게임 — Snake, 2048, Flappy Bird (localStorage 저장, 이어하기)
+│       ├── games.js           # 🎮 미니게임 공통 (모달, 메뉴)
+│       ├── games/             # 미니게임 개별 파일
+│       │   ├── snake.js       # Snake (localStorage 저장, 이어하기)
+│       │   ├── 2048.js        # 2048 (localStorage 저장, 이어하기)
+│       │   └── flappy.js      # Flappy Bird
 │       ├── api.js             # 서버 API 호출 래퍼 (fetch/save/delete)
 │       ├── log.js             # 로그 패널 (addLog, renderLogs, fmtTime)
-│       ├── sessions.js        # 세션/탭 관리 (register/switch/rename/reorder + 상태 헬퍼)
+│       ├── sessions.js        # 세션/탭 관리 (register/switch/rename/reorder + 이벤트 위임)
 │       ├── workspace.js       # 워크스페이스 + 에이전트 목록 + Master 카드 렌더 (Ambient 버프 적용)
 │       ├── panels.js          # Activity + Timeline 패널 렌더
 │       ├── stats.js           # Daily Stats 드롭다운 + SSE 실시간 업데이트
@@ -344,7 +353,18 @@ CLAUDE.md
 │       ├── server-control.js  # 재시작/종료/도움말/토스트
 │       ├── events.js          # SSE 연결 + 이벤트 타입별 핸들러 (handleLiveEvent)
 │       └── main.js            # 부트스트랩 — Theme, renderAll, Logo, init, Page Visibility, 게임 버프 초기화 + 프리뷰 모드
-├── server.js                  # Node.js HTTP 서버
+├── lib/                       # 서버 모듈 (server.js에서 분리)
+│   ├── state.js               # 공유 상태 컨테이너 (sessions, sseClients, statsData, pointsData)
+│   ├── utils.js               # 순수 유틸 (maskSecrets, truncate, isPrivacyOn, _ymd)
+│   ├── security.js            # 보안 가드 (guardMutate, readBodySafe, isValidCwd, safePath)
+│   ├── frontmatter.js         # YAML Frontmatter 파서
+│   ├── sse.js                 # SSE 브로드캐스트
+│   ├── agents.js              # 에이전트/MCP/Hooks CRUD
+│   ├── stats.js               # 일일 통계
+│   ├── gamification.js        # 게임화 (포인트/성취/레벨/구매)
+│   ├── session-tracker.js     # 세션 트래커
+│   └── history.js             # 히스토리 저장/파싱
+├── server.js                  # Node.js HTTP 서버 (라우팅 + lib 모듈 조합)
 ├── hook-handler.sh            # Claude Code 훅 → 서버 이벤트 브릿지
 ├── start.sh                   # 서버 시작/종료/상태 CLI
 ├── enabled                    # 자동 실행 플래그 (파일 존재 여부)

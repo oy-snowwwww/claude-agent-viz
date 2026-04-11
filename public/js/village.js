@@ -42,98 +42,24 @@ function _ensureLayout(w, h) {
 // 떠도는 행성 색상 팔레트 — 함수 밖 상수로 추출 (hot path 미세 최적화)
 var PLANET_COLORS = ['#a8c8ff', '#ffd0a0', '#c8a8ff', '#a0e8c8'];
 
-function _ensurePlanetsCount(arr, count) {
-  while (arr.length < count) {
-    arr.push({
-      orbitRadiusRatio: 0.30 + Math.random() * 0.15,  // 화면 30~45% 반경
-      orbitDur: 90 + Math.floor(Math.random() * 60),   // 90~150초 1바퀴
-      startAngle: Math.floor(Math.random() * 360),
-      sizePx: 6 + Math.floor(Math.random() * 4),      // 6~9px
-      color: PLANET_COLORS[arr.length % PLANET_COLORS.length],
-    });
-  }
+// === 제네릭 ensure — count가 늘어나면 factory로 추가 생성, 줄어들면 앞 N개만 사용해 위치 안정 ===
+function _ensureCount(arr, count, factory) {
+  while (arr.length < count) arr.push(factory(arr.length));
 }
 
-function _ensurePulsarsCount(arr, count) {
-  while (arr.length < count) {
-    arr.push({
-      xRatio: 0.15 + Math.random() * 0.7,
-      yRatio: 0.10 + Math.random() * 0.5,
-      sizePx: 4 + Math.floor(Math.random() * 2),
-      color: ['#ffffff', '#a8c8ff', '#ffd0a0'][Math.floor(Math.random() * 3)],
-      blinkDur: (0.25 + Math.random() * 0.25).toFixed(2),  // 0.25~0.5초 매우 빠른 점멸
-    });
-  }
-}
-
-// === Lazy generators — count가 늘어나면 추가 생성, 줄어들면 앞 N개만 사용해 위치 안정 ===
-
-function _ensureStarsCount(arr, count) {
-  // 확장 팔레트 포함 13색까지 colorIdx 0~12 — star_palette 미구매 시 8 이상은 fallback
-  var maxIdx = STAR_COLOR_PALETTE.length + STAR_COLOR_PALETTE_EXT.length;
-  while (arr.length < count) {
-    arr.push({
-      xRatio: Math.random(),
-      yRatio: Math.random(),
-      baseSize: 1 + Math.floor(Math.random() * 3),  // 1~3px
-      dur: 2 + Math.random() * 4,                    // 2~6초
-      delay: Math.random() * 3,                      // 0~3초
-      colorIdx: Math.floor(Math.random() * maxIdx),
-    });
-  }
-}
-
-function _ensureColoredStarsCount(arr, count) {
-  // 푸른별/주황별 공용 (색은 렌더 시 고정)
-  while (arr.length < count) {
-    arr.push({
-      xRatio: Math.random(),
-      yRatio: Math.random(),
-      baseSize: 1 + Math.floor(Math.random() * 3),
-      dur: 2 + Math.random() * 4,
-      delay: Math.random() * 3,
-    });
-  }
-}
-
-function _ensurePulsesCount(arr, count) {
-  while (arr.length < count) {
-    arr.push({
-      xRatio: Math.random(),
-      yRatio: Math.random() * 0.7,  // 상단 70% 영역만
-      baseSize: 4 + Math.floor(Math.random() * 3),  // 4~6px
-      dur: 3 + Math.random() * 3,
-      delay: Math.random() * 4,
-      colorRoll: Math.random(),     // 색 결정용 (블루/오렌지 확정 후 나머지)
-      randomColorIdx: Math.floor(Math.random() * 3),  // ['#ffffff','#a8c8ff','#ffd0a0'] 중
-    });
-  }
-}
-
-function _ensureRainbowsCount(arr, count) {
-  while (arr.length < count) {
-    arr.push({
-      xRatio: Math.random(),
-      yRatio: Math.random() * 0.7,
-      baseSize: 5 + Math.floor(Math.random() * 3),  // 5~7px
-      dur: 6 + Math.random() * 3,
-      delay: Math.random() * 3,
-    });
-  }
-}
-
-function _ensureNebulaeCount(arr, count) {
-  while (arr.length < count) {
-    arr.push({
-      xRatio: Math.random(),
-      yRatio: Math.random(),
-      sizeRatio: 0.44 + Math.random() * 0.56,        // 0.44~1.0 (200~450 / 450 비율)
-      driftDur: Math.round(35 + Math.random() * 25),
-      driftDelay: Math.round(Math.random() * 15),
-      pulseDur: (4 + Math.random() * 2).toFixed(1),
-      pulseDelay: (Math.random() * 3).toFixed(1),
-    });
-  }
+// === 별 DOM 생성 팩토리 — 일반별/푸른별/주황별 공용 ===
+function _createStar(layer, spec, w, h, color, sizePx, glowPx, twinkleMul) {
+  var el = document.createElement('div');
+  el.className = 'village-star';
+  var glowStyle = glowPx > 0 ? 'box-shadow:0 0 ' + glowPx + 'px ' + color + ';' : '';
+  el.style.cssText = 'position:absolute;' +
+    'left:' + Math.round(spec.xRatio * w) + 'px;' +
+    'top:' + Math.round(spec.yRatio * h) + 'px;' +
+    'width:' + sizePx + 'px;height:' + sizePx + 'px;' +
+    'background:' + color + ';border-radius:50%;' +
+    glowStyle +
+    'animation:village-twinkle ' + (spec.dur * twinkleMul).toFixed(2) + 's ease-in-out ' + spec.delay.toFixed(2) + 's infinite';
+  layer.appendChild(el);
 }
 
 // === 별 레이어 (반짝임 + 색깔 + 맥동 + nebula + 은하수) ===
@@ -419,7 +345,17 @@ function ensureStarsLayer() {
     var basicNebulae = 1 + Math.round(_bf('nebulaCountAdd'));  // 1 + stacks
     var purpleNebulae = _bf('nebulaPurpleAdd') > 0 ? 1 : 0;
     var numNebulae = basicNebulae + purpleNebulae;
-    _ensureNebulaeCount(layoutStars.nebulae, numNebulae);  // 부족하면 추가 생성, 있으면 재사용
+    _ensureCount(layoutStars.nebulae, numNebulae, function() {
+      return {
+        xRatio: Math.random(),
+        yRatio: Math.random(),
+        sizeRatio: 0.44 + Math.random() * 0.56,
+        driftDur: Math.round(35 + Math.random() * 25),
+        driftDelay: Math.round(Math.random() * 15),
+        pulseDur: (4 + Math.random() * 2).toFixed(1),
+        pulseDelay: (Math.random() * 3).toFixed(1),
+      };
+    });
     var nebulaSizeMul = 1 + _bf('nebulaSizeMul');
     // 화면 단축 축의 35%를 절대 상한 — 작은 화면에서 성운이 뷰포트를 덮지 않도록
     var nebulaMaxSize = Math.round(Math.min(w, h) * 0.35);
@@ -472,23 +408,22 @@ function ensureStarsLayer() {
   var starGlowPx = Math.round(_bf('starBrightnessMul'));  // 일반 별 글로우 (0~5px)
   // star_palette 활성 시 확장 팔레트(13색) 사용, 아니면 기본 10색만 (확장 인덱스는 fallback)
   var palette = (_bf('starPaletteAdd') > 0) ? STAR_COLOR_PALETTE.concat(STAR_COLOR_PALETTE_EXT) : STAR_COLOR_PALETTE;
-  _ensureStarsCount(layoutStars.stars, numStars);
+  var _starMaxIdx = STAR_COLOR_PALETTE.length + STAR_COLOR_PALETTE_EXT.length;
+  _ensureCount(layoutStars.stars, numStars, function() {
+    return {
+      xRatio: Math.random(),
+      yRatio: Math.random(),
+      baseSize: 1 + Math.floor(Math.random() * 3),
+      dur: 2 + Math.random() * 4,
+      delay: Math.random() * 3,
+      colorIdx: Math.floor(Math.random() * _starMaxIdx),
+    };
+  });
   for (var i = 0; i < numStars; i++) {
     var sSpec = layoutStars.stars[i];
-    var star = document.createElement('div');
-    star.className = 'village-star';
     var starSize = sSpec.baseSize + starSizeAdd;
-    var starDur = sSpec.dur * twinkleMul;
     var starColor = palette[sSpec.colorIdx % palette.length];
-    var starGlowStyle = starGlowPx > 0 ? ('box-shadow:0 0 ' + starGlowPx + 'px ' + starColor + ';') : '';
-    star.style.cssText = 'position:absolute;' +
-      'left:' + Math.round(sSpec.xRatio * w) + 'px;' +
-      'top:' + Math.round(sSpec.yRatio * h) + 'px;' +
-      'width:' + starSize + 'px;height:' + starSize + 'px;' +
-      'background:' + starColor + ';border-radius:50%;' +
-      starGlowStyle +
-      'animation:village-twinkle ' + starDur.toFixed(2) + 's ease-in-out ' + sSpec.delay.toFixed(2) + 's infinite';
-    layer.appendChild(star);
+    _createStar(layer, sSpec, w, h, starColor, starSize, starGlowPx, twinkleMul);
   }
 
   // === 푸른 별 — layout 캐시 ===
@@ -496,38 +431,36 @@ function ensureStarsLayer() {
   var numBlueStars = Math.round(_bf('blueStarAdd'));
   var blueGlowMul = 1 + _bf('blueGlowMul');
   var blueGlowPx = Math.round(3 * blueGlowMul);
-  _ensureColoredStarsCount(layoutStars.blueStars, numBlueStars);
+  _ensureCount(layoutStars.blueStars, numBlueStars, function() {
+    return {
+      xRatio: Math.random(),
+      yRatio: Math.random(),
+      baseSize: 1 + Math.floor(Math.random() * 3),
+      dur: 2 + Math.random() * 4,
+      delay: Math.random() * 3,
+    };
+  });
   for (var bs = 0; bs < numBlueStars; bs++) {
     var bSpec = layoutStars.blueStars[bs];
-    var bStar = document.createElement('div');
-    bStar.className = 'village-star';
-    bStar.style.cssText = 'position:absolute;' +
-      'left:' + Math.round(bSpec.xRatio * w) + 'px;' +
-      'top:' + Math.round(bSpec.yRatio * h) + 'px;' +
-      'width:' + bSpec.baseSize + 'px;height:' + bSpec.baseSize + 'px;' +
-      'background:#a8c8ff;border-radius:50%;' +
-      'box-shadow:0 0 ' + blueGlowPx + 'px #a8c8ff;' +
-      'animation:village-twinkle ' + (bSpec.dur * twinkleMul).toFixed(2) + 's ease-in-out ' + bSpec.delay.toFixed(2) + 's infinite';
-    layer.appendChild(bStar);
+    _createStar(layer, bSpec, w, h, '#a8c8ff', bSpec.baseSize, blueGlowPx, twinkleMul);
   }
 
   // === 주황 별 — layout 캐시 ===
   var numOrangeStars = Math.round(_bf('orangeStarAdd'));
   var orangeGlowMul = 1 + _bf('orangeGlowMul');
   var orangeGlowPx = Math.round(3 * orangeGlowMul);
-  _ensureColoredStarsCount(layoutStars.orangeStars, numOrangeStars);
+  _ensureCount(layoutStars.orangeStars, numOrangeStars, function() {
+    return {
+      xRatio: Math.random(),
+      yRatio: Math.random(),
+      baseSize: 1 + Math.floor(Math.random() * 3),
+      dur: 2 + Math.random() * 4,
+      delay: Math.random() * 3,
+    };
+  });
   for (var os = 0; os < numOrangeStars; os++) {
     var oSpec = layoutStars.orangeStars[os];
-    var oStar = document.createElement('div');
-    oStar.className = 'village-star';
-    oStar.style.cssText = 'position:absolute;' +
-      'left:' + Math.round(oSpec.xRatio * w) + 'px;' +
-      'top:' + Math.round(oSpec.yRatio * h) + 'px;' +
-      'width:' + oSpec.baseSize + 'px;height:' + oSpec.baseSize + 'px;' +
-      'background:#ffd0a0;border-radius:50%;' +
-      'box-shadow:0 0 ' + orangeGlowPx + 'px #ffd0a0;' +
-      'animation:village-twinkle ' + (oSpec.dur * twinkleMul).toFixed(2) + 's ease-in-out ' + oSpec.delay.toFixed(2) + 's infinite';
-    layer.appendChild(oStar);
+    _createStar(layer, oSpec, w, h, '#ffd0a0', oSpec.baseSize, orangeGlowPx, twinkleMul);
   }
 
   // === 큰 맥동 별 (해금 후) — layout 캐시 ===
@@ -541,7 +474,17 @@ function ensureStarsLayer() {
     var orangePulseCount = Math.round(_bf('orangePulseAdd'));
     var glowR1 = Math.round(6 * pulseGlowMul);
     var glowR2 = Math.round(12 * pulseGlowMul);
-    _ensurePulsesCount(layoutStars.pulses, numPulse);
+    _ensureCount(layoutStars.pulses, numPulse, function() {
+      return {
+        xRatio: Math.random(),
+        yRatio: Math.random() * 0.7,
+        baseSize: 4 + Math.floor(Math.random() * 3),
+        dur: 3 + Math.random() * 3,
+        delay: Math.random() * 4,
+        colorRoll: Math.random(),
+        randomColorIdx: Math.floor(Math.random() * 3),
+      };
+    });
 
     for (var p = 0; p < numPulse; p++) {
       var pSpec = layoutStars.pulses[p];
@@ -576,7 +519,15 @@ function ensureStarsLayer() {
     var rbGlowR1 = Math.round(8 * rainbowGlowMul);
     var rbGlowR2 = Math.round(14 * rainbowGlowMul);
     var rbGlowR3 = Math.round(24 * rainbowGlowMul);  // trail용 추가 외곽 반경
-    _ensureRainbowsCount(layoutStars.rainbows, numRainbow);
+    _ensureCount(layoutStars.rainbows, numRainbow, function() {
+      return {
+        xRatio: Math.random(),
+        yRatio: Math.random() * 0.7,
+        baseSize: 5 + Math.floor(Math.random() * 3),
+        dur: 6 + Math.random() * 3,
+        delay: Math.random() * 3,
+      };
+    });
     for (var rb = 0; rb < numRainbow; rb++) {
       var rbSpec = layoutStars.rainbows[rb];
       var rbSize = rbSpec.baseSize + rainbowSizeAdd;
@@ -624,7 +575,15 @@ function ensureStarsLayer() {
   // 떠도는 행성 — 화면 중앙 기준 큰 궤도로 매우 천천히 공전
   var numPlanets = Math.round(_bf('celestialPlanetAdd'));
   if (numPlanets > 0) {
-    _ensurePlanetsCount(layoutStars.planets, numPlanets);
+    _ensureCount(layoutStars.planets, numPlanets, function(i) {
+      return {
+        orbitRadiusRatio: 0.30 + Math.random() * 0.15,
+        orbitDur: 90 + Math.floor(Math.random() * 60),
+        startAngle: Math.floor(Math.random() * 360),
+        sizePx: 6 + Math.floor(Math.random() * 4),
+        color: PLANET_COLORS[i % PLANET_COLORS.length],
+      };
+    });
     for (var pi = 0; pi < numPlanets; pi++) {
       var pSp = layoutStars.planets[pi];
       var orbitR = Math.round(Math.min(w, h) * pSp.orbitRadiusRatio);
@@ -650,7 +609,15 @@ function ensureStarsLayer() {
   // 펄사 — 매우 빠른 점멸 별
   var numPulsars = Math.round(_bf('celestialPulsarAdd'));
   if (numPulsars > 0) {
-    _ensurePulsarsCount(layoutStars.pulsars, numPulsars);
+    _ensureCount(layoutStars.pulsars, numPulsars, function() {
+      return {
+        xRatio: 0.15 + Math.random() * 0.7,
+        yRatio: 0.10 + Math.random() * 0.5,
+        sizePx: 4 + Math.floor(Math.random() * 2),
+        color: ['#ffffff', '#a8c8ff', '#ffd0a0'][Math.floor(Math.random() * 3)],
+        blinkDur: (0.25 + Math.random() * 0.25).toFixed(2),
+      };
+    });
     for (var psi = 0; psi < numPulsars; psi++) {
       var pulSp = layoutStars.pulsars[psi];
       var pulsar = document.createElement('div');

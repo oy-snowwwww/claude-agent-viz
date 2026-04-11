@@ -21,13 +21,13 @@ function renderDailyStat() {
   var agentKeys = Object.keys(d.agents || {}).sort(function(a, b) { return d.agents[b] - d.agents[a] });
   dd += '<div class="daily-section">' + t('stat_agent') + ' ' + d.totalAgents + '</div>';
   if (agentKeys.length === 0) { dd += '<div class="daily-row"><span>-</span><span>-</span></div>' }
-  agentKeys.forEach(function(k, i) { dd += '<div class="daily-row sub' + (i === agentKeys.length - 1 ? ' last' : '') + '"><span>' + k + '</span><span>' + d.agents[k] + '</span></div>' });
+  agentKeys.forEach(function(k, i) { dd += '<div class="daily-row sub' + (i === agentKeys.length - 1 ? ' last' : '') + '"><span>' + esc(k) + '</span><span>' + d.agents[k] + '</span></div>' });
 
   // 오늘 도구 (기본 접힘)
   var toolKeys = Object.keys(d.tools || {}).sort(function(a, b) { return d.tools[b] - d.tools[a] });
   dd += '<details class="daily-collapse"><summary class="daily-section">' + t('stat_tool') + ' ' + d.totalTools + '</summary>';
   var showTools = toolKeys.slice(0, 8);
-  showTools.forEach(function(k, i) { dd += '<div class="daily-row sub' + (i === showTools.length - 1 ? ' last' : '') + '"><span>' + k + '</span><span>' + d.tools[k] + '</span></div>' });
+  showTools.forEach(function(k, i) { dd += '<div class="daily-row sub' + (i === showTools.length - 1 ? ' last' : '') + '"><span>' + esc(k) + '</span><span>' + d.tools[k] + '</span></div>' });
   if (toolKeys.length > 8) { dd += '<div class="daily-row sub last"><span>+' + (toolKeys.length - 8) + '</span><span></span></div>' }
   dd += '</details>';
 
@@ -44,7 +44,7 @@ function renderDailyStat() {
   var tt = d.total || {};
   var tAgents = 0; Object.keys(tt.agents || {}).forEach(function(k) { tAgents += tt.agents[k] });
   var tTools = 0; Object.keys(tt.tools || {}).forEach(function(k) { tTools += tt.tools[k] });
-  dd += '<div class="daily-title" style="margin-top:10px;border-top:1px solid var(--border);padding-top:8px">🏆 ' + t('stat_total') + (tt.since ? ' (' + tt.since + '~)' : '') + '</div>';
+  dd += '<div class="daily-title" style="margin-top:10px;border-top:1px solid var(--border);padding-top:8px">🏆 ' + t('stat_total') + (tt.since ? ' (' + esc(tt.since) + '~)' : '') + '</div>';
   dd += '<div class="daily-row"><span>' + t('stat_question') + '</span><span>' + (tt.prompts || 0) + '</span></div>';
   dd += '<div class="daily-row"><span>' + t('stat_agent') + '</span><span>' + tAgents + '</span></div>';
   dd += '<div class="daily-row"><span>' + t('stat_tool') + '</span><span>' + tTools + '</span></div>';

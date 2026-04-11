@@ -78,18 +78,19 @@ test('ensureToday: 날짜가 다르면 history로 이동', () => {
   assert.strictEqual(state2.statsData.history[0].prompts, 10);
 });
 
-test('ensureToday: history 90일 cap', () => {
+test('ensureToday: history 무제한 보관 (90일 cap 제거됨)', () => {
   ensureToday();
   const state = _getTestState();
   // history를 95개로 채움
   for (var i = 0; i < 95; i++) {
     state.statsData.history.push({ date: '2020-01-' + (i + 1).toString().padStart(2, '0'), prompts: 1 });
   }
-  // 강제로 today를 과거로 → ensureToday가 history로 밀어넣으며 slice
+  // 강제로 today를 과거로 → ensureToday가 history로 밀어넣음
   state.statsData.today.date = '2019-12-31';
   ensureToday();
   const state2 = _getTestState();
-  assert.ok(state2.statsData.history.length <= 90);
+  // 무제한 보관 — 95 + 1(이전 today) = 96
+  assert.ok(state2.statsData.history.length >= 95);
 });
 
 // === todayKey ===
