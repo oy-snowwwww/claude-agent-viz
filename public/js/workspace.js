@@ -99,6 +99,39 @@ function renderList() {
   if (left) left.scrollTop = scrollPos;
 }
 
+// 드래그 중 좌측 패널 자동 스크롤 — 마우스가 상/하단 40px 영역에 있으면 스크롤
+var _dragScrollRaf = null;
+(function() {
+  var left = null;
+  var EDGE = 40; // 가장자리 감지 영역 (px)
+  var SPEED = 6; // 스크롤 속도 (px/frame)
+
+  document.addEventListener('dragover', function(e) {
+    if (!left) left = document.querySelector('.left');
+    if (!left) return;
+    var rect = left.getBoundingClientRect();
+    // 좌측 패널 영역 밖이면 무시
+    if (e.clientX < rect.left || e.clientX > rect.right) { _stopDragScroll(); return; }
+    var dy = 0;
+    if (e.clientY < rect.top + EDGE && e.clientY >= rect.top) dy = -SPEED;
+    else if (e.clientY > rect.bottom - EDGE && e.clientY <= rect.bottom) dy = SPEED;
+    if (dy === 0) { _stopDragScroll(); return; }
+    if (_dragScrollRaf) return; // 이미 실행 중
+    (function scroll() {
+      if (!dy) return;
+      left.scrollTop += dy;
+      _dragScrollRaf = requestAnimationFrame(scroll);
+    })();
+  });
+
+  document.addEventListener('dragend', _stopDragScroll);
+  document.addEventListener('drop', _stopDragScroll);
+
+  function _stopDragScroll() {
+    if (_dragScrollRaf) { cancelAnimationFrame(_dragScrollRaf); _dragScrollRaf = null; }
+  }
+})();
+
 function reorderAgent(srcId, targetId, before) {
   var order = agents.map(function(a) { return a.id; });
   order = order.filter(function(id) { return id !== srcId; });

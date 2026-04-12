@@ -119,7 +119,8 @@ function saveAgent() {
   }
   var name = document.getElementById('fName').value.trim();
   if (!name) { toast('\uC774\uB984 \uD544\uC694', 'err'); return }
-  var d = { id: name.toLowerCase().replace(/[^a-z0-9-]/g, '-'), name: name, description: document.getElementById('fDesc').value.trim(), model: document.getElementById('fModel').value, tools: getSelectedTools(), body: document.getElementById('fBody').value };
+  var existingAgent = !isNew && agents ? agents.find(function(a) { return a.id === editingId; }) : null;
+  var d = { id: name.toLowerCase().replace(/[^a-z0-9-]/g, '-'), name: name, description: document.getElementById('fDesc').value.trim(), model: document.getElementById('fModel').value, tools: getSelectedTools(), body: document.getElementById('fBody').value, order: existingAgent ? existingAgent.order : undefined };
   var isNew = editingId === null;
   var id = isNew ? d.id : editingId;
   saveAgentAPI(id, d, isNew).then(function(r) { if (r.ok) { toast(id + '.md \uC800\uC7A5'); closeModal(); fetchAgents() } else toast('\uC2E4\uD328', 'err') }).catch(function() { toast('\uC5F0\uACB0 \uC2E4\uD328', 'err') });
