@@ -3,7 +3,7 @@ const { test, before, after } = require('node:test');
 const assert = require('node:assert');
 const fs = require('node:fs');
 const path = require('node:path');
-const { parseTranscriptTurns, extractLatestRenameFromTranscript, buildTurnSummaries } = require('../../server.js');
+const { parseTranscriptTurns, extractLatestRenameFromTranscript, buildTurnSummaries, _clearRenameCache } = require('../../server.js');
 
 // isValidTranscriptPath는 ~/.claude/projects/ 하위만 허용하므로
 // 테스트 파일을 해당 디렉토리에 만들고 사용 후 정리
@@ -97,6 +97,7 @@ test('parseTranscriptTurns: assistant가 마지막 text로 덮어씀', () => {
 // === extractLatestRenameFromTranscript ===
 
 test('extractLatestRenameFromTranscript: /rename 명령 없음 → null', () => {
+  _clearRenameCache();
   writeJsonl([
     { type: 'user', message: { content: 'hello' } },
   ]);
@@ -105,6 +106,7 @@ test('extractLatestRenameFromTranscript: /rename 명령 없음 → null', () => 
 });
 
 test('extractLatestRenameFromTranscript: system/local_command /rename → 이름 추출', () => {
+  _clearRenameCache();
   writeJsonl([
     { type: 'system', subtype: 'local_command', content: '<command-name>/rename</command-name>\n<command-args>내세션</command-args>' },
   ]);
@@ -113,6 +115,7 @@ test('extractLatestRenameFromTranscript: system/local_command /rename → 이름
 });
 
 test('extractLatestRenameFromTranscript: 여러 /rename 중 가장 최근 것', () => {
+  _clearRenameCache();
   writeJsonl([
     { type: 'system', subtype: 'local_command', content: '<command-name>/rename</command-name>\n<command-args>첫번째</command-args>' },
     { type: 'user', message: { content: 'q' } },

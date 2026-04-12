@@ -1202,6 +1202,7 @@ if (require.main === module) {
     // transcript 파싱 (파일 시스템 read — 테스트에서 임시 파일 사용)
     parseTranscriptTurns: history.parseTranscriptTurns,
     extractLatestRenameFromTranscript: sessionTracker.extractLatestRenameFromTranscript,
+    _clearRenameCache: sessionTracker._clearRenameCache,
     buildTurnSummaries: history.buildTurnSummaries,
     // 통계
     ensureToday: stats.ensureToday,
